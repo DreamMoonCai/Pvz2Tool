@@ -1,0 +1,212 @@
+package io.github.dreammooncai.pvz2tool.pop.core.rsb
+
+import io.github.dreammooncai.pvz2tool.pop.core.rsb.model.*
+import io.github.dreammooncai.pvz2tool.pop.plugin.io.CoroutineBinaryStream
+import io.github.dreammooncai.pvz2tool.pop.plugin.io.Endian
+import kotlinx.coroutines.runBlocking
+import java.io.File
+
+/**
+ * 深度对比两个 RSB 文件，找出导致游戏无法运行的差异
+ */
+object RsbDeepDiagnostic {
+
+    fun diagnose(originalFile: File, repackedFile: File) {
+        println("=".repeat(70))
+        println("RSB 深度诊断工具 - 查找游戏无法运行的原因")
+        println("=".repeat(70))
+
+        if (!originalFile.exists()) {
+            println("❌ 原始文件不存在: ${originalFile.absolutePath}")
+            return
+        }
+        if (!repackedFile.exists()) {
+            println("❌ 重新打包文件不存在: ${repackedFile.absolutePath}")
+            return
+        }
+
+        println("\n📊 文件信息:")
+        println("  原始文件: ${originalFile.name} (${originalFile.length()} bytes)")
+        println("  重新打包: ${repackedFile.name} (${repackedFile.length()} bytes)")
+
+        runBlocking {
+            CoroutineBinaryStream.open(originalFile.absolutePath).use { bsOrig ->
+                CoroutineBinaryStream.open(repackedFile.absolutePath).use { bsRepack ->
+                    // 检测字节序
+                    detectAndSetEndian(bsOrig)
+                    detectAndSetEndian(bsRepack)
+
+                    // 读取头部
+                    val headOrig = RsbHeadInfo().read(bsOrig)
+                    bsRepack.readPosition = 0
+                    val headRepack = RsbHeadInfo().read(bsRepack)
+
+                    // 1. 对比头部所有字段
+                    compareFullHeader(headOrig, headRepack)
+
+                    // 2. 检查文件魔数
+                    checkMagic(bsOrig, bsRepack)
+
+                    // 3. 对比资源组的实际数据偏移
+                    compareResourceDataPositions(bsOrig, headOrig, bsRepack, headRepack)
+
+                    // 4. 检查文件尾部
+                    checkFileTail(bsOrig, bsRepack)
+                }
+            }
+        }
+
+        println("\n" + "=".repeat(70))
+        println("诊断完成")
+        println("=".repeat(70))
+    }
+
+    private fun detectAndSetEndian(bs: CoroutineBinaryStream) {
+        bs.readPosition = 0
+        when (bs.readInt32()) {
+            1920164401 -> {} // 1bsr - 小端
+            828535666 -> bs.endian = Endian.Big // RSB1 - 大端
+            else -> error("未知的 RSB 魔数")
+        }
+        bs.readPosition = 0
+    }
+
+    private fun compareFullHeader(orig: RsbHeadInfo, repack: RsbHeadInfo) {
+        println("\n" + "=".repeat(70))
+        println("完整头部字段对比")
+        println("=".repeat(70))
+
+        println("  version: 原始=${orig.version} vs 重新打包=${repack.version} ${if (orig.version == repack.version) "✅" else "❌"}")
+        println("  headLength: 原始=${orig.headLength} vs 重新打包=${repack.headLength} ${if (orig.headLength == repack.headLength) "✅" else "❌ 差异: ${orig.headLength.toLong() - repack.headLength.toLong()}"}")
+        println("  fileList_Length: 原始=${orig.fileList_Length} vs 重新打包=${repack.fileList_Length} ${if (orig.fileList_Length == repack.fileList_Length) "✅" else "❌"}")
+        println("  fileList_BeginOffset: 原始=${orig.fileList_BeginOffset} vs 重新打包=${repack.fileList_BeginOffset} ${if (orig.fileList_BeginOffset == repack.fileList_BeginOffset) "✅" else "❌"}")
+        println("  rsgp_Number: 原始=${orig.rsgp_Number} vs 重新打包=${repack.rsgp_Number} ${if (orig.rsgp_Number == repack.rsgp_Number) "✅" else "❌"}")
+        println("  rsgpInfo_BeginOffset: 原始=${orig.rsgpInfo_BeginOffset} vs 重新打包=${repack.rsgpInfo_BeginOffset} ${if (orig.rsgpInfo_BeginOffset == repack.rsgpInfo_BeginOffset) "✅" else "❌ 差异: ${orig.rsgpInfo_BeginOffset.toLong() - repack.rsgpInfo_BeginOffset.toLong()}"}")
+        println("  autopool_Number: 原始=${orig.autopool_Number} vs 重新打包=${repack.autopool_Number} ${if (orig.autopool_Number == repack.autopool_Number) "✅" else "❌"}")
+        println("  ptx_Number: 原始=${orig.ptx_Number} vs 重新打包=${repack.ptx_Number} ${if (orig.ptx_Number == repack.ptx_Number) "✅" else "❌"}")
+        println("  xmlPart1_BeginOffset: 原始=${orig.xmlPart1_BeginOffset} vs 重新打包=${repack.xmlPart1_BeginOffset} ${if (orig.xmlPart1_BeginOffset == repack.xmlPart1_BeginOffset) "✅" else "❌"}")
+        println("  rsbInfo_Length: 原始=${orig.rsbInfo_Length} vs 重新打包=${repack.rsbInfo_Length} ${if (orig.rsbInfo_Length == repack.rsbInfo_Length) "✅" else "❌ 差异: ${orig.rsbInfo_Length.toLong() - repack.rsbInfo_Length.toLong()}"}")
+
+        // 关键：检查 headLength 和 rsbInfo_Length 的关系
+        println("\n  关键检查:")
+        println("    headLength == rsbInfo_Length? ${if (orig.headLength == orig.rsbInfo_Length) "✅" else "❌ 原始文件就不等！"}")
+        println("    原始: headLength=${orig.headLength}, rsbInfo_Length=${orig.rsbInfo_Length}")
+        println("    重新打包: headLength=${repack.headLength}, rsbInfo_Length=${repack.rsbInfo_Length}")
+    }
+
+    private fun checkMagic(bsOrig: CoroutineBinaryStream, bsRepack: CoroutineBinaryStream) {
+        println("\n" + "=".repeat(70))
+        println("检查文件魔数")
+        println("=".repeat(70))
+
+        bsOrig.readPosition = 0
+        val magic1 = bsOrig.readInt32()
+        bsRepack.readPosition = 0
+        val magic2 = bsRepack.readInt32()
+
+        println("  原始文件魔数: 0x${magic1.toString(16)} (${magic1})")
+        println("  重新打包魔数: 0x${magic2.toString(16)} (${magic2})")
+
+        when (magic1) {
+            1920164401 -> println("  原始文件: RSB v1 (小端)")
+            828535666 -> println("  原始文件: RSB v1 (大端)")
+            else -> println("  原始文件: 未知格式!")
+        }
+
+        if (magic1 == magic2) {
+            println("  ✅ 魔数一致")
+        } else {
+            println("  ❌ 魔数不同！")
+        }
+    }
+
+    private suspend fun compareResourceDataPositions(
+        bsOrig: CoroutineBinaryStream,
+        headOrig: RsbHeadInfo,
+        bsRepack: CoroutineBinaryStream,
+        headRepack: RsbHeadInfo
+    ) {
+        println("\n" + "=".repeat(70))
+        println("检查前 10 个资源组的 offset 和 size")
+        println("=".repeat(70))
+
+        val count = minOf(headOrig.rsgp_Number.toInt(), headRepack.rsgp_Number.toInt(), 10)
+
+        for (i in 0 until count) {
+            bsOrig.readPosition = headOrig.rsgpInfo_BeginOffset.toLong() + i.toLong() * RsbHeadInfo.rsgpInfo_EachLength.toLong()
+            bsRepack.readPosition = headRepack.rsgpInfo_BeginOffset.toLong() + i.toLong() * RsbHeadInfo.rsgpInfo_EachLength.toLong()
+
+            val infoOrig = RsbRsgpInfo().read(bsOrig)
+            val infoRepack = RsbRsgpInfo().read(bsRepack)
+
+            val offsetMatch = infoOrig.offset == infoRepack.offset
+            val sizeMatch = infoOrig.size == infoRepack.size
+
+            if (!offsetMatch || !sizeMatch) {
+                println("\n  RSGP [$i] ${infoOrig.ID}:")
+                println("    offset: 原始=${infoOrig.offset} vs 重新打包=${infoRepack.offset} ${if (offsetMatch) "✅" else "❌ 差异: ${infoOrig.offset.toLong() - infoRepack.offset.toLong()}"}")
+                println("    size: 原始=${infoOrig.size} vs 重新打包=${infoRepack.size} ${if (sizeMatch) "✅" else "❌ 差异: ${infoOrig.size.toLong() - infoRepack.size.toLong()}"}")
+            }
+        }
+        println("\n  （仅显示有差异的前 10 个资源组）")
+    }
+
+    private fun checkFileTail(bsOrig: CoroutineBinaryStream, bsRepack: CoroutineBinaryStream) {
+        println("\n" + "=".repeat(70))
+        println("检查文件尾部（是否有额外数据或损坏）")
+        println("=".repeat(70))
+
+        val sizeOrig = bsOrig.size()
+        val sizeRepack = bsRepack.size()
+
+        println("  原始文件大小: $sizeOrig")
+        println("  重新打包大小: $sizeRepack")
+
+        // 读取最后 32 字节
+        val tailSize = 32L
+        bsOrig.readPosition = if (sizeOrig > tailSize) sizeOrig - tailSize else 0
+        val tailOrig = ByteArray(tailSize.toInt())
+        var bytesRead = 0
+        while (bytesRead < tailSize) {
+            tailOrig[bytesRead] = bsOrig.readInt8().toByte()
+            bytesRead++
+        }
+
+        bsRepack.readPosition = if (sizeRepack > tailSize) sizeRepack - tailSize else 0
+        val tailRepack = ByteArray(tailSize.toInt())
+        bytesRead = 0
+        while (bytesRead < tailSize) {
+            tailRepack[bytesRead] = bsRepack.readInt8().toByte()
+            bytesRead++
+        }
+
+        // 检查尾部是否全是 0（填充）
+        val origAllZero = tailOrig.all { it == 0.toByte() }
+        val repackAllZero = tailRepack.all { it == 0.toByte() }
+
+        println("  原始文件尾部 32 字节: ${if (origAllZero) "全是 0（填充）" else "有数据 ⚠️"}")
+        println("  重新打包尾部 32 字节: ${if (repackAllZero) "全是 0（填充）" else "有数据 ⚠️"}")
+
+        if (!origAllZero) {
+            println("\n  原始文件尾部（十六进制）:")
+            println("  ${tailOrig.joinToString(" ") { "%02X".format(it) }}")
+        }
+        if (!repackAllZero) {
+            println("\n  重新打包尾部（十六进制）:")
+            println("  ${tailRepack.joinToString(" ") { "%02X".format(it) }}")
+        }
+    }
+}
+
+fun main() {
+    val originalFile = File("data/main.639.com.ea.game.pvz2_drp.obb")
+    val repackedFile = File("rsb_output/rsb_repacked.rsb")
+
+    if (!repackedFile.exists()) {
+        println("❌ 重新打包文件不存在: ${repackedFile.absolutePath}")
+        println("   请先运行打包测试")
+        return
+    }
+
+    RsbDeepDiagnostic.diagnose(originalFile, repackedFile)
+}

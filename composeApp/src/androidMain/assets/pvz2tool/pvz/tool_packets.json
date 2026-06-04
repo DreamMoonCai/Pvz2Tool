@@ -1,0 +1,42 @@
+{
+  "tool_powertile_alpha": {
+    "name": "未来世界能量瓷砖-绿\"╳\"",
+    "code": "tool_powertile_alpha"
+  },
+  "tool_powertile_beta": {
+    "name": "未来世界能量瓷砖-红\"□\"",
+    "code": "tool_powertile_beta"
+  },
+  "tool_powertile_gamma": {
+    "name": "未来世界能量瓷砖-蓝\"┼\"",
+    "code": "tool_powertile_gamma"
+  },
+  "tool_powertile_delta": {
+    "name": "未来世界能量瓷砖-黄\"△\"",
+    "code": "tool_powertile_delta"
+  },
+  "tool_powertile_epsilon": {
+    "name": "未来世界能量瓷砖-紫\"○\"",
+    "code": "tool_powertile_epsilon"
+  },
+  "tool_projectile_bowlingbulb1": {
+    "name": "青色小型保龄球",
+    "code": "tool_projectile_bowlingbulb1"
+  },
+  "tool_projectile_bowlingbulb2": {
+    "name": "蓝色中型保龄球",
+    "code": "tool_projectile_bowlingbulb2"
+  },
+  "tool_projectile_bowlingbulb3": {
+    "name": "橙色大型保龄球",
+    "code": "tool_projectile_bowlingbulb3"
+  },
+  "tool_projectile_bowlingbulb_mega": {
+    "name": "橙色巨型保龄球",
+    "code": "tool_projectile_bowlingbulb_mega"
+  },
+  "tool_projectile_bowlingbulb_explode": {
+    "name": "大招爆炸保龄球",
+    "code": "tool_projectile_bowlingbulb_explode"
+  }
+}

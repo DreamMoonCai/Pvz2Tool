@@ -1,0 +1,558 @@
+{
+  "none": {
+    "name": "none",
+    "section": "僵尸"
+  },
+  "chill": {
+    "name": "chill",
+    "section": "障碍物"
+  },
+  "freeze": {
+    "name": "freeze",
+    "section": "障碍物"
+  },
+  "stun": {
+    "name": "stun",
+    "section": "僵尸"
+  },
+  "numb": {
+    "name": "numb",
+    "section": "僵尸"
+  },
+  "butter": {
+    "name": "butter",
+    "section": "僵尸"
+  },
+  "bleeding": {
+    "name": "bleeding",
+    "section": "僵尸"
+  },
+  "lightning": {
+    "name": "lightning",
+    "section": "障碍物"
+  },
+  "stucked": {
+    "name": "stucked",
+    "section": "僵尸"
+  },
+  "rush": {
+    "name": "rush",
+    "section": "僵尸"
+  },
+  "speedup1": {
+    "name": "speedup1",
+    "section": "僵尸"
+  },
+  "speedup2": {
+    "name": "speedup2",
+    "section": "僵尸"
+  },
+  "speedup3": {
+    "name": "speedup3",
+    "section": "僵尸"
+  },
+  "speedup4": {
+    "name": "speedup4",
+    "section": "僵尸"
+  },
+  "speedup5": {
+    "name": "speedup5",
+    "section": "僵尸"
+  },
+  "speedup6": {
+    "name": "speedup6",
+    "section": "僵尸"
+  },
+  "tossed": {
+    "name": "tossed",
+    "section": "僵尸"
+  },
+  "warpingIn": {
+    "name": "warpingIn",
+    "section": "僵尸"
+  },
+  "potionspeed1": {
+    "name": "potionspeed1",
+    "section": "僵尸"
+  },
+  "potionspeed2": {
+    "name": "potionspeed2",
+    "section": "僵尸"
+  },
+  "potionspeed3": {
+    "name": "potionspeed3",
+    "section": "僵尸"
+  },
+  "potiontoughness1": {
+    "name": "potiontoughness1",
+    "section": "僵尸"
+  },
+  "potiontoughness2": {
+    "name": "potiontoughness2",
+    "section": "僵尸"
+  },
+  "potiontoughness3": {
+    "name": "potiontoughness3",
+    "section": "僵尸"
+  },
+  "hypnotized": {
+    "name": "hypnotized",
+    "section": "僵尸"
+  },
+  "sunbeaned": {
+    "name": "sunbeaned",
+    "section": "僵尸"
+  },
+  "morphedtogargantuar": {
+    "name": "morphedtogargantuar",
+    "section": "僵尸"
+  },
+  "knighted": {
+    "name": "knighted",
+    "section": "僵尸"
+  },
+  "hasplantfood": {
+    "name": "hasplantfood",
+    "section": "僵尸"
+  },
+  "damageflash": {
+    "name": "damageflash",
+    "section": "障碍物"
+  },
+  "zombossstun": {
+    "name": "zombossstun",
+    "section": "僵尸"
+  },
+  "haunted": {
+    "name": "haunted",
+    "section": "障碍物"
+  },
+  "icecubed": {
+    "name": "icecubed",
+    "section": "植物"
+  },
+  "hungered": {
+    "name": "hungered",
+    "section": "僵尸"
+  },
+  "stoneblocked": {
+    "name": "stoneblocked",
+    "section": "僵尸"
+  },
+  "sapped": {
+    "name": "sapped",
+    "section": "僵尸"
+  },
+  "unsuspendable": {
+    "name": "unsuspendable",
+    "section": "僵尸"
+  },
+  "present_boxed": {
+    "name": "present_boxed",
+    "section": "僵尸"
+  },
+  "stalled": {
+    "name": "stalled",
+    "section": "僵尸"
+  },
+  "invincible": {
+    "name": "invincible",
+    "section": "僵尸"
+  },
+  "warpingOut": {
+    "name": "warpingOut",
+    "section": "僵尸"
+  },
+  "terrified": {
+    "name": "terrified",
+    "section": "僵尸"
+  },
+  "shrinking": {
+    "name": "shrinking",
+    "section": "僵尸"
+  },
+  "shrunken": {
+    "name": "shrunken",
+    "section": "僵尸"
+  },
+  "poisoned": {
+    "name": "poisoned",
+    "section": "僵尸"
+  },
+  "contagiouspoison": {
+    "name": "contagiouspoison",
+    "section": "僵尸"
+  },
+  "bloomingheartdebuff": {
+    "name": "bloomingheartdebuff",
+    "section": "障碍物"
+  },
+  "bloomingheartfocusfiredebuff": {
+    "name": "bloomingheartfocusfiredebuff",
+    "section": "僵尸"
+  },
+  "slimed": {
+    "name": "slimed",
+    "section": "僵尸"
+  },
+  "shadowpoisoned": {
+    "name": "shadowpoisoned",
+    "section": "僵尸"
+  },
+  "onfire": {
+    "name": "onfire",
+    "section": "僵尸"
+  },
+  "binded": {
+    "name": "binded",
+    "section": "僵尸"
+  },
+  "chemist_poison": {
+    "name": "chemist_poison",
+    "section": "僵尸"
+  },
+  "chemist_venom": {
+    "name": "chemist_venom",
+    "section": "僵尸"
+  },
+  "chemist_contagiouspoison": {
+    "name": "chemist_contagiouspoison",
+    "section": "僵尸"
+  },
+  "lotus_poison": {
+    "name": "lotus_poison",
+    "section": "僵尸"
+  },
+  "confusion": {
+    "name": "confusion",
+    "section": "僵尸"
+  },
+  "shadowmist": {
+    "name": "shadowmist",
+    "section": "僵尸"
+  },
+  "gluttonous": {
+    "name": "gluttonous",
+    "section": "僵尸"
+  },
+  "badsmell": {
+    "name": "badsmell",
+    "section": "僵尸"
+  },
+  "badsmellpoison": {
+    "name": "badsmellpoison",
+    "section": "僵尸"
+  },
+  "slowdown": {
+    "name": "slowdown",
+    "section": "僵尸"
+  },
+  "gummed": {
+    "name": "gummed",
+    "section": "僵尸"
+  },
+  "fire_vulnerable": {
+    "name": "fire_vulnerable",
+    "section": "僵尸"
+  },
+  "stickybombed": {
+    "name": "stickybombed",
+    "section": "僵尸"
+  },
+  "radiated": {
+    "name": "radiated",
+    "section": "僵尸"
+  },
+  "cureup": {
+    "name": "cureup",
+    "section": "僵尸"
+  },
+  "cureshield": {
+    "name": "cureshield",
+    "section": "僵尸"
+  },
+  "positive": {
+    "name": "positive",
+    "section": "僵尸"
+  },
+  "negative": {
+    "name": "negative",
+    "section": "僵尸"
+  },
+  "artifact_bleeding": {
+    "name": "artifact_bleeding",
+    "section": "僵尸"
+  },
+  "artifact_stunning": {
+    "name": "artifact_stunning",
+    "section": "僵尸"
+  },
+  "artifact_slowing": {
+    "name": "artifact_slowing",
+    "section": "僵尸"
+  },
+  "theme_shrunken": {
+    "name": "theme_shrunken",
+    "section": "僵尸"
+  },
+  "potioninvisible": {
+    "name": "potioninvisible",
+    "section": "僵尸"
+  },
+  "potionpoison": {
+    "name": "potionpoison",
+    "section": "僵尸"
+  },
+  "buffspeed": {
+    "name": "buffspeed",
+    "section": "僵尸"
+  },
+  "buffattack": {
+    "name": "buffattack",
+    "section": "僵尸"
+  },
+  "squidified": {
+    "name": "squidified",
+    "section": "植物"
+  },
+  "snowed": {
+    "name": "snowed",
+    "section": "僵尸"
+  },
+  "lemon_rain": {
+    "name": "lemon_rain",
+    "section": "僵尸"
+  },
+  "rapidfire": {
+    "name": "rapidfire",
+    "section": "植物"
+  },
+  "sheeped": {
+    "name": "sheeped",
+    "section": "植物"
+  },
+  "plantfoodflash": {
+    "name": "plantfoodflash",
+    "section": "植物"
+  },
+  "highlighted": {
+    "name": "highlighted",
+    "section": "植物"
+  },
+  "froststage1": {
+    "name": "froststage1",
+    "section": "植物"
+  },
+  "froststage2": {
+    "name": "froststage2",
+    "section": "植物"
+  },
+  "notfiring": {
+    "name": "notfiring",
+    "section": "植物"
+  },
+  "sauced": {
+    "name": "sauced",
+    "section": "植物"
+  },
+  "stunnedbyzombielove": {
+    "name": "stunnedbyzombielove",
+    "section": "植物"
+  },
+  "shadowboosted": {
+    "name": "shadowboosted",
+    "section": "植物"
+  },
+  "swapping": {
+    "name": "swapping",
+    "section": "植物"
+  },
+  "lifted_off": {
+    "name": "lifted_off",
+    "section": "植物"
+  },
+  "smoke": {
+    "name": "smoke",
+    "section": "植物"
+  },
+  "wrapped_in_wormhole": {
+    "name": "wrapped_in_wormhole",
+    "section": "植物"
+  },
+  "damage_reduction": {
+    "name": "damage_reduction",
+    "section": "植物"
+  },
+  "healflash": {
+    "name": "healflash",
+    "section": "障碍物"
+  },
+  "water": {
+    "name": "water",
+    "section": "障碍物"
+  },
+  "DamageTypeFlags": {
+    "name": "DamageTypeFlags",
+    "section": "障碍物"
+  },
+  "fatal": {
+    "name": "fatal",
+    "section": "障碍物"
+  },
+  "instantly_fatal": {
+    "name": "instantly_fatal",
+    "section": "障碍物"
+  },
+  "bypass_shield": {
+    "name": "bypass_shield",
+    "section": "障碍物"
+  },
+  "hits_shield_and_body": {
+    "name": "hits_shield_and_body",
+    "section": "障碍物"
+  },
+  "hits_only_shield": {
+    "name": "hits_only_shield",
+    "section": "障碍物"
+  },
+  "no_flash": {
+    "name": "no_flash",
+    "section": "障碍物"
+  },
+  "no_death_spawns": {
+    "name": "no_death_spawns",
+    "section": "障碍物"
+  },
+  "lobbed": {
+    "name": "lobbed",
+    "section": "障碍物"
+  },
+  "ash_death": {
+    "name": "ash_death",
+    "section": "障碍物"
+  },
+  "plantfood_effect": {
+    "name": "plantfood_effect",
+    "section": "障碍物"
+  },
+  "mower": {
+    "name": "mower",
+    "section": "障碍物"
+  },
+  "propagated": {
+    "name": "propagated",
+    "section": "障碍物"
+  },
+  "no_sound": {
+    "name": "no_sound",
+    "section": "障碍物"
+  },
+  "cuke": {
+    "name": "cuke",
+    "section": "障碍物"
+  },
+  "eating": {
+    "name": "eating",
+    "section": "障碍物"
+  },
+  "spinning": {
+    "name": "spinning",
+    "section": "障碍物"
+  },
+  "mech": {
+    "name": "mech",
+    "section": "障碍物"
+  },
+  "crushing": {
+    "name": "crushing",
+    "section": "障碍物"
+  },
+  "friendly_fire": {
+    "name": "friendly_fire",
+    "section": "障碍物"
+  },
+  "magnet": {
+    "name": "magnet",
+    "section": "障碍物"
+  },
+  "catapult": {
+    "name": "catapult",
+    "section": "障碍物"
+  },
+  "squidify": {
+    "name": "squidify",
+    "section": "障碍物"
+  },
+  "hits_submerged": {
+    "name": "hits_submerged",
+    "section": "障碍物"
+  },
+  "frost_tiny": {
+    "name": "frost_tiny",
+    "section": "障碍物"
+  },
+  "frost_moderate": {
+    "name": "frost_moderate",
+    "section": "障碍物"
+  },
+  "frost_whole_stage": {
+    "name": "frost_whole_stage",
+    "section": "障碍物"
+  },
+  "frost_freeze": {
+    "name": "frost_freeze",
+    "section": "障碍物"
+  },
+  "thaw_tiny": {
+    "name": "thaw_tiny",
+    "section": "障碍物"
+  },
+  "thaw_moderate": {
+    "name": "thaw_moderate",
+    "section": "障碍物"
+  },
+  "thaw_whole_stage": {
+    "name": "thaw_whole_stage",
+    "section": "障碍物"
+  },
+  "heals_iceblocks": {
+    "name": "heals_iceblocks",
+    "section": "障碍物"
+  },
+  "shooter": {
+    "name": "shooter",
+    "section": "障碍物"
+  },
+  "melee": {
+    "name": "melee",
+    "section": "障碍物"
+  },
+  "suicide": {
+    "name": "suicide",
+    "section": "障碍物"
+  },
+  "smash": {
+    "name": "smash",
+    "section": "障碍物"
+  },
+  "drown": {
+    "name": "drown",
+    "section": "障碍物"
+  },
+  "shovel": {
+    "name": "shovel",
+    "section": "障碍物"
+  },
+  "plantify_on_death": {
+    "name": "plantify_on_death",
+    "section": "障碍物"
+  },
+  "no_bleed_on_death": {
+    "name": "no_bleed_on_death",
+    "section": "障碍物"
+  },
+  "removed_from_board": {
+    "name": "removed_from_board",
+    "section": "障碍物"
+  }
+}

@@ -1,0 +1,382 @@
+{
+  "feature_shovel": {
+    "id": 0,
+    "name": "铲子",
+    "code": "feature_shovel"
+  },
+  "feature_almanac": {
+    "id": 1,
+    "name": "图鉴",
+    "code": "feature_almanac"
+  },
+  "feature_coins": {
+    "id": 2,
+    "name": "金币栏",
+    "code": "feature_coins"
+  },
+  "feature_gems": {
+    "id": 3,
+    "name": "钻石栏",
+    "code": "feature_gems"
+  },
+  "feature_buy_sun": {
+    "id": 4,
+    "name": "购买阳光",
+    "code": "feature_buy_sun"
+  },
+  "feature_keys": {
+    "id": 5,
+    "name": "支线钥匙栏",
+    "code": "feature_keys"
+  },
+  "feature_worldmap": {
+    "id": 6,
+    "name": "时空地图",
+    "code": "feature_worldmap"
+  },
+  "feature_plantfood": {
+    "id": 7,
+    "name": "能量豆栏",
+    "code": "feature_plantfood"
+  },
+  "feature_plantfood_purchase": {
+    "id": 8,
+    "name": "购买能量豆",
+    "code": "feature_plantfood_purchase"
+  },
+  "feature_has_played_dangerroom": {
+    "id": 9,
+    "name": "无尽挑战记录",
+    "code": "feature_has_played_dangerroom"
+  },
+  "feature_has_failed_dangerroom": {
+    "id": 10,
+    "name": "无尽挑战失败记录",
+    "code": "feature_has_failed_dangerroom"
+  },
+  "feature_has_won_dangerroom": {
+    "id": 11,
+    "name": "无尽挑战胜利记录",
+    "code": "feature_has_won_dangerroom"
+  },
+  "feature_treasure_yeti": {
+    "id": 12,
+    "name": "雪人事件开启",
+    "code": "feature_treasure_yeti"
+  },
+  "feature_mower_type_1": {
+    "id": 13,
+    "name": "神秘埃及小推车",
+    "code": "feature_mower_type_1"
+  },
+  "feature_mower_type_2": {
+    "id": 14,
+    "name": "海盗港湾小推车",
+    "code": "feature_mower_type_2"
+  },
+  "feature_mower_type_3": {
+    "id": 15,
+    "name": "狂野西部小推车",
+    "code": "feature_mower_type_3"
+  },
+  "6_slots": {
+    "id": 16,
+    "name": "增加1个卡槽1",
+    "code": "6_slots"
+  },
+  "7_slots": {
+    "id": 17,
+    "name": "增加1个卡槽2",
+    "code": "7_slots"
+  },
+  "seedslot2": {
+    "id": 18,
+    "name": "增加1个卡槽3",
+    "code": "seedslot2"
+  },
+  "sunshovel_lvl1": {
+    "id": 19,
+    "name": "阳光铲1",
+    "code": "sunshovel_lvl1"
+  },
+  "sunshovel_lvl2": {
+    "id": 20,
+    "name": "阳光铲2",
+    "code": "sunshovel_lvl2"
+  },
+  "sunshovel3": {
+    "id": 21,
+    "name": "阳光铲3",
+    "code": "sunshovel3"
+  },
+  "pf_refresh": {
+    "id": 22,
+    "name": "立即补充",
+    "code": "pf_refresh"
+  },
+  "wallnut_firstaid": {
+    "id": 23,
+    "name": "坚果包扎术",
+    "code": "wallnut_firstaid"
+  },
+  "pf_slots_lvl1": {
+    "id": 24,
+    "name": "增加1个能量豆槽1",
+    "code": "pf_slots_lvl1"
+  },
+  "pf_slots_lvl2": {
+    "id": 25,
+    "name": "增加1个能量豆槽2",
+    "code": "pf_slots_lvl2"
+  },
+  "pf_slots_lvl3": {
+    "id": 26,
+    "name": "增加1个能量豆槽3",
+    "code": "pf_slots_lvl3"
+  },
+  "starting_sun_lvl1": {
+    "id": 27,
+    "name": "强化初始阳光1",
+    "code": "starting_sun_lvl1"
+  },
+  "startingsun2": {
+    "id": 28,
+    "name": "强化初始阳光2",
+    "code": "startingsun2"
+  },
+  "startingsun3": {
+    "id": 29,
+    "name": "强化初始阳光3",
+    "code": "startingsun3"
+  },
+  "feature_powerup_wizardfinger": {
+    "id": 30,
+    "name": "电击指",
+    "code": "feature_powerup_wizardfinger"
+  },
+  "feature_powerup_flick_zombie": {
+    "id": 31,
+    "name": "浮空指",
+    "code": "feature_powerup_flick_zombie"
+  },
+  "feature_powerup_pinch": {
+    "id": 32,
+    "name": "剪刀指",
+    "code": "feature_powerup_pinch"
+  },
+  "feature_powerup_tacticalcuke": {
+    "id": 34,
+    "name": "战术黄瓜",
+    "code": "feature_powerup_tacticalcuke"
+  },
+  "kongfu_coming_soon": {
+    "id": 35,
+    "name": "功夫世界预告",
+    "code": "kongfu_coming_soon"
+  },
+  "sunshovel_lvl4": {
+    "id": 36,
+    "name": "阳光铲4",
+    "code": "sunshovel_lvl4"
+  },
+  "startingsun4": {
+    "id": 37,
+    "name": "强化初始阳光4",
+    "code": "startingsun4"
+  },
+  "feature_mower_type_4": {
+    "id": 38,
+    "name": "功夫世界小推车",
+    "code": "feature_mower_type_4"
+  },
+  "feature_mower_type_5": {
+    "id": 39,
+    "name": "未来世界小推车",
+    "code": "feature_mower_type_5"
+  },
+  "feature_festival_entrance": {
+    "id": 40,
+    "name": "每日挑战",
+    "code": "feature_festival_entrance"
+  },
+  "feature_festivalgame_crazyyeti_legend": {
+    "id": 41,
+    "name": "暴走雪人传奇",
+    "code": "feature_festivalgame_crazyyeti_legend"
+  },
+  "feature_festivalgame_gargantuarcrisis_legend": {
+    "id": 42,
+    "name": "巨人危机传奇",
+    "code": "feature_festivalgame_gargantuarcrisis_legend"
+  },
+  "feature_festivalgame_devilinvade_legend": {
+    "id": 43,
+    "name": "邪恶入侵传奇",
+    "code": "feature_festivalgame_devilinvade_legend"
+  },
+  "feature_mower_type_6": {
+    "id": 45,
+    "name": "黑暗时代小推车",
+    "code": "feature_mower_type_6"
+  },
+  "manual_mowers_1": {
+    "id": 46,
+    "name": "小推车发射1",
+    "code": "manual_mowers_1"
+  },
+  "manual_mowers_2": {
+    "id": 47,
+    "name": "小推车发射2",
+    "code": "manual_mowers_2"
+  },
+  "manual_mowers_3": {
+    "id": 48,
+    "name": "小推车发射3",
+    "code": "manual_mowers_3"
+  },
+  "manual_mowers_4": {
+    "id": 49,
+    "name": "小推车发射4",
+    "code": "manual_mowers_4"
+  },
+  "manual_mowers_5": {
+    "id": 50,
+    "name": "小推车发射5",
+    "code": "manual_mowers_5"
+  },
+  "feature_mower_type_7": {
+    "id": 51,
+    "name": "巨浪沙滩小推车",
+    "code": "feature_mower_type_7"
+  },
+  "feature_festivalgame_wealthgod_legend": {
+    "id": 52,
+    "name": "喜迎财神传奇",
+    "code": "feature_festivalgame_wealthgod_legend"
+  },
+  "feature_mower_type_8": {
+    "id": 53,
+    "name": "冰河世界小推车",
+    "code": "feature_mower_type_8"
+  },
+  "feature_tip_freezingwind": {
+    "id": 54,
+    "name": "冰风小贴士",
+    "code": "feature_tip_freezingwind"
+  },
+  "feature_tip_shield": {
+    "id": 55,
+    "name": "护盾小贴士",
+    "code": "feature_tip_shield"
+  },
+  "feature_mower_type_9": {
+    "id": 56,
+    "name": "天空之城小推车",
+    "code": "feature_mower_type_9"
+  },
+  "feature_air_missile_guide": {
+    "id": 57,
+    "name": "飞弹僵尸击杀教程",
+    "code": "feature_air_missile_guide"
+  },
+  "feature_cannon_1": {
+    "id": 58,
+    "name": "天空之城主炮",
+    "code": "feature_cannon_1"
+  },
+  "feature_shield_1": {
+    "id": 59,
+    "name": "天空之城护盾",
+    "code": "feature_shield_1"
+  },
+  "feature_cannon_intro": {
+    "id": 60,
+    "name": "天空之城主炮教程",
+    "code": "feature_cannon_intro"
+  },
+  "feature_shield_intro": {
+    "id": 61,
+    "name": "天空之城护盾教程",
+    "code": "feature_shield_intro"
+  },
+  "feature_battle_array": {
+    "id": 62,
+    "name": "围追堵截布置教程",
+    "code": "feature_battle_array"
+  },
+  "feature_mower_type_10": {
+    "id": 63,
+    "name": "失落之城小推车",
+    "code": "feature_mower_type_10"
+  },
+  "feature_christmas_protect_intro": {
+    "id": 64,
+    "name": "圣诞节保护教程",
+    "code": "feature_christmas_protect_intro"
+  },
+  "feature_unlock_hardlevel": {
+    "id": 65,
+    "name": "解锁困难关卡",
+    "code": "feature_unlock_hardlevel"
+  },
+  "feature_get_easylevel_star": {
+    "id": 66,
+    "name": "获得简单关卡的星星",
+    "code": "feature_get_easylevel_star"
+  },
+  "feature_mower_type_11": {
+    "id": 67,
+    "name": "摇滚年代小推车",
+    "code": "feature_mower_type_11"
+  },
+  "feature_mower_type_12": {
+    "id": 68,
+    "name": "恐龙危机小推车",
+    "code": "feature_mower_type_12"
+  },
+  "feature_mower_type_13": {
+    "id": 69,
+    "name": "摩登世界小推车",
+    "code": "feature_mower_type_13"
+  },
+  "feature_mower_type_14": {
+    "id": 71,
+    "name": "蒸汽时代小推车",
+    "code": "feature_mower_type_14"
+  },
+  "feature_mower_type_15": {
+    "id": 72,
+    "name": "复兴时代小推车",
+    "code": "feature_mower_type_15"
+  },
+  "feature_mower_type_16": {
+    "id": 73,
+    "name": "平安时代小推车",
+    "code": "feature_mower_type_16"
+  },
+  "feature_powerup_vasebreaker_move": {
+    "id": 74,
+    "name": "花瓶终结者-移罐指",
+    "code": "feature_powerup_vasebreaker_move"
+  },
+  "feature_powerup_vasebreaker_reveal": {
+    "id": 75,
+    "name": "花瓶终结者-查罐指",
+    "code": "feature_powerup_vasebreaker_reveal"
+  },
+  "feature_powerup_vasebreaker_color": {
+    "id": 76,
+    "name": "花瓶终结者-变色指",
+    "code": "feature_powerup_vasebreaker_color"
+  },
+  "feature_powerup_vasebreaker_butter": {
+    "id": 77,
+    "name": "花瓶终结者-黄油指",
+    "code": "feature_powerup_vasebreaker_butter"
+  },
+  "feature_has_seen_rift_how_to_play": {
+    "id": 78,
+    "name": "潘妮的追击教程",
+    "code": "feature_has_seen_rift_how_to_play"
+  }
+}

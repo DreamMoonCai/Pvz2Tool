@@ -1,0 +1,92 @@
+{
+  "tutorial": {
+    "id": 1,
+    "name": "教程关",
+    "code": "tutorial"
+  },
+  "egypt": {
+    "id": 2,
+    "name": "神秘埃及",
+    "code": "egypt"
+  },
+  "pirate": {
+    "id": 3,
+    "name": "海盗港湾",
+    "code": "pirate"
+  },
+  "cowboy": {
+    "id": 4,
+    "name": "狂野西部",
+    "code": "cowboy"
+  },
+  "kongfu": {
+    "id": 5,
+    "name": "功夫世界",
+    "code": "kongfu"
+  },
+  "future": {
+    "id": 6,
+    "name": "未来世界",
+    "code": "future"
+  },
+  "dark": {
+    "id": 7,
+    "name": "黑暗时代",
+    "code": "dark"
+  },
+  "beach": {
+    "id": 8,
+    "name": "巨浪沙滩",
+    "code": "beach"
+  },
+  "iceage": {
+    "id": 9,
+    "name": "冰河世界",
+    "code": "iceage"
+  },
+  "skycity": {
+    "id": 10,
+    "name": "天空之城",
+    "code": "skycity"
+  },
+  "lostcity": {
+    "id": 11,
+    "name": "失落之城",
+    "code": "lostcity"
+  },
+  "eighties": {
+    "id": 12,
+    "name": "摇滚年代",
+    "code": "eighties"
+  },
+  "dino": {
+    "id": 13,
+    "name": "恐龙危机",
+    "code": "dino"
+  },
+  "modern": {
+    "id": 14,
+    "name": "摩登世界",
+    "code": "modern"
+  },
+  "steam": {
+    "id": 15,
+    "name": "蒸汽时代",
+    "code": "steam"
+  },
+  "renai": {
+    "id": 16,
+    "name": "复兴时代",
+    "code": "renai"
+  },
+  "heian": {
+    "id": 17,
+    "name": "平安时代",
+    "code": "heian"
+  },
+  "atlantis": {
+    "id": 18,
+    "name": "海底世界",
+    "code": "atlantis"
+  }
+}

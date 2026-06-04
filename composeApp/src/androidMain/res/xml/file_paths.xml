@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- 缓存目录 -->
+    <cache-path name="cache" path="." />
+    <!-- 可选：如果需要分享外部存储文件，添加 external-path -->
+</paths>

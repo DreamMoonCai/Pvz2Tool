@@ -1,0 +1,1682 @@
+{
+  "CabbageDefault": {
+    "name": "卷心菜",
+    "code": "CabbageDefault"
+  },
+  "MegaCabbageDefault": {
+    "name": "大卷心菜",
+    "code": "MegaCabbageDefault"
+  },
+  "StarCabbageDefault": {
+    "name": "闪电卷心菜",
+    "code": "StarCabbageDefault"
+  },
+  "GoldCabbageDefault": {
+    "name": "五阶金卷心菜",
+    "code": "GoldCabbageDefault"
+  },
+  "GoldFoodCabbageDefault": {
+    "name": "黄金大招卷心菜",
+    "code": "GoldFoodCabbageDefault"
+  },
+  "GoldFoodLightingCabbageDefault": {
+    "name": "黄金分裂超大闪电卷心菜",
+    "code": "GoldFoodLightingCabbageDefault"
+  },
+  "wallnutFire": {
+    "name": "坚果5阶火卫星",
+    "code": "wallnutFire"
+  },
+  "wallnutIce": {
+    "name": "坚果5阶冰卫星",
+    "code": "wallnutIce"
+  },
+  "wallnutElectric": {
+    "name": "坚果5阶电卫星",
+    "code": "wallnutElectric"
+  },
+  "BloomerangAvatar": {
+    "name": "超大回旋镖",
+    "code": "BloomerangAvatar"
+  },
+  "KernelDefault": {
+    "name": "玉米",
+    "code": "KernelDefault"
+  },
+  "ButterDefault": {
+    "name": "黄油",
+    "code": "ButterDefault"
+  },
+  "ButterRocket": {
+    "name": "飞弹",
+    "code": "ButterRocket"
+  },
+  "ButterFire": {
+    "name": "火焰黄油",
+    "code": "ButterFire"
+  },
+  "MelonDefault": {
+    "name": "西瓜",
+    "code": "MelonDefault"
+  },
+  "MegaMelonDefault": {
+    "name": "大西瓜",
+    "code": "MegaMelonDefault"
+  },
+  "AvatarMegaMelonDefault": {
+    "name": "火焰西瓜",
+    "code": "AvatarMegaMelonDefault"
+  },
+  "MegaMelonLevel5": {
+    "name": "西瓜片",
+    "code": "MegaMelonLevel5"
+  },
+  "WinterMelonDefault": {
+    "name": "冰瓜",
+    "code": "WinterMelonDefault"
+  },
+  "WinterMegaMelonDefault": {
+    "name": "大冰瓜",
+    "code": "WinterMegaMelonDefault"
+  },
+  "StarWinterMegaMelonDefault": {
+    "name": "冰火西瓜",
+    "code": "StarWinterMegaMelonDefault"
+  },
+  "WinterMelonLevel5": {
+    "name": "冰瓜片",
+    "code": "WinterMelonLevel5"
+  },
+  "CannonballDefault": {
+    "name": "椰子炮",
+    "code": "CannonballDefault"
+  },
+  "PlantfoodCannonballDefault": {
+    "name": "大椰子炮",
+    "code": "PlantfoodCannonballDefault"
+  },
+  "StarPlantfoodCannonballDefault": {
+    "name": "装扮大招椰子炮",
+    "code": "StarPlantfoodCannonballDefault"
+  },
+  "CannonballSpecialBomb": {
+    "name": "五阶椰子裂弹",
+    "code": "CannonballSpecialBomb"
+  },
+  "CannonballPulp1": {
+    "name": "椰子裂壳1",
+    "code": "CannonballPulp1"
+  },
+  "CannonballPulp2": {
+    "name": "椰子裂壳2",
+    "code": "CannonballPulp2"
+  },
+  "CannonballPulp3": {
+    "name": "椰子裂壳3",
+    "code": "CannonballPulp3"
+  },
+  "CannonballPulp4": {
+    "name": "椰子裂壳4",
+    "code": "CannonballPulp4"
+  },
+  "CannonballPulp5": {
+    "name": "椰子裂壳5",
+    "code": "CannonballPulp5"
+  },
+  "ThreepeaterPeaDefault": {
+    "name": "三线豌豆子弹",
+    "code": "ThreepeaterPeaDefault"
+  },
+  "PeaDefault": {
+    "name": "豌豆",
+    "code": "PeaDefault"
+  },
+  "PlantfoodPeaDefault": {
+    "name": "大招豌豆",
+    "code": "PlantfoodPeaDefault"
+  },
+  "DamagePeaDefault": {
+    "name": "超级豌豆",
+    "code": "DamagePeaDefault"
+  },
+  "DamageFirePeaDefault": {
+    "name": "超级火豆",
+    "code": "DamageFirePeaDefault"
+  },
+  "DamageFireBluePeaDefault": {
+    "name": "超级蓝火豆",
+    "code": "DamageFireBluePeaDefault"
+  },
+  "AvatarDamageFireBluePeaDefault": {
+    "name": "超级紫火豆",
+    "code": "AvatarDamageFireBluePeaDefault"
+  },
+  "GiantSnowPeaDefault": {
+    "name": "大冰豆",
+    "code": "GiantSnowPeaDefault"
+  },
+  "IceLancePeaDefault": {
+    "name": "冰棱",
+    "code": "IceLancePeaDefault"
+  },
+  "SnowballDefault": {
+    "name": "雪球",
+    "code": "SnowballDefault"
+  },
+  "IceburgDefault": {
+    "name": "冰生菜球",
+    "code": "IceburgDefault"
+  },
+  "AvatarGiantPeaDefault": {
+    "name": "紫火大豌豆",
+    "code": "AvatarGiantPeaDefault"
+  },
+  "GiantDamagePeaDefault": {
+    "name": "大超级豌豆",
+    "code": "GiantDamagePeaDefault"
+  },
+  "GiantDamageFirePeaDefault": {
+    "name": "大火超级豌豆",
+    "code": "GiantDamageFirePeaDefault"
+  },
+  "GiantDamageFireBluePeaDefault": {
+    "name": "大蓝火超级豌豆",
+    "code": "GiantDamageFireBluePeaDefault"
+  },
+  "AvatarGiantDamageFireBluePeaDefault": {
+    "name": "大紫火超级豌豆",
+    "code": "AvatarGiantDamageFireBluePeaDefault"
+  },
+  "AvatarGiantUltraFirePeaDefault": {
+    "name": "大紫火豆",
+    "code": "AvatarGiantUltraFirePeaDefault"
+  },
+  "PeapodGiantFirePeaDefault": {
+    "name": "豆荚大火豆",
+    "code": "PeapodGiantFirePeaDefault"
+  },
+  "PeapodGiantUltraFirePeaDefault": {
+    "name": "豆荚大蓝火豆",
+    "code": "PeapodGiantUltraFirePeaDefault"
+  },
+  "AvatarPeapodGiantUltraFirePeaDefault": {
+    "name": "豆荚大紫火豆",
+    "code": "AvatarPeapodGiantUltraFirePeaDefault"
+  },
+  "BambooDefault": {
+    "name": "竹笋",
+    "code": "BambooDefault"
+  },
+  "BambooPlantfoodDefault": {
+    "name": "竹笋大招",
+    "code": "BambooPlantfoodDefault"
+  },
+  "MagnifyingGrassPoweredShot": {
+    "name": "聚光波",
+    "code": "MagnifyingGrassPoweredShot"
+  },
+  "OakDefault": {
+    "name": "弓箭",
+    "code": "OakDefault"
+  },
+  "OakSuperDefault": {
+    "name": "寒冰鉴",
+    "code": "OakSuperDefault"
+  },
+  "OakPlantFood": {
+    "name": "大招弓箭",
+    "code": "OakPlantFood"
+  },
+  "OakPlantAvatarFood": {
+    "name": "光箭",
+    "code": "OakPlantAvatarFood"
+  },
+  "OakSplitDefault": {
+    "name": "分裂箭",
+    "code": "OakSplitDefault"
+  },
+  "OakSuperSplitDefault": {
+    "name": "寒冰裂箭",
+    "code": "OakSuperSplitDefault"
+  },
+  "OakBulletNormal": {
+    "name": "小游戏弓箭",
+    "code": "OakBulletNormal"
+  },
+  "OakBulletMultiple": {
+    "name": "一号箭",
+    "code": "OakBulletMultiple"
+  },
+  "OakBulletPower": {
+    "name": "二号箭",
+    "code": "OakBulletPower"
+  },
+  "OakBulletTrack": {
+    "name": "三号箭",
+    "code": "OakBulletTrack"
+  },
+  "CarrotDefault": {
+    "name": "葫萝卜",
+    "code": "CarrotDefault"
+  },
+  "StarfruitShot": {
+    "name": "星星",
+    "code": "StarfruitShot"
+  },
+  "StarfruitGiantShot": {
+    "name": "大星星",
+    "code": "StarfruitGiantShot"
+  },
+  "PinkStarFruitShot": {
+    "name": "天使星星",
+    "code": "PinkStarFruitShot"
+  },
+  "PinkStarFruitRedShot": {
+    "name": "天使红星",
+    "code": "PinkStarFruitRedShot"
+  },
+  "PinkStarFruitBlueShot": {
+    "name": "天使冰星",
+    "code": "PinkStarFruitBlueShot"
+  },
+  "PinkStarFruitSuperShot": {
+    "name": "天使穿透星",
+    "code": "PinkStarFruitSuperShot"
+  },
+  "PinkStarFruitBigShot": {
+    "name": "天使大招星",
+    "code": "PinkStarFruitBigShot"
+  },
+  "PinkStarFruitBigRedShot": {
+    "name": "天使大招红星",
+    "code": "PinkStarFruitBigRedShot"
+  },
+  "PinkStarFruitBigBlueShot": {
+    "name": "天使大招冰星",
+    "code": "PinkStarFruitBigBlueShot"
+  },
+  "PlasmaBall": {
+    "name": "柚子炮",
+    "code": "PlasmaBall"
+  },
+  "GiantPlasmaBall": {
+    "name": "蓝色等离子",
+    "code": "GiantPlasmaBall"
+  },
+  "PlasmaCloudBall": {
+    "name": "Lv5电磁炮",
+    "code": "PlasmaCloudBall"
+  },
+  "PuffSporeDefault": {
+    "name": "小喷菇孢子",
+    "code": "PuffSporeDefault"
+  },
+  "PuffSporeEx": {
+    "name": "小喷菇装扮超级孢子",
+    "code": "PuffSporeEx"
+  },
+  "FumeshroomDefault": {
+    "name": "大喷菇子弹",
+    "code": "FumeshroomDefault"
+  },
+  "ThrownZombieParticle": {
+    "name": "大力花菜扔的僵尸",
+    "code": "ThrownZombieParticle"
+  },
+  "BroccoliThrownZombie": {
+    "name": "大招扔的僵尸",
+    "code": "BroccoliThrownZombie"
+  },
+  "IceShroomSmallShot": {
+    "name": "寒冰菇小形态雪球",
+    "code": "IceShroomSmallShot"
+  },
+  "IceShroomMidShot": {
+    "name": "寒冰菇中形态雪球",
+    "code": "IceShroomMidShot"
+  },
+  "IceShroomBigShot": {
+    "name": "寒冰菇大形态雪球",
+    "code": "IceShroomBigShot"
+  },
+  "IceShroomStepOneShot": {
+    "name": "寒冰菇第一次分裂",
+    "code": "IceShroomStepOneShot"
+  },
+  "IceShroomStepTwoShot": {
+    "name": "寒冰菇第二次分裂",
+    "code": "IceShroomStepTwoShot"
+  },
+  "IceShroomSuperBigShot": {
+    "name": "寒冰螺旋",
+    "code": "IceShroomSuperBigShot"
+  },
+  "IceShroomStepOneSuperShot": {
+    "name": "寒冰螺旋一次分裂",
+    "code": "IceShroomStepOneSuperShot"
+  },
+  "IceShroomStepTwoSuperShot": {
+    "name": "寒冰螺旋二次分裂",
+    "code": "IceShroomStepTwoSuperShot"
+  },
+  "FireShroomSmallShot": {
+    "name": "烈焰菇小形态火球",
+    "code": "FireShroomSmallShot"
+  },
+  "FireShroomMidShot": {
+    "name": "烈焰菇中形态火球",
+    "code": "FireShroomMidShot"
+  },
+  "PeanutDefault": {
+    "name": "花生",
+    "code": "PeanutDefault"
+  },
+  "FirePeanutDefault": {
+    "name": "火花生",
+    "code": "FirePeanutDefault"
+  },
+  "UltraFirePeanutDefault": {
+    "name": "蓝火花生",
+    "code": "UltraFirePeanutDefault"
+  },
+  "AvatarUltraFirePeanutDefault": {
+    "name": "紫火花生",
+    "code": "AvatarUltraFirePeanutDefault"
+  },
+  "DandelionBombDefault": {
+    "name": "蒲公英炸弹",
+    "code": "DandelionBombDefault"
+  },
+  "HomingThistlePlantfoodFire": {
+    "name": "火刺",
+    "code": "HomingThistlePlantfoodFire"
+  },
+  "HomingThistlePlantfoodCold": {
+    "name": "冰刺",
+    "code": "HomingThistlePlantfoodCold"
+  },
+  "BowlingBulbDefault": {
+    "name": "1号保龄球",
+    "code": "BowlingBulbDefault"
+  },
+  "BowlingBulbDefault2": {
+    "name": "2号保龄球",
+    "code": "BowlingBulbDefault2"
+  },
+  "BowlingBulbDefault3": {
+    "name": "3号保龄球",
+    "code": "BowlingBulbDefault3"
+  },
+  "PlantfoodBowlerDefault": {
+    "name": "闪电保龄球",
+    "code": "PlantfoodBowlerDefault"
+  },
+  "AvatarBowlingBulb1": {
+    "name": "火焰保龄球",
+    "code": "AvatarBowlingBulb1"
+  },
+  "AvatarBowlingBulb2": {
+    "name": "寒冰保龄球",
+    "code": "AvatarBowlingBulb2"
+  },
+  "AvatarBowlingBulb3": {
+    "name": "闪电保龄球",
+    "code": "AvatarBowlingBulb3"
+  },
+  "BowlingBulbSuper1": {
+    "name": "分裂保龄1",
+    "code": "BowlingBulbSuper1"
+  },
+  "BowlingBulbSuper2": {
+    "name": "分裂保龄2",
+    "code": "BowlingBulbSuper2"
+  },
+  "BowlingBulbSuper3": {
+    "name": "分裂保龄3",
+    "code": "BowlingBulbSuper3"
+  },
+  "BowlingBulbSuper": {
+    "name": "合体保龄",
+    "code": "BowlingBulbSuper"
+  },
+  "PlantCrackerPlantfoodAvatarBomb": {
+    "name": "竹员外炮竹",
+    "code": "PlantCrackerPlantfoodAvatarBomb"
+  },
+  "BananaDefault": {
+    "name": "香蕉",
+    "code": "BananaDefault"
+  },
+  "BananaBigDefault": {
+    "name": "大香蕉",
+    "code": "BananaBigDefault"
+  },
+  "BananaLv5Default": {
+    "name": "五阶炸弹",
+    "code": "BananaLv5Default"
+  },
+  "GuacodileTouthDefault": {
+    "name": "牙套",
+    "code": "GuacodileTouthDefault"
+  },
+  "PameBulletNormal": {
+    "name": "机枪石榴子弹",
+    "code": "PameBulletNormal"
+  },
+  "PameBulletPlantfood": {
+    "name": "石榴大招子弹",
+    "code": "PameBulletPlantfood"
+  },
+  "PameBulletAvatarPlantfood": {
+    "name": "石榴装扮大招子弹",
+    "code": "PameBulletAvatarPlantfood"
+  },
+  "LemonBulletDefault": {
+    "name": "柠檬汁",
+    "code": "LemonBulletDefault"
+  },
+  "LemonBulletLevel5": {
+    "name": "柠檬片",
+    "code": "LemonBulletLevel5"
+  },
+  "LotusShowerLandNormalBullet": {
+    "name": "莲蓬子弹",
+    "code": "LotusShowerLandNormalBullet"
+  },
+  "LotusShowerLandPlantFoodBullet": {
+    "name": "莲蓬大招",
+    "code": "LotusShowerLandPlantFoodBullet"
+  },
+  "LotusShowerLandAvatarPlantFoodBullet": {
+    "name": "莲蓬装扮大招",
+    "code": "LotusShowerLandAvatarPlantFoodBullet"
+  },
+  "LotusShowerWaterNormalBullet": {
+    "name": "鱼雷",
+    "code": "LotusShowerWaterNormalBullet"
+  },
+  "LotusShowerWaterPlantFoodBullet": {
+    "name": "大招鱼雷",
+    "code": "LotusShowerWaterPlantFoodBullet"
+  },
+  "LotusShowerWaterAvatarPlantFoodBullet": {
+    "name": "装扮大招鱼雷",
+    "code": "LotusShowerWaterAvatarPlantFoodBullet"
+  },
+  "PepperpultPlantfoodSecondary": {
+    "name": "鬼火彩椒",
+    "code": "PepperpultPlantfoodSecondary"
+  },
+  "XShotAdvancedShot": {
+    "name": "大招子弹",
+    "code": "XShotAdvancedShot"
+  },
+  "XShotAvatarShot": {
+    "name": "装扮大招子弹",
+    "code": "XShotAvatarShot"
+  },
+  "StunionPlantfood": {
+    "name": "洋葱大招",
+    "code": "StunionPlantfood"
+  },
+  "RafflesiaDefault": {
+    "name": "大王花子弹",
+    "code": "RafflesiaDefault"
+  },
+  "RafflesiaSpecialDefault": {
+    "name": "大王花大招子弹",
+    "code": "RafflesiaSpecialDefault"
+  },
+  "RafflesiaAvatarDefault": {
+    "name": "大王花装扮大招",
+    "code": "RafflesiaAvatarDefault"
+  },
+  "AcornDefault": {
+    "name": "橡果发条",
+    "code": "AcornDefault"
+  },
+  "ChestnutAvatarDefault": {
+    "name": "板栗装扮大招最后一个",
+    "code": "ChestnutAvatarDefault"
+  },
+  "MagicShroomDefault": {
+    "name": "扑克牌",
+    "code": "MagicShroomDefault"
+  },
+  "HorseBeanDefault": {
+    "name": "蚕豆",
+    "code": "HorseBeanDefault"
+  },
+  "CannonFireDefault": {
+    "name": "飞船主炮子弹",
+    "code": "CannonFireDefault"
+  },
+  "AnthuriumDefault": {
+    "name": "红掌电荷",
+    "code": "AnthuriumDefault"
+  },
+  "AnthuriumAdvanced": {
+    "name": "红掌大电荷",
+    "code": "AnthuriumAdvanced"
+  },
+  "GreenTurnip": {
+    "name": "导弹萝卜导弹1",
+    "code": "GreenTurnip"
+  },
+  "GreenTurnip2": {
+    "name": "导弹萝卜导弹2",
+    "code": "GreenTurnip2"
+  },
+  "GreenTurnip3": {
+    "name": "导弹萝卜导弹3",
+    "code": "GreenTurnip3"
+  },
+  "GreenTurnipPlantfoodDefault": {
+    "name": "原子弹",
+    "code": "GreenTurnipPlantfoodDefault"
+  },
+  "StingerDefault": {
+    "name": "红针花刺",
+    "code": "StingerDefault"
+  },
+  "AkeeDefault": {
+    "name": "akee炮弹",
+    "code": "AkeeDefault"
+  },
+  "AkeeFission": {
+    "name": "大akee子弹",
+    "code": "AkeeFission"
+  },
+  "MegaAkeeDefault": {
+    "name": "akee大招子弹",
+    "code": "MegaAkeeDefault"
+  },
+  "LavaGuavaProjectileDefault": {
+    "name": "岩浆",
+    "code": "LavaGuavaProjectileDefault"
+  },
+  "PumpkinDefault": {
+    "name": "南瓜套",
+    "code": "PumpkinDefault"
+  },
+  "ToadstoolGasDefault": {
+    "name": "金蟾菇毒雾",
+    "code": "ToadstoolGasDefault"
+  },
+  "CottonDefault": {
+    "name": "棉花",
+    "code": "CottonDefault"
+  },
+  "CottonPlantfoodDefault": {
+    "name": "大招棉花",
+    "code": "CottonPlantfoodDefault"
+  },
+  "AgaveSwordLightDefault": {
+    "name": "龙舌兰大招剑光",
+    "code": "AgaveSwordLightDefault"
+  },
+  "DragonFruitDefault": {
+    "name": "火龙果火球",
+    "code": "DragonFruitDefault"
+  },
+  "DragonFruitAdvancedDefault": {
+    "name": "火龙果蓝火球",
+    "code": "DragonFruitAdvancedDefault"
+  },
+  "DragonFruitPlantfoodDefault": {
+    "name": "火龙果大招火球",
+    "code": "DragonFruitPlantfoodDefault"
+  },
+  "DragonFruitAvatarDefault": {
+    "name": "火龙果大招蓝火球",
+    "code": "DragonFruitAvatarDefault"
+  },
+  "DragonFruitSuperDefault": {
+    "name": "火龙果紫火球",
+    "code": "DragonFruitSuperDefault"
+  },
+  "DragonFruitSuperAvatarDefault": {
+    "name": "火龙果大招紫火球",
+    "code": "DragonFruitSuperAvatarDefault"
+  },
+  "FlameladyDefault": {
+    "name": "火焰花火球",
+    "code": "FlameladyDefault"
+  },
+  "FlameladyAdvancedDefault": {
+    "name": "火焰花蓝火球",
+    "code": "FlameladyAdvancedDefault"
+  },
+  "FlameladyPlantFoodDefault": {
+    "name": "火焰花大招火球",
+    "code": "FlameladyPlantFoodDefault"
+  },
+  "FlameladyAdvancePlantFoodDefault": {
+    "name": "火焰花装扮大招火球",
+    "code": "FlameladyAdvancePlantFoodDefault"
+  },
+  "FlameladyDamageNormal": {
+    "name": "火焰花超级火球",
+    "code": "FlameladyDamageNormal"
+  },
+  "FlameladyDamageBlue": {
+    "name": "火焰花超级蓝火",
+    "code": "FlameladyDamageBlue"
+  },
+  "FlameladyDamagePurple": {
+    "name": "火焰花紫火球",
+    "code": "FlameladyDamagePurple"
+  },
+  "GatlingPeaDefault": {
+    "name": "机枪豆",
+    "code": "GatlingPeaDefault"
+  },
+  "FireGatlingPeaDefault": {
+    "name": "机枪火焰豆",
+    "code": "FireGatlingPeaDefault"
+  },
+  "DamageGatlingPeaDefault": {
+    "name": "超级机枪豆",
+    "code": "DamageGatlingPeaDefault"
+  },
+  "DamageFireGatlingPeaDefault": {
+    "name": "超级火机枪豆",
+    "code": "DamageFireGatlingPeaDefault"
+  },
+  "DamageBlueGatlingPeaDefault": {
+    "name": "超级蓝火机枪豆",
+    "code": "DamageBlueGatlingPeaDefault"
+  },
+  "AvatarDamageBlueGatlingPeaDefault": {
+    "name": "超级紫火机枪豆",
+    "code": "AvatarDamageBlueGatlingPeaDefault"
+  },
+  "KiwiFruitProjectileDefault": {
+    "name": "金箍棒",
+    "code": "KiwiFruitProjectileDefault"
+  },
+  "KiwiFruitSmallProjectileDefault": {
+    "name": "小猴子",
+    "code": "KiwiFruitSmallProjectileDefault"
+  },
+  "PassionFlowerProjectileDefault": {
+    "name": "齿轮",
+    "code": "PassionFlowerProjectileDefault"
+  },
+  "PassionFlowerProjectileSecond": {
+    "name": "定身齿轮",
+    "code": "PassionFlowerProjectileSecond"
+  },
+  "PassionFlowerProjectilePlantFood": {
+    "name": "大招齿轮",
+    "code": "PassionFlowerProjectilePlantFood"
+  },
+  "PassionFlowerProjectilePlantFoodAvatar": {
+    "name": "钻石齿轮",
+    "code": "PassionFlowerProjectilePlantFoodAvatar"
+  },
+  "PassionFlowerLV5SamllProjectile": {
+    "name": "分裂后的齿轮",
+    "code": "PassionFlowerLV5SamllProjectile"
+  },
+  "PassionFlowerLV5ProjectileDefault": {
+    "name": "分裂齿轮",
+    "code": "PassionFlowerLV5ProjectileDefault"
+  },
+  "WintersweetProjectileDefault": {
+    "name": "梅花",
+    "code": "WintersweetProjectileDefault"
+  },
+  "WintersweetTinyProjectileDefault": {
+    "name": "白梅",
+    "code": "WintersweetTinyProjectileDefault"
+  },
+  "CactusSpecial": {
+    "name": "仙人掌特殊刺",
+    "code": "CactusSpecial"
+  },
+  "MorningGloryDefault": {
+    "name": "喇叭花音波",
+    "code": "MorningGloryDefault"
+  },
+  "MorningGloryPlantfood": {
+    "name": "大招音障",
+    "code": "MorningGloryPlantfood"
+  },
+  "MorningGloryAvatar": {
+    "name": "三排音障",
+    "code": "MorningGloryAvatar"
+  },
+  "MorningGloryLV5": {
+    "name": "喇叭花5阶超强音波",
+    "code": "MorningGloryLV5"
+  },
+  "MorningGloryLV5Extra": {
+    "name": "超强音波辅音",
+    "code": "MorningGloryLV5Extra"
+  },
+  "MorningGloryShockWaveDefault": {
+    "name": "喇叭花反射音波",
+    "code": "MorningGloryShockWaveDefault"
+  },
+  "ColorfulSporeshroomDefault": {
+    "name": "迷幻孢子",
+    "code": "ColorfulSporeshroomDefault"
+  },
+  "ColorfulMegaSporeshroomDefault": {
+    "name": "迷幻大孢子",
+    "code": "ColorfulMegaSporeshroomDefault"
+  },
+  "NekotailStabDefault": {
+    "name": "猫尾刺",
+    "code": "NekotailStabDefault"
+  },
+  "NekotailStabAdvance": {
+    "name": "猫尾电刺",
+    "code": "NekotailStabAdvance"
+  },
+  "HugeNekotailStab": {
+    "name": "猫尾导弹",
+    "code": "HugeNekotailStab"
+  },
+  "NekotailReedArrow": {
+    "name": "猫尾5阶电箭",
+    "code": "NekotailReedArrow"
+  },
+  "PrimalFirePeaDefault": {
+    "name": "原豌火豆",
+    "code": "PrimalFirePeaDefault"
+  },
+  "PrimalFireBluePeaDefault": {
+    "name": "原豌蓝火豆",
+    "code": "PrimalFireBluePeaDefault"
+  },
+  "AvatarPrimalFireBluePeaDefault": {
+    "name": "原豌紫火豆",
+    "code": "AvatarPrimalFireBluePeaDefault"
+  },
+  "PrimalPeashooterPlantfoodPea": {
+    "name": "原豌大招豆",
+    "code": "PrimalPeashooterPlantfoodPea"
+  },
+  "PrimalPlantfoodFirePeaDefault": {
+    "name": "原豌大招火豆",
+    "code": "PrimalPlantfoodFirePeaDefault"
+  },
+  "PrimalPlantfoodFireBluePeaDefault": {
+    "name": "原豌大招蓝火豆",
+    "code": "PrimalPlantfoodFireBluePeaDefault"
+  },
+  "AvatarPrimalPlantfoodFireBluePeaDefault": {
+    "name": "原豌大招紫火豆",
+    "code": "AvatarPrimalPlantfoodFireBluePeaDefault"
+  },
+  "PrimalPeashooterRockPea": {
+    "name": "原豌石块弹",
+    "code": "PrimalPeashooterRockPea"
+  },
+  "PrimalRockFirePeaDefault": {
+    "name": "火焰石块弹",
+    "code": "PrimalRockFirePeaDefault"
+  },
+  "PrimalRockFireBluePeaDefault": {
+    "name": "蓝火石块弹",
+    "code": "PrimalRockFireBluePeaDefault"
+  },
+  "AvatarPrimalRockFireBluePeaDefault": {
+    "name": "紫火石块弹",
+    "code": "AvatarPrimalRockFireBluePeaDefault"
+  },
+  "PrimalPeashooterPlantfoodRockPea": {
+    "name": "大招石块弹",
+    "code": "PrimalPeashooterPlantfoodRockPea"
+  },
+  "PrimalPlantfoodRockFirePeaDefault": {
+    "name": "大招火焰石块弹",
+    "code": "PrimalPlantfoodRockFirePeaDefault"
+  },
+  "PrimalPlantfoodRockFireBluePeaDefault": {
+    "name": "大招蓝火石块弹",
+    "code": "PrimalPlantfoodRockFireBluePeaDefault"
+  },
+  "AvatarPrimalPlantfoodRockFireBluePeaDefault": {
+    "name": "大招紫火石块弹",
+    "code": "AvatarPrimalPlantfoodRockFireBluePeaDefault"
+  },
+  "PrimalPeashooterLevel5Pea": {
+    "name": "岩浆弹",
+    "code": "PrimalPeashooterLevel5Pea"
+  },
+  "PrimalPeashooterLevel5FirePea": {
+    "name": "火焰岩浆弹",
+    "code": "PrimalPeashooterLevel5FirePea"
+  },
+  "PrimalPeashooterLevel5FireBluePea": {
+    "name": "蓝火岩浆弹",
+    "code": "PrimalPeashooterLevel5FireBluePea"
+  },
+  "AvatarPrimalPeashooterLevel5FireBluePea": {
+    "name": "紫火岩浆弹",
+    "code": "AvatarPrimalPeashooterLevel5FireBluePea"
+  },
+  "PrimalPeashooterPlantfoodLevel5Pea": {
+    "name": "大招岩浆弹",
+    "code": "PrimalPeashooterPlantfoodLevel5Pea"
+  },
+  "PrimalPeashooterPlantfoodLevel5FirePea": {
+    "name": "大招火焰岩浆弹",
+    "code": "PrimalPeashooterPlantfoodLevel5FirePea"
+  },
+  "PrimalPeashooterPlantfoodLevel5FireBluePea": {
+    "name": "大招蓝火岩浆弹",
+    "code": "PrimalPeashooterPlantfoodLevel5FireBluePea"
+  },
+  "AvatarPrimalPeashooterPlantfoodLevel5FireBluePea": {
+    "name": "大招紫火岩浆弹",
+    "code": "AvatarPrimalPeashooterPlantfoodLevel5FireBluePea"
+  },
+  "PrimalPeashooterAvatarBall": {
+    "name": "装扮大招火球",
+    "code": "PrimalPeashooterAvatarBall"
+  },
+  "PrimalWallnutBullet": {
+    "name": "原坚果实",
+    "code": "PrimalWallnutBullet"
+  },
+  "DragonRoarProjectile": {
+    "name": "龙吼草毒液",
+    "code": "DragonRoarProjectile"
+  },
+  "DragonRoarLevelProjectile": {
+    "name": "龙吼草五阶毒液",
+    "code": "DragonRoarLevelProjectile"
+  },
+  "PrimalRafflesiaDefault": {
+    "name": "原始大王花子弹",
+    "code": "PrimalRafflesiaDefault"
+  },
+  "PrimalRafflesiaAdvanced": {
+    "name": "毒爆子弹",
+    "code": "PrimalRafflesiaAdvanced"
+  },
+  "PrimalRafflesiaExpert": {
+    "name": "交叉爆弹",
+    "code": "PrimalRafflesiaExpert"
+  },
+  "PrimalRafflesiaExpertNonAvatar": {
+    "name": "装扮子弹",
+    "code": "PrimalRafflesiaExpertNonAvatar"
+  },
+  "PrimalRafflesiaPlantFoodBasic": {
+    "name": "大招子弹",
+    "code": "PrimalRafflesiaPlantFoodBasic"
+  },
+  "PrimalRafflesiaPlantFoodAdvanced": {
+    "name": "大招毒爆子弹",
+    "code": "PrimalRafflesiaPlantFoodAdvanced"
+  },
+  "PrimalRafflesiaPlantFoodAvatar": {
+    "name": "装扮大招子弹",
+    "code": "PrimalRafflesiaPlantFoodAvatar"
+  },
+  "PrimalRafflesiaPlantFoodExpert": {
+    "name": "大招交叉爆弹",
+    "code": "PrimalRafflesiaPlantFoodExpert"
+  },
+  "PrimalRafflesiaPlantFoodExpertAvatar": {
+    "name": "装扮大招交叉爆弹",
+    "code": "PrimalRafflesiaPlantFoodExpertAvatar"
+  },
+  "CobcannonDefault": {
+    "name": "玉米炮",
+    "code": "CobcannonDefault"
+  },
+  "CobcannonBulletDefault": {
+    "name": "玉米大招粒",
+    "code": "CobcannonBulletDefault"
+  },
+  "CobcannonRocketDefault": {
+    "name": "追踪导弹",
+    "code": "CobcannonRocketDefault"
+  },
+  "CobcannonBigRocketDefault": {
+    "name": "装扮大招最后导弹",
+    "code": "CobcannonBigRocketDefault"
+  },
+  "EscapeRootGrapeDefaultProjectile": {
+    "name": "树根葡萄粒",
+    "code": "EscapeRootGrapeDefaultProjectile"
+  },
+  "AppleMortarDefault": {
+    "name": "苹果核",
+    "code": "AppleMortarDefault"
+  },
+  "AppleMortarGolden": {
+    "name": "金苹果",
+    "code": "AppleMortarGolden"
+  },
+  "AppleMortarPlantfoodDefault": {
+    "name": "大招苹果",
+    "code": "AppleMortarPlantfoodDefault"
+  },
+  "AppleMortarPlantfoodPoison": {
+    "name": "大招毒苹果",
+    "code": "AppleMortarPlantfoodPoison"
+  },
+  "AppleMortarPlantfoodGolden": {
+    "name": "大招金苹果",
+    "code": "AppleMortarPlantfoodGolden"
+  },
+  "NightshadePFAvatarProjectile": {
+    "name": "装扮龙葵叶",
+    "code": "NightshadePFAvatarProjectile"
+  },
+  "BloomingHeartsDefault": {
+    "name": "爱心",
+    "code": "BloomingHeartsDefault"
+  },
+  "BloomingHeartsPlantfoodDefault": {
+    "name": "大招爱心",
+    "code": "BloomingHeartsPlantfoodDefault"
+  },
+  "BloomingHeartsPlantfoodAvatarDefault": {
+    "name": "装扮大招爱心",
+    "code": "BloomingHeartsPlantfoodAvatarDefault"
+  },
+  "DusklobberDefault": {
+    "name": "幽暮子弹",
+    "code": "DusklobberDefault"
+  },
+  "DusklobberLevelTwoDefault": {
+    "name": "大型幽暮子弹",
+    "code": "DusklobberLevelTwoDefault"
+  },
+  "DusklobberLevelTwoStunDefault": {
+    "name": "定身幽暮子弹",
+    "code": "DusklobberLevelTwoStunDefault"
+  },
+  "DusklobberSuperDefault": {
+    "name": "五阶幽暮子弹",
+    "code": "DusklobberSuperDefault"
+  },
+  "DusklobberPlantfoodDefault": {
+    "name": "大招幽暮子弹",
+    "code": "DusklobberPlantfoodDefault"
+  },
+  "DusklobberPlantfoodAvatarDefault": {
+    "name": "装扮大招子弹",
+    "code": "DusklobberPlantfoodAvatarDefault"
+  },
+  "CaulipowerProjectileDefault": {
+    "name": "花菜音波",
+    "code": "CaulipowerProjectileDefault"
+  },
+  "CaulipowerProjectileLv5": {
+    "name": "彩色音波",
+    "code": "CaulipowerProjectileLv5"
+  },
+  "ParsnipDefault": {
+    "name": "防风草",
+    "code": "ParsnipDefault"
+  },
+  "ParsnipUltraDefault": {
+    "name": "高阶防风草",
+    "code": "ParsnipUltraDefault"
+  },
+  "wasabiwhipLevel5": {
+    "name": "防风钳",
+    "code": "wasabiwhipLevel5"
+  },
+  "MissileToeDefault": {
+    "name": "仙子冰锥",
+    "code": "MissileToeDefault"
+  },
+  "MissileToeSuperDefault": {
+    "name": "仙子大招",
+    "code": "MissileToeSuperDefault"
+  },
+  "MissileToeLvl5Default": {
+    "name": "寒冰仙弹",
+    "code": "MissileToeLvl5Default"
+  },
+  "ElectricPeaDefault": {
+    "name": "电豆",
+    "code": "ElectricPeaDefault"
+  },
+  "ElectricPeaPlantfoodDefault": {
+    "name": "大招电豆",
+    "code": "ElectricPeaPlantfoodDefault"
+  },
+  "ElectricPeaPlantfoodSub": {
+    "name": "分裂电豆",
+    "code": "ElectricPeaPlantfoodSub"
+  },
+  "ElectricBall": {
+    "name": "大电球",
+    "code": "ElectricBall"
+  },
+  "ElectricPeaAvatarDefault": {
+    "name": "装扮大招电豆",
+    "code": "ElectricPeaAvatarDefault"
+  },
+  "ElectricAdvancedPeaDefault": {
+    "name": "分裂大招电豆",
+    "code": "ElectricAdvancedPeaDefault"
+  },
+  "TulipDefault": {
+    "name": "音符",
+    "code": "TulipDefault"
+  },
+  "TulipSpecialDefault": {
+    "name": "特殊音符",
+    "code": "TulipSpecialDefault"
+  },
+  "TulipLvl5Default": {
+    "name": "魅惑音符",
+    "code": "TulipLvl5Default"
+  },
+  "ShurikenDefault": {
+    "name": "手里箭",
+    "code": "ShurikenDefault"
+  },
+  "ShurikenSuperDefault": {
+    "name": "超大手里箭",
+    "code": "ShurikenSuperDefault"
+  },
+  "ShurikenStormDefault": {
+    "name": "旋风飞镖",
+    "code": "ShurikenStormDefault"
+  },
+  "ShurikenLightningDefault": {
+    "name": "黄金手里箭",
+    "code": "ShurikenLightningDefault"
+  },
+  "ShurikenBombDefault": {
+    "name": "火焰手里箭",
+    "code": "ShurikenBombDefault"
+  },
+  "LotusshooterDefault": {
+    "name": "莲藕汁",
+    "code": "LotusshooterDefault"
+  },
+  "LotusshooterPoisonDefault": {
+    "name": "莲藕毒汁",
+    "code": "LotusshooterPoisonDefault"
+  },
+  "LotusshooterVenomDefault": {
+    "name": "莲藕大招",
+    "code": "LotusshooterVenomDefault"
+  },
+  "LotusBallDefault": {
+    "name": "水球",
+    "code": "LotusBallDefault"
+  },
+  "LotusPoisonBallDefault": {
+    "name": "毒水球",
+    "code": "LotusPoisonBallDefault"
+  },
+  "ConvallariaChemistDefault": {
+    "name": "药师药瓶",
+    "code": "ConvallariaChemistDefault"
+  },
+  "ConvallariaChemistPlantfoodDefault": {
+    "name": "大招药瓶",
+    "code": "ConvallariaChemistPlantfoodDefault"
+  },
+  "ConvallariaChemistAvatarDefault": {
+    "name": "装扮大招药瓶",
+    "code": "ConvallariaChemistAvatarDefault"
+  },
+  "ConvallariaChemistSuperDefault": {
+    "name": "5阶药瓶",
+    "code": "ConvallariaChemistSuperDefault"
+  },
+  "MulberryDefault": {
+    "name": "桑葚手雷",
+    "code": "MulberryDefault"
+  },
+  "MulberryAdvancedDefault": {
+    "name": "爆炸弹",
+    "code": "MulberryAdvancedDefault"
+  },
+  "GiantPlasmaGrenade": {
+    "name": "击飞弹",
+    "code": "GiantPlasmaGrenade"
+  },
+  "GiantFlashGrenade": {
+    "name": "定身弹",
+    "code": "GiantFlashGrenade"
+  },
+  "GiantGasGrenade": {
+    "name": "毒弹",
+    "code": "GiantGasGrenade"
+  },
+  "MulberryPlantfoodDefault": {
+    "name": "大招手雷",
+    "code": "MulberryPlantfoodDefault"
+  },
+  "MulberryAvatarDefault": {
+    "name": "装扮手雷",
+    "code": "MulberryAvatarDefault"
+  },
+  "VanillaProjectileDefault": {
+    "name": "荚兰子弹",
+    "code": "VanillaProjectileDefault"
+  },
+  "VanillaTornadoProjectile": {
+    "name": "小型龙卷风",
+    "code": "VanillaTornadoProjectile"
+  },
+  "VanillaSkillProjectile": {
+    "name": "空气炮",
+    "code": "VanillaSkillProjectile"
+  },
+  "VanillaPlantFoodProjectile": {
+    "name": "大型龙卷风",
+    "code": "VanillaPlantFoodProjectile"
+  },
+  "VanillaAvatarPlantFoodProjectile": {
+    "name": "寒冰龙卷风",
+    "code": "VanillaAvatarPlantFoodProjectile"
+  },
+  "PlantainDefault": {
+    "name": "芭蕉龙卷风",
+    "code": "PlantainDefault"
+  },
+  "PlantainSpecialDefault": {
+    "name": "芭蕉特殊龙卷风",
+    "code": "PlantainSpecialDefault"
+  },
+  "PlantainSuperSkillDefault": {
+    "name": "彩灯龙卷风",
+    "code": "PlantainSuperSkillDefault"
+  },
+  "PlantainPlantFoodProjectile": {
+    "name": "芭蕉大招龙卷风",
+    "code": "PlantainPlantFoodProjectile"
+  },
+  "PlantainAvatarPlantFoodProjectile": {
+    "name": "装扮大招龙卷风",
+    "code": "PlantainAvatarPlantFoodProjectile"
+  },
+  "NarcissusBasic": {
+    "name": "水仙花泡沫",
+    "code": "NarcissusBasic"
+  },
+  "NarcissusPlantfoodDefault": {
+    "name": "大招泡沫",
+    "code": "NarcissusPlantfoodDefault"
+  },
+  "NarcissusAvatarDefault": {
+    "name": "装扮大招泡沫",
+    "code": "NarcissusAvatarDefault"
+  },
+  "pineconeProDefault": {
+    "name": "松果炮弹",
+    "code": "pineconeProDefault"
+  },
+  "pineconeSpecialDefault": {
+    "name": "松果击飞弹",
+    "code": "pineconeSpecialDefault"
+  },
+  "pineconePlantFoodDefault": {
+    "name": "松果大招弹",
+    "code": "pineconePlantFoodDefault"
+  },
+  "pineconePlantFoodAvatar": {
+    "name": "松果装扮大招弹",
+    "code": "pineconePlantFoodAvatar"
+  },
+  "pineconeSuperSkillDefault": {
+    "name": "松果击退弹",
+    "code": "pineconeSuperSkillDefault"
+  },
+  "AlarmSagittifoliaTeslaBombDefault": {
+    "name": "电磁菇的雷电",
+    "code": "AlarmSagittifoliaTeslaBombDefault"
+  },
+  "HollyKnightLeafDefault": {
+    "name": "冬青导弹",
+    "code": "HollyKnightLeafDefault"
+  },
+  "HollyKnightLeafAvatarDefault": {
+    "name": "冬青大招导弹",
+    "code": "HollyKnightLeafAvatarDefault"
+  },
+  "SnapPeaDefault": {
+    "name": "食人花豌豆的豌豆",
+    "code": "SnapPeaDefault"
+  },
+  "SoccerGameFootballDefault": {
+    "name": "世界杯的足球",
+    "code": "SoccerGameFootballDefault"
+  },
+  "ShadowPeashooterDefault": {
+    "name": "暗影豌豆普通子弹",
+    "code": "ShadowPeashooterDefault"
+  },
+  "ShadowPeashooterSpecialDefault": {
+    "name": "暗影豌豆激光弹",
+    "code": "ShadowPeashooterSpecialDefault"
+  },
+  "ShadowPeashooterBombDefault": {
+    "name": "普通暗影豌豆大招子弹",
+    "code": "ShadowPeashooterBombDefault"
+  },
+  "ShadowPeashooterBombTier2": {
+    "name": "暗影豌豆核弹(2月光花效果)",
+    "code": "ShadowPeashooterBombTier2"
+  },
+  "ShadowPeashooterBombTier3": {
+    "name": "暗影豌豆核弹(3月光花效果)",
+    "code": "ShadowPeashooterBombTier3"
+  },
+  "SlingPeaDefault": {
+    "name": "豌豆迫击炮子弹",
+    "code": "SlingPeaDefault"
+  },
+  "SlingPeaBounceDefault": {
+    "name": "豌豆迫击炮弹射子弹",
+    "code": "SlingPeaBounceDefault"
+  },
+  "SlingPeaSuperDefault": {
+    "name": "豌豆迫击炮炸弹豌豆",
+    "code": "SlingPeaSuperDefault"
+  },
+  "SlingPeaPlantfoodDefault": {
+    "name": "豌豆迫击炮大招子弹",
+    "code": "SlingPeaPlantfoodDefault"
+  },
+  "SlingPeaPlantfoodFireDefault": {
+    "name": "豌豆迫击炮火焰大招子弹",
+    "code": "SlingPeaPlantfoodFireDefault"
+  },
+  "SlingPeaPlantfoodBlueFireDefault": {
+    "name": "豌豆迫击炮蓝火大招子弹",
+    "code": "SlingPeaPlantfoodBlueFireDefault"
+  },
+  "ThunderSnapdragonDefault": {
+    "name": "雷龙草雷电球",
+    "code": "ThunderSnapdragonDefault"
+  },
+  "ThunderSnapdragonPurpleDefault": {
+    "name": "雷龙草麻痹球",
+    "code": "ThunderSnapdragonPurpleDefault"
+  },
+  "AloesSprayDefault": {
+    "name": "芦荟加速药水",
+    "code": "AloesSprayDefault"
+  },
+  "BearberryDefaultProjectile": {
+    "name": "熊果子弹",
+    "code": "BearberryDefaultProjectile"
+  },
+  "BearberryLevel2Projectile": {
+    "name": "熊果双发弹",
+    "code": "BearberryLevel2Projectile"
+  },
+  "BearberryLevel5Projectile": {
+    "name": "熊果黄金弹",
+    "code": "BearberryLevel5Projectile"
+  },
+  "BearberryPlantfoodProjectile": {
+    "name": "熊果大招击飞弹",
+    "code": "BearberryPlantfoodProjectile"
+  },
+  "BearberryAvatarProjectile": {
+    "name": "熊果火焰大招击飞弹",
+    "code": "BearberryAvatarProjectile"
+  },
+  "EgretflowerNormal": {
+    "name": "白鹭花战机机枪弹",
+    "code": "EgretflowerNormal"
+  },
+  "EgretflowerMissile": {
+    "name": "白鹭花战机眩晕导弹",
+    "code": "EgretflowerMissile"
+  },
+  "EgretflowerPlantFoodBomb": {
+    "name": "白鹭花战机火焰炸弹",
+    "code": "EgretflowerPlantFoodBomb"
+  },
+  "StrawburstProjectileSmall": {
+    "name": "草莓(第一形态)",
+    "code": "StrawburstProjectileSmall"
+  },
+  "StrawburstProjectileMedium": {
+    "name": "草莓(第二形态)",
+    "code": "StrawburstProjectileMedium"
+  },
+  "StrawburstProjectileLarge": {
+    "name": "草莓(第三形态)",
+    "code": "StrawburstProjectileLarge"
+  },
+  "StrawburstProjectileFood": {
+    "name": "空降巨型草莓",
+    "code": "StrawburstProjectileFood"
+  },
+  "StrawburstProjectileSelfDestructSmall": {
+    "name": "含酱草莓(第一形态)",
+    "code": "StrawburstProjectileSelfDestructSmall"
+  },
+  "StrawburstProjectileSelfDestructMedium": {
+    "name": "含酱草莓(第二形态)",
+    "code": "StrawburstProjectileSelfDestructMedium"
+  },
+  "StrawburstProjectileSelfDestructLarge": {
+    "name": "含酱草莓(第三形态)",
+    "code": "StrawburstProjectileSelfDestructLarge"
+  },
+  "PomegranateJewelerOneDefault": {
+    "name": "宝石",
+    "code": "PomegranateJewelerOneDefault"
+  },
+  "PomegranateJewelerTwoDefault": {
+    "name": "双生宝石",
+    "code": "PomegranateJewelerTwoDefault"
+  },
+  "PomegranateJewelerThreeDefault": {
+    "name": "三生宝石",
+    "code": "PomegranateJewelerThreeDefault"
+  },
+  "PomegranateJewelerBigDefault": {
+    "name": "大宝石",
+    "code": "PomegranateJewelerBigDefault"
+  },
+  "PomegranateJewelerSmallDefault": {
+    "name": "小宝石",
+    "code": "PomegranateJewelerSmallDefault"
+  },
+  "PomegranateJewelerGiantDefault": {
+    "name": "大招巨大宝石",
+    "code": "PomegranateJewelerGiantDefault"
+  },
+  "PomegranateJewelerAbsorbDefault": {
+    "name": "吸引宝石",
+    "code": "PomegranateJewelerAbsorbDefault"
+  },
+  "PoisonPeaDefault": {
+    "name": "剧毒豌豆",
+    "code": "PoisonPeaDefault"
+  },
+  "PoisonPeaLevel5Default": {
+    "name": "范围剧毒豌豆",
+    "code": "PoisonPeaLevel5Default"
+  },
+  "PoisonPeaPlantfoodDefault": {
+    "name": "剧毒豌豆滚球",
+    "code": "PoisonPeaPlantfoodDefault"
+  },
+  "PoisonPeaPlantfoodAvatarDefault": {
+    "name": "超级剧毒豌豆滚球",
+    "code": "PoisonPeaPlantfoodAvatarDefault"
+  },
+  "ElaeocarpusDefault": {
+    "name": "羽毛球",
+    "code": "ElaeocarpusDefault"
+  },
+  "ElaeocarpusSmash": {
+    "name": "羽毛球扣杀弹",
+    "code": "ElaeocarpusSmash"
+  },
+  "ElaeocarpusPlantfood": {
+    "name": "大招羽毛球",
+    "code": "ElaeocarpusPlantfood"
+  },
+  "EleocurlingSmallProjectile": {
+    "name": "小荸荠冰壶",
+    "code": "EleocurlingSmallProjectile"
+  },
+  "EleocurlingBigProjectile": {
+    "name": "大荸荠冰壶",
+    "code": "EleocurlingBigProjectile"
+  },
+  "EleocurlingSmallLv5Projectile": {
+    "name": "五阶小荸荠冰雾壶",
+    "code": "EleocurlingSmallLv5Projectile"
+  },
+  "EleocurlingBigLv5Projectile": {
+    "name": "五阶大荸荠冰雾壶",
+    "code": "EleocurlingBigLv5Projectile"
+  },
+  "EleocurlingNormalSmallLv5Projectile": {
+    "name": "五阶小荸荠冰壶",
+    "code": "EleocurlingNormalSmallLv5Projectile"
+  },
+  "EleocurlingNormalBigLv5Projectile": {
+    "name": "五阶大荸荠冰壶",
+    "code": "EleocurlingNormalBigLv5Projectile"
+  },
+  "EleocurlingPlantfoodProjectile": {
+    "name": "大招旋风荸荠冰壶",
+    "code": "EleocurlingPlantfoodProjectile"
+  },
+  "EleocurlingSmallPenetrateProjectile": {
+    "name": "小荸荠穿透冰壶",
+    "code": "EleocurlingSmallPenetrateProjectile"
+  },
+  "EleocurlingBigPenetrateProjectile": {
+    "name": "大荸荠穿透冰壶",
+    "code": "EleocurlingBigPenetrateProjectile"
+  },
+  "Icelotus1WaterDefault": {
+    "name": "冰莲水滴1",
+    "code": "Icelotus1WaterDefault"
+  },
+  "Icelotus2WaterDefault": {
+    "name": "冰莲水滴2",
+    "code": "Icelotus2WaterDefault"
+  },
+  "Icelotus3WaterDefault": {
+    "name": "冰莲水滴3",
+    "code": "Icelotus3WaterDefault"
+  },
+  "CypripediumDefault": {
+    "name": "杓兰汤汁",
+    "code": "CypripediumDefault"
+  },
+  "CypripediumThickDefault": {
+    "name": "浓缩杓兰汤汁",
+    "code": "CypripediumThickDefault"
+  },
+  "CypripediumPlantfood": {
+    "name": "大招杓兰汤汁",
+    "code": "CypripediumPlantfood"
+  },
+  "CypripediumPlantfoodAvatar": {
+    "name": "大招麻痹杓兰汤汁",
+    "code": "CypripediumPlantfoodAvatar"
+  },
+  "CypripediumLv5": {
+    "name": "毒杓兰汤汁",
+    "code": "CypripediumLv5"
+  },
+  "StickybombRiceDefault": {
+    "name": "糯米团",
+    "code": "StickybombRiceDefault"
+  },
+  "StickybombRicePlantfoodDefault": {
+    "name": "大招糯米团",
+    "code": "StickybombRicePlantfoodDefault"
+  },
+  "StickybombRicePlantfoodAvatarDefault": {
+    "name": "大招紫糯米团",
+    "code": "StickybombRicePlantfoodAvatarDefault"
+  },
+  "StickybombRiceLevel5": {
+    "name": "超大糯米团",
+    "code": "StickybombRiceLevel5"
+  },
+  "GumnutPlantfood": {
+    "name": "口香糖",
+    "code": "GumnutPlantfood"
+  },
+  "DartichokeLeafDefault": {
+    "name": "洋蓟飞镖",
+    "code": "DartichokeLeafDefault"
+  },
+  "DartichokeLeafPerfect": {
+    "name": "暴击飞镖",
+    "code": "DartichokeLeafPerfect"
+  },
+  "DartichokeThunderBoost": {
+    "name": "洋蓟闪电弹",
+    "code": "DartichokeThunderBoost"
+  },
+  "PokraDefault": {
+    "name": "秋葵尖刺（普攻5次）",
+    "code": "PokraDefault"
+  },
+  "PokraPlantfood": {
+    "name": "秋葵大招尖刺",
+    "code": "PokraPlantfood"
+  },
+  "ShadowVanillaNormalDefault": {
+    "name": "暗影荚兰子弹",
+    "code": "ShadowVanillaNormalDefault"
+  },
+  "ShadowVanillaShadowDefault": {
+    "name": "暗影状态暗影荚兰子弹",
+    "code": "ShadowVanillaShadowDefault"
+  },
+  "ShadowVanillaHurricaneDefault": {
+    "name": "暗影荚兰龙卷风",
+    "code": "ShadowVanillaHurricaneDefault"
+  },
+  "ShadowVanillaShadowHurricaneDefault": {
+    "name": "暗影状态暗影荚兰龙卷风",
+    "code": "ShadowVanillaShadowHurricaneDefault"
+  },
+  "ShadowVanillaSpecialHurricaneDefault": {
+    "name": "暗影荚兰超级龙卷风",
+    "code": "ShadowVanillaSpecialHurricaneDefault"
+  },
+  "ShadowVanillaShadowMistDefault": {
+    "name": "暗影荚兰薄雾",
+    "code": "ShadowVanillaShadowMistDefault"
+  },
+  "ShadowVanillaShadowThreelinesHurricaneDefault": {
+    "name": "暗影荚兰暗影状态三行龙卷风",
+    "code": "ShadowVanillaShadowThreelinesHurricaneDefault"
+  },
+  "ZombieSnowPeaDefault": {
+    "name": "寒冰僵尸豌豆",
+    "code": "ZombieSnowPeaDefault"
+  },
+  "ZombieGatlingPeaDefault": {
+    "name": "机枪僵尸豌豆",
+    "code": "ZombieGatlingPeaDefault"
+  },
+  "StephaniaProjectileDefault": {
+    "name": "千金藤飞盾",
+    "code": "StephaniaProjectileDefault"
+  },
+  "StephaniaPlantfoodProjectileDefault": {
+    "name": "千金藤大招飞盾",
+    "code": "StephaniaPlantfoodProjectileDefault"
+  },
+  "StephaniaAvatarPlantfoodProjectileDefault": {
+    "name": "千金藤大招火焰飞盾",
+    "code": "StephaniaAvatarPlantfoodProjectileDefault"
+  },
+  "GeishaDefault": {
+    "name": "刺眼花艺伎飞扇",
+    "code": "GeishaDefault"
+  },
+  "GeishaSuperDefault": {
+    "name": "穿透飞扇",
+    "code": "GeishaSuperDefault"
+  },
+  "GeishaPlantfoodDefault": {
+    "name": "燃烧花扇",
+    "code": "GeishaPlantfoodDefault"
+  },
+  "GeishaPlantfoodSplitDefault": {
+    "name": "燃烧回旋花扇",
+    "code": "GeishaPlantfoodSplitDefault"
+  },
+  "GeishaPlantfoodSplit2Default": {
+    "name": "燃烧穿透分裂花扇",
+    "code": "GeishaPlantfoodSplit2Default"
+  },
+  "Impatiensshooter_1_ProjectileDefault": {
+    "name": "凤仙花白色染料",
+    "code": "Impatiensshooter_1_ProjectileDefault"
+  },
+  "Impatiensshooter_2_ProjectileDefault": {
+    "name": "凤仙花粉色染料",
+    "code": "Impatiensshooter_2_ProjectileDefault"
+  },
+  "Impatiensshooter_3_ProjectileDefault": {
+    "name": "凤仙花橙色染料",
+    "code": "Impatiensshooter_3_ProjectileDefault"
+  },
+  "Impatiensshooter_4_ProjectileDefault": {
+    "name": "凤仙花紫色染料",
+    "code": "Impatiensshooter_4_ProjectileDefault"
+  },
+  "Impatiensshooter_5_ProjectileDefault": {
+    "name": "凤仙花紫色超级染料",
+    "code": "Impatiensshooter_5_ProjectileDefault"
+  },
+  "SauceDefault": {
+    "name": "寿司",
+    "code": "SauceDefault"
+  },
+  "FishHookGrassDefault": {
+    "name": "鱼钩草",
+    "code": "FishHookGrassDefault"
+  },
+  "HeadbutterlettuceButterDefault": {
+    "name": "奶油生菜的奶油",
+    "code": "HeadbutterlettuceButterDefault"
+  },
+  "HeadbutterlettuceLevel2ButterDefault": {
+    "name": "二阶奶油(控制时间更长)",
+    "code": "HeadbutterlettuceLevel2ButterDefault"
+  },
+  "HeadbutterlettucePlantfoodButterDefault": {
+    "name": "奶油生菜大招奶油",
+    "code": "HeadbutterlettucePlantfoodButterDefault"
+  },
+  "HeadbutterlettuceAvatarPlantfoodButterDefault": {
+    "name": "奶油生菜装扮大招奶油",
+    "code": "HeadbutterlettuceAvatarPlantfoodButterDefault"
+  },
+  "TurkeyDefault": {
+    "name": "土鸡",
+    "code": "TurkeyDefault"
+  },
+  "TurkzillaDefault": {
+    "name": "大宅鸡",
+    "code": "TurkzillaDefault"
+  },
+  "TurkzillaAvatar": {
+    "name": "南瓜大宅鸡",
+    "code": "TurkzillaAvatar"
+  },
+  "ArtifactWeatherMonkeyProjectileDefault": {
+    "name": "窜天猴神器的烟花",
+    "code": "ArtifactWeatherMonkeyProjectileDefault"
+  },
+  "ArtifactWeatherMonkeyProjectileSmallDefault": {
+    "name": "窜天猴神器的鞭炮",
+    "code": "ArtifactWeatherMonkeyProjectileSmallDefault"
+  },
+  "ArtifactGashaponGuacodileDefault": {
+    "name": "扭蛋神器的鳄梨",
+    "code": "ArtifactGashaponGuacodileDefault"
+  },
+  "ArtifactGashaponParsnipDefault": {
+    "name": "扭蛋神器的防风草",
+    "code": "ArtifactGashaponParsnipDefault"
+  },
+  "ArtifactSquidDefault": {
+    "name": "章鱼神器的章鱼",
+    "code": "ArtifactSquidDefault"
+  },
+  "ArtifactTossedVase": {
+    "name": "内鬼神器的陶罐",
+    "code": "ArtifactTossedVase"
+  }
+}

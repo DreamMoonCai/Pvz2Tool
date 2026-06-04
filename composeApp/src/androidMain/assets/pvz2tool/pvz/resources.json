@@ -1,0 +1,347 @@
+{
+  "mat_Gem": {
+    "id": 3008,
+    "name": "钻石",
+    "code": "mat_Gem"
+  },
+  "mat_limitgroupbuy_ticket": {
+    "id": 3010,
+    "name": "戴夫券",
+    "code": "mat_limitgroupbuy_ticket"
+  },
+  "coin_gold": {
+    "id": 4013,
+    "name": "金币",
+    "code": "coin_gold"
+  },
+  "mat_coin_fire": {
+    "id": 23001,
+    "name": "炎晶",
+    "code": "mat_coin_fire"
+  },
+  "mat_coin_ice": {
+    "id": 23002,
+    "name": "冰晶",
+    "code": "mat_coin_ice"
+  },
+  "mat_evolution_fireflower": {
+    "id": 23003,
+    "name": "赤焰稀土",
+    "code": "mat_evolution_fireflower"
+  },
+  "mat_medal": {
+    "id": 23004,
+    "name": "宝石",
+    "code": "mat_medal"
+  },
+  "mat_redpacket_s": {
+    "id": 23005,
+    "name": "小红包",
+    "code": "mat_redpacket_s"
+  },
+  "mat_redpacket_b": {
+    "id": 23006,
+    "name": "大红包",
+    "code": "mat_redpacket_b"
+  },
+  "mat_nutrient_0": {
+    "id": 23007,
+    "name": "白色5阶培养液",
+    "code": "mat_nutrient_0"
+  },
+  "mat_nutrient_1": {
+    "id": 23008,
+    "name": "绿色5阶培养液",
+    "code": "mat_nutrient_1"
+  },
+  "mat_nutrient_2": {
+    "id": 23009,
+    "name": "蓝色5阶培养液",
+    "code": "mat_nutrient_2"
+  },
+  "mat_nutrient_3": {
+    "id": 23010,
+    "name": "紫色5阶培养液",
+    "code": "mat_nutrient_3"
+  },
+  "mat_nutrient_4": {
+    "id": 23011,
+    "name": "橙色5阶培养液",
+    "code": "mat_nutrient_4"
+  },
+  "mat_redpacket_gold": {
+    "id": 23012,
+    "name": "宝开通宝",
+    "code": "mat_redpacket_gold"
+  },
+  "mat_gachakey_rare": {
+    "id": 23015,
+    "name": "稀有宝箱钥匙",
+    "code": "mat_gachakey_rare"
+  },
+  "mat_gachakey_rare_multi": {
+    "id": 23016,
+    "name": "稀有宝箱钥匙串",
+    "code": "mat_gachakey_rare_multi"
+  },
+  "mat_national_medal": {
+    "id": 23017,
+    "name": "宝石",
+    "code": "mat_national_medal"
+  },
+  "mat_national_currency": {
+    "id": 23018,
+    "name": "国庆兑换碎片",
+    "code": "mat_national_currency"
+  },
+  "mat_miniGame_currency": {
+    "id": 23209,
+    "name": "迷你币3",
+    "code": "mat_miniGame_currency"
+  },
+  "mat_chrismas_medal": {
+    "id": 23021,
+    "name": "宝石",
+    "code": "mat_chrismas_medal"
+  },
+  "mat_chrismas_currency": {
+    "id": 23022,
+    "name": "圣诞兑换碎片",
+    "code": "mat_chrismas_currency"
+  },
+  "mat_festival_currency": {
+    "id": 23024,
+    "name": "新春碎片",
+    "code": "mat_festival_currency"
+  },
+  "mat_new_dumpling": {
+    "id": 23026,
+    "name": "？？？？",
+    "code": "mat_new_dumpling"
+  },
+  "steam_GemHammer": {
+    "id": 23027,
+    "name": "蒸汽时代钻石锤",
+    "code": "steam_GemHammer"
+  },
+  "mat_ZMatch_ticket": {
+    "id": 23028,
+    "name": "超Z联赛币",
+    "code": "mat_ZMatch_ticket"
+  },
+  "mat_collect_coin_a": {
+    "id": 23030,
+    "name": "芭蕉舞蹈家纪念币",
+    "code": "mat_collect_coin_a"
+  },
+  "mat_collect_coin_b": {
+    "id": 23031,
+    "name": "水仙花射手纪念币",
+    "code": "mat_collect_coin_b"
+  },
+  "mat_collect_coin_c": {
+    "id": 23032,
+    "name": "郁金香号手纪念币",
+    "code": "mat_collect_coin_c"
+  },
+  "mat_collect_coin_d": {
+    "id": 23033,
+    "name": "电能豌豆射手纪念币",
+    "code": "mat_collect_coin_d"
+  },
+  "mat_collect_coin_e": {
+    "id": 23034,
+    "name": "向日葵纪念币",
+    "code": "mat_collect_coin_e"
+  },
+  "mat_BossRush_crystal": {
+    "id": 23035,
+    "name": "蓝水晶1",
+    "code": "mat_BossRush_crystal"
+  },
+  "mat_limitlottery_crystal": {
+    "id": 23036,
+    "name": "紫金币",
+    "code": "mat_limitlottery_crystal"
+  },
+  "mat_limitlottery_cup": {
+    "id": 23037,
+    "name": "限时夺宝奖杯",
+    "code": "mat_limitlottery_cup"
+  },
+  "mat_2018NewYear_currency": {
+    "id": 23045,
+    "name": "向日葵奖杯",
+    "code": "mat_2018NewYear_currency"
+  },
+  "mat_plant_levelup_book": {
+    "id": 23046,
+    "name": "进阶书",
+    "code": "mat_plant_levelup_book"
+  },
+  "mat_worldcup_coin": {
+    "id": 23061,
+    "name": "向日葵金币",
+    "code": "mat_worldcup_coin"
+  },
+  "mat_new_redpacket": {
+    "id": 23071,
+    "name": "扭蛋1",
+    "code": "mat_new_redpacket"
+  },
+  "mat_BossRush_crystal_blue": {
+    "id": 23208,
+    "name": "蓝水晶4",
+    "code": "mat_BossRush_crystal_blue"
+  },
+  "mat_richman_coin": {
+    "id": 23091,
+    "name": "剧场硬币",
+    "code": "mat_richman_coin"
+  },
+  "mat_rift_coin": {
+    "id": 23093,
+    "name": "时空币",
+    "code": "mat_rift_coin"
+  },
+  "mat_space_time_crystal": {
+    "id": 23094,
+    "name": "时空水晶",
+    "code": "mat_space_time_crystal"
+  },
+  "mat_space_time_dust": {
+    "id": 23095,
+    "name": "时空粉尘",
+    "code": "mat_space_time_dust"
+  },
+  "mat_mystery_crystal": {
+    "id": 23097,
+    "name": "神秘水晶",
+    "code": "mat_mystery_crystal"
+  },
+  "mat_secret_gacha_ticket": {
+    "id": 23098,
+    "name": "潘妮秘宝单抽券",
+    "code": "mat_secret_gacha_ticket"
+  },
+  "mat_redpacket_ticket": {
+    "id": 23104,
+    "name": "福袋券",
+    "code": "mat_redpacket_ticket"
+  },
+  "mat_callofwish_ticket": {
+    "id": 23111,
+    "name": "心愿单抽券",
+    "code": "mat_callofwish_ticket"
+  },
+  "mat_artifact_vial": {
+    "id": 23112,
+    "name": "时空能量罐",
+    "code": "mat_artifact_vial"
+  },
+  "mat_artifact_cube": {
+    "id": 23113,
+    "name": "时空立方",
+    "code": "mat_artifact_cube"
+  },
+  "mat_artifact_vial2": {
+    "id": 23114,
+    "name": "时空能量罐2",
+    "code": "mat_artifact_vial2"
+  },
+  "mat_artifact_vial3": {
+    "id": 23115,
+    "name": "时空立方2",
+    "code": "mat_artifact_vial3"
+  },
+  "mat_artifact_cube2": {
+    "id": 23116,
+    "name": "时空能量罐3",
+    "code": "mat_artifact_cube2"
+  },
+  "mat_artifact_cube3": {
+    "id": 23117,
+    "name": "时空立方3",
+    "code": "mat_artifact_cube3"
+  },
+  "mat_space_time_crystal2": {
+    "id": 23118,
+    "name": "时空水晶2",
+    "code": "mat_space_time_crystal2"
+  },
+  "mat_space_time_crystal3": {
+    "id": 23119,
+    "name": "时空水晶3",
+    "code": "mat_space_time_crystal3"
+  },
+  "mat_springFestival_currency": {
+    "id": 23120,
+    "name": "迷你币2",
+    "code": "mat_springFestival_currency"
+  },
+  "mat_space_time_dust2": {
+    "id": 23120,
+    "name": "时空粉尘2",
+    "code": "mat_space_time_dust2"
+  },
+  "mat_space_time_dust3": {
+    "id": 23121,
+    "name": "时空粉尘3",
+    "code": "mat_space_time_dust3"
+  },
+  "mat_space_time_dust4": {
+    "id": 23122,
+    "name": "时空粉尘4",
+    "code": "mat_space_time_dust4"
+  },
+  "mat_renaissance_challenge_statue": {
+    "id": 23224,
+    "name": "蓝水晶",
+    "code": "mat_renaissance_challenge_statue"
+  },
+  "mat_fireworks": {
+    "id": 23406,
+    "name": "三明治",
+    "code": "mat_fireworks"
+  },
+  "mat_arborday_kettle": {
+    "id": 23214,
+    "name": "植树节水壶",
+    "code": "mat_arborday_kettle"
+  },
+  "mat_future_gift_token_use": {
+    "id": 23319,
+    "name": "潘妮金币",
+    "code": "mat_future_gift_token_use"
+  },
+  "mat_pvz1mode_coin": {
+    "id": 23400,
+    "name": "金蜗牛币",
+    "code": "mat_pvz1mode_coin"
+  },
+  "mat_pvz1mode_coin_hard": {
+    "id": 23401,
+    "name": "彩蜗牛币",
+    "code": "mat_pvz1mode_coin_hard"
+  },
+  "mat_customlevel_play_coin": {
+    "id": 23402,
+    "name": "游玩代币",
+    "code": "mat_customlevel_play_coin"
+  },
+  "mat_customlevel_create_coin": {
+    "id": 23403,
+    "name": "创作代币",
+    "code": "mat_customlevel_create_coin"
+  },
+  "mat_festival_golden_egg_hammer": {
+    "id": 23404,
+    "name": "砸蛋锤",
+    "code": "mat_festival_golden_egg_hammer"
+  },
+  "mat_ZMatch_challenges": {
+    "id": 52282,
+    "name": "超Z联赛铁手",
+    "code": "mat_ZMatch_challenges"
+  }
+}

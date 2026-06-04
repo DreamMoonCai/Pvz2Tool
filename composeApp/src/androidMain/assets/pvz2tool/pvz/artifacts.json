@@ -1,0 +1,187 @@
+{
+  "artifact_wind": {
+    "id": 60001,
+    "name": "神风神器",
+    "code": "artifact_wind"
+  },
+  "artifact_lightning": {
+    "id": 60002,
+    "name": "闪电神器",
+    "code": "artifact_lightning"
+  },
+  "artifact_vase": {
+    "id": 60003,
+    "name": "投罐神器",
+    "code": "artifact_vase"
+  },
+  "artifact_cure": {
+    "id": 60004,
+    "name": "治愈神器",
+    "code": "artifact_cure"
+  },
+  "artifact_shield": {
+    "id": 60005,
+    "name": "护盾神器",
+    "code": "artifact_shield"
+  },
+  "artifact_squid": {
+    "id": 60006,
+    "name": "章鱼神器",
+    "code": "artifact_squid"
+  },
+  "artifact_arcade": {
+    "id": 60007,
+    "name": "街机神器",
+    "code": "artifact_arcade"
+  },
+  "artifact_time": {
+    "id": 60008,
+    "name": "时间神器",
+    "code": "artifact_time"
+  },
+  "artifact_weathermonkey": {
+    "id": 60009,
+    "name": "窜天猴神器",
+    "code": "artifact_weathermonkey"
+  },
+  "artifact_gashapon": {
+    "id": 60010,
+    "name": "扭蛋神器",
+    "code": "artifact_gashapon"
+  },
+  "artifact_magicbeans": {
+    "id": 60011,
+    "name": "魔豆神器",
+    "code": "artifact_magicbeans"
+  },
+  "artifact_ufo": {
+    "id": 60012,
+    "name": "飞碟神器",
+    "code": "artifact_ufo"
+  },
+  "artifact_devolve": {
+    "id": 60013,
+    "name": "退化神器",
+    "code": "artifact_devolve"
+  },
+  "artifact_prismtower": {
+    "id": 60014,
+    "name": "棱镜塔神器",
+    "code": "artifact_prismtower"
+  },
+  "artifact_dinosaurhorn": {
+    "id": 60015,
+    "name": "恐龙号角神器",
+    "code": "artifact_dinosaurhorn"
+  },
+  "artifact_watergun": {
+    "id": 60016,
+    "name": "水枪神器",
+    "code": "artifact_watergun"
+  },
+  "artifact_blackhole": {
+    "id": 60017,
+    "name": "黑洞神器",
+    "code": "artifact_blackhole"
+  },
+  "artifact_meteor": {
+    "id": 60018,
+    "name": "陨石神器",
+    "code": "artifact_meteor"
+  },
+  "artifact_magichat": {
+    "id": 60019,
+    "name": "魔法帽神器",
+    "code": "artifact_magichat"
+  },
+  "artifact_beehive": {
+    "id": 60020,
+    "name": "蜂巢神器",
+    "code": "artifact_beehive"
+  },
+  "artifact_evolution": {
+    "id": 60021,
+    "name": "进化神器",
+    "code": "artifact_evolution"
+  },
+  "artifact_midastouch": {
+    "id": 60022,
+    "name": "点金神器",
+    "code": "artifact_midastouch"
+  },
+  "artifact_acid": {
+    "id": 60023,
+    "name": "酸液神器",
+    "code": "artifact_acid"
+  },
+  "artifact_snowdrift": {
+    "id": 60024,
+    "name": "造雪神器",
+    "code": "artifact_snowdrift"
+  },
+  "artifact_skateboard": {
+    "id": 60025,
+    "name": "滑板神器",
+    "code": "artifact_skateboard"
+  },
+  "artifact_guitar": {
+    "id": 60026,
+    "name": "摇滚神器",
+    "code": "artifact_guitar"
+  },
+  "artifact_sliverkey": {
+    "id": 60027,
+    "name": "银之键神器",
+    "code": "artifact_sliverkey"
+  },
+  "artifact_dragon": {
+    "id": 60028,
+    "name": "龙灯神器",
+    "code": "artifact_dragon"
+  },
+  "artifact_trident": {
+    "id": 60029,
+    "name": "海神三叉戟神器",
+    "code": "artifact_trident"
+  },
+  "artifact_calabash": {
+    "id": 60030,
+    "name": "葫芦神器",
+    "code": "artifact_calabash"
+  },
+  "artifact_swarm": {
+    "id": 60031,
+    "name": "一窝蜂神器",
+    "code": "artifact_swarm"
+  },
+  "artifact_holo": {
+    "id": 60032,
+    "name": "全息神器",
+    "code": "artifact_holo"
+  },
+  "artifact_sourbell": {
+    "id": 60033,
+    "name": "摄魂铃神器",
+    "code": "artifact_sourbell"
+  },
+  "artifact_camera": {
+    "id": 60034,
+    "name": "相机神器",
+    "code": "artifact_camera"
+  },
+  "artifact_gravity": {
+    "id": 60035,
+    "name": "超重力神器",
+    "code": "artifact_gravity"
+  },
+  "artifact_hydraulic": {
+    "id": 60036,
+    "name": "液压神器",
+    "code": "artifact_hydraulic"
+  },
+  "artifact_bowling": {
+    "id": 60037,
+    "name": "保龄球神器",
+    "code": "artifact_bowling"
+  }
+}

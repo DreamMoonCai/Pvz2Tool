@@ -1,0 +1,1771 @@
+# ------------------------------
+# 游戏主 Activity
+# ------------------------------
+#gameActivity: com.popcap.pvz2cmhd360.SexyAppActivity
+gameActivity: com.popcap.pvz2cmhd.SexyAppActivity
+
+# ------------------------------
+# 本地读取配置文件，优先读取本地配置文件属性
+#
+# 配置文件必须在 pvz2tool 文件夹的子目录，否则无法使用
+#
+# 使用此属性需要文件存储权限否则可能不生效，或者使用设置里面的手动选定(通过SFM选择文件夹解压速度较慢)
+# ------------------------------
+#localConfigFile: /storage/emulated/0/Android/data/io.github.dreammooncai.pvz2tool/files/pvz2tool/dream.yml
+#localConfigFile: /storage/emulated/0/植物大战僵尸2工具箱/pvz2tool/dream.yml
+
+# ------------------------------
+# 游戏默认SMF存放目录
+# 当 section 不填写 targetPath 时，默认使用此目录
+# ------------------------------
+smfDirectory: files/
+
+# ------------------------------
+# 关于复合颜色文本说明
+#
+# 以下所有文本除了明确写了不支持以外，都支持复合颜色文本
+# 支持复合颜色文本的文字都可以在里面更换部分颜色文字
+# 1. 颜色标签：使用 {{样式名:文本内容}}
+#    支持核心颜色: "green", "purple", "red", "gold", "gray", "white", "olive"
+#    带阴影版本: 在颜色后加 "-shadow"，如 {{red-shadow:文本}}
+#
+# 2. 链接标签：使用 {{link|URL:显示文本}}
+#    普通链接: {{link|https://github.com:点击跳转}} (默认蓝色)
+#    带样式链接: 使用 {{link-样式名|URL:显示文本}}
+#    例如: {{link-red-shadow|https://xxx.com:红色阴影的链接}}
+#
+# 3. 图标标签：使用 {{icon:文件名}}
+#    图标会自动从 pvz2tool 目录中的 images/ 下读取。
+#    例如: {{icon:sun.png}} 对应路径为 images/sun.png
+# ------------------------------
+# 版本配置
+# ------------------------------
+versions:
+  - id: "old"
+    name: "怀旧服"
+    desc: "经典怀旧"
+    icon: "old_version_icon.png"
+    default: false
+    # 可选：是否自带base目录的基础包 默认自带 取消此属性可以使用 baseAssetPath: null
+    # baseAssetPath: "version/base/smf"
+    # 可选：如果该版本有专属的资源目录，填在这里 默认 version/old/smf
+    # assetPath: "version/old/smf"
+    # 游戏存档版本隔离：切换版本时会自动备份/恢复存档（存放在应用私有目录）
+
+    # ------------------------------
+    # 进入游戏前执行的 JS 脚本（可选）
+    # 完整 API 文档见: js_documentation.md
+    # ------------------------------
+    # enterGameScript: |
+    #   console.log("进入游戏前的全局脚本");
+    #   console.log("当前版本: " + this.version.name);
+    #   "脚本执行完成";
+
+
+  - id: "new"
+    name: "正式服"
+    desc: "全新体验"
+    icon: "new_version_icon.png"
+    default: true
+    # 游戏存档版本隔离：切换版本时会自动备份/恢复存档
+
+# 版本管理面板是否默认展开
+isExpandedVersions: false
+
+# 版本管理面板的主题颜色（右侧固定的版本选择区域）
+# 可选值：BROWN（默认棕色）| BLUE | BLUE_BACKGROUND | GREEN | GREEN_BACKGROUND
+#         RED | PURPLE | PURPLE_BACKGROUND | ORANGE | TEAL | TEAL_BACKGROUND
+#         GOLD | GRAY | GRAY_BACKGROUND
+# 带 _BACKGROUND 后缀 = 深色背景+亮色文字（适合深色风格）
+versionsTheme: "BROWN"
+
+# ------------------------------
+# 【核心】动态栏目配置
+# ------------------------------
+sections:
+  # ==========================================
+  # 栏目 1: 存档管理
+  # 类型: 单选 (RADIO)
+  # 目标: 自定义目录
+  # ==========================================
+  - id: "saves"
+    title: "存档管理"
+    isExpanded: false
+    targetPath: "com.popcap.pvz2restartNo_Backup"
+
+    items:
+      - id: "save_1"
+        name: "存档1"
+        desc: "新手-1-5"
+        type: "RADIO"
+        icon: "save_icon.png"
+        assetPath: "saves/save_1"
+        default: true
+
+      - id: "save_2"
+        name: "存档2"
+        desc: "进阶-10-20"
+        type: "RADIO"
+        icon: "save_icon.png"
+        assetPath: "saves/save_2"
+
+  - id: "saves_info"
+    title: "存档信息"
+    theme: "RED"
+
+    items:
+      - id: "GoldQuantity"
+        name: "金币数量"
+        desc: "查看你存档中当前的金币数量"
+        type: "INFO"
+        infoValue: "暂无金币信息"
+        jsScript: |-
+          var saves = pvz.saves.load();
+          var datas = saves.objects[0].objdata
+          datas.c.解密
+      - id: "DiamondQuantity"
+        name: "钻石数量"
+        desc: "查看你存档中当前的钻石数量"
+        type: "INFO"
+        infoValue: "暂无钻石信息"
+        jsScript: |-
+          var saves = pvz.saves.load();
+          var datas = saves.objects[0].objdata
+          datas.g.解密
+      - id: "PlantQuantity"
+        name: "植物数量"
+        desc: "查看你存档中当前的植物数量"
+        type: "INFO"
+        infoValue: "暂无植物信息"
+        jsScript: |-
+          var saves = pvz.saves.load();
+          var datas = saves.objects[0].objdata
+          datas.psla.length
+
+
+  # ==========================================
+  # 栏目 2: 功能管理
+  # 类型: 多选 (CHECKBOX)
+  # ==========================================
+  - id: "features"
+    title: "功能管理"
+    theme: "BLUE"
+    # 不写 targetPath，默认使用上面的 smfDirectory (files/)
+
+    # 可见性控制：只有选中以下版本ID时才显示此栏目
+    visibleOnVersionIds: [ "old","new" ]
+
+    items:
+      - id: "auto_collect"
+        name: "阳光自动收集"
+        desc: "解放双手"
+        type: "CHECKBOX"
+        icon: "auto_collect.png"
+        smfList: [ "dynamic" ]
+        jsPath: "version/auto_collect.js"
+
+  # ==========================================
+  # 栏目: 福利中心 - GOLD
+  # 展示 INPUT + BUTTON 组合：礼品码兑换功能
+  # ==========================================
+  - id: "welfare"
+    title: "福利中心"
+    theme: "GOLD"
+
+    items:
+      # ----- 礼品码说明 -----
+      - id: "welfare_header"
+        desc: "🎁 输入礼品码即可领取豪华礼包"
+        type: "DESCRIPTION"
+
+      # ----- 礼品码输入框 -----
+      - id: "giftcode_input"
+        name: "礼品码"
+        desc: "请输入礼品码"
+        type: "INPUT"
+        placeholder: "请输入礼品码"
+        inputDefault: ""
+
+      # ----- 兑换按钮 -----
+      - id: "redeem_giftcode"
+        type: "BUTTON"
+        buttonText: "🎁 立即兑换"
+        buttonColor: "green"
+        jsPath: "giftcode/redeem_giftcode.js"
+
+      # ----- 分隔线 -----
+      - id: "welfare_sep_1"
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- 礼品码状态提示 -----
+      - id: "welfare_status"
+        name: "兑换记录"
+        desc: "查看你总计兑换过多少个礼品码"
+        type: "INFO"
+        infoValue: "暂无兑换记录"
+        jsPath: "giftcode/welfare_status.js"
+
+      # ----- 查看已使用礼品码按钮 -----
+      - id: "show_used_codes"
+        name: "查看兑换记录"
+        desc: "查看所有已成功兑换的礼品码"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsPath: "giftcode/show_used_codes.js"
+
+      # ----- 分隔线 -----
+      - id: "welfare_sep_2"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+
+  # ==========================================
+  # 栏目 3: 功能说明
+  # 类型: 纯文本 (DESCRIPTION)
+  # ==========================================
+  - id: "instructions"
+    title: "功能说明"
+    items:
+      - id: "desc_1"
+        name: ""
+        desc: "1. 存档切换即时生效"
+        type: "DESCRIPTION"
+      - id: "desc_2"
+        name: ""
+        desc: "2. 版本切换需重启应用"
+        type: "DESCRIPTION"
+      - id: "desc_3"
+        name: ""
+        desc: "3. 功能开关实时生效，不同版本功能不同"
+        type: "DESCRIPTION"
+
+  # ==========================================
+  # 栏目 4: JS 工具
+  # 类型: 按钮 (BUTTON)
+  # 说明: 每个 item 点击后执行对应的 JS 脚本
+  #       脚本支持 async/await，可调用 rton/rsb/ptx/pvz 等内置对象
+  #
+  # 按钮样式规则：
+  #   - buttonColor（item 级）：可选 blue（默认）| red | green | orange | purple
+  #   - 按钮布局规则：
+  #       name 或 desc 有内容 → 左侧文字 + 右侧小按钮
+  #       name 和 desc 均为空 → 渲染为全宽横条大按钮（与存档按钮风格一致）
+  # ==========================================
+  - id: "js_tools"
+    title: "JS 工具"
+#    isExpanded: true
+    theme: "BLUE"
+
+    items:
+      # ---------- 示例4：数字加密解密 ----------
+      - id: "encrypt_demo"
+        name: "数字加密示例"
+        desc: "演示 pvz 数字加密/解密（结果返回解密值）"
+        type: "BUTTON"
+        jsScript: |-
+          var raw = 1000;
+          var enc = raw.encrypt;
+          var dec = enc.decrypt;
+          dec
+
+      # ---------- 示例5：全宽横条大按钮（name 和 desc 均留空） ----------
+      # name 和 desc 均为空时，渲染为全宽横条按钮
+      - id: "test_ui_0"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "UI显示弹窗"
+        buttonColor: "purple"
+        jsScript: |-
+          ui.confirm("确认删除", "确定要删除这个文件吗？")
+
+      - id: "test_ui_1"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "UI显示输入框"
+        jsScript: |-
+          ui.prompt("输入名称", "请输入文件名", "默认名称")
+
+      - id: "test_ui_2"
+        name: "UI显示进度栏"
+        desc: ""
+        type: "BUTTON"
+        jsScript: |-
+          const progress = ui.progress("正在处理...", {
+              message: "初始化...",
+              indeterminate: false,
+              showCancel: true
+          });
+          
+          // 更新进度
+          progress.update("已完成 50%", 0.5);
+
+      # ---------- 测试：使用 version/new/smf/dynamic.rsb.smf ----------
+      - id: "test_dynamic_手动解包"
+        name: "测试 SMF 手动解包"
+        desc: "使用 version/new/smf/dynamic.rsb.smf 进行测试"
+        type: "BUTTON"
+        jsScript: |-
+          const progress = ui.progress("解包中...", { showCancel: true });//显示一个进度条
+          try {
+            //解包当前版本SMF目录下的dynamic.rsb.smf到/storage/emulated/0/Android/data/包名/files/resources_unpacked
+            rsb.unpack(path.pvz2tool.smf + "/dynamic.rsb.smf", path.android.files + "/resources_unpacked", {
+              onProgress: (percent, message) => {
+                  progress.update(message, percent);//解包的进度事件，将信息与进度给进度条更新
+              }
+            });
+          } finally {//完成后执行
+            progress.close();//关闭进度条
+          }
+          "成功";
+      - id: "test_dynamic_smf"
+        name: "测试 SMF 资源"
+        # smfList：填写需要读写的 SMF 基名（不含扩展名），工具会自动：
+        # 1. 先在 pvz2tool/version/<版本ID>/smf/<名称>.rsb.smf 中查找
+        # 2. 找不到则去 pvz2tool/version/base/smf/<名称>.rsb.smf 查找
+        # 缓存按版本隔离，同版本下所有功能项共享同一份解包缓存
+        desc: "使用 smfList 读写 dynamic.rsb.smf 进行测试"
+        type: "BUTTON"
+        smfList:
+          - "dynamic"
+        jsScript: |-
+          console.log(data.dynamic.packages.npcs.path)//获取dynamic解包后的npcs路径
+          let npcs = data.dynamic.packages.npcs.load()//获取npcs将RTON转JSON后的对象
+          console.log(npcs["#comment"])//获取对象的属性
+          npcs["#comment"] = "666"//修改对象的属性
+          npcs.save()//保存对象JSON为RTON
+          "成功";
+
+      - id: "test_存档"
+        name: "测试存档读取与修改"
+        desc: "测试"
+        type: "BUTTON"
+        jsScript: |-
+          let saves = pvz.saves.load()
+          console.log(saves.objects[0].objclass);
+          saves.save()
+          "成功";
+
+  # ==========================================
+  # 栏目: JS 脚本联动示例
+  # 展示 RADIO、CHECKBOX、SLIDER 与 jsScript 的配合使用
+  # 完整 API 文档见: js_documentation.md
+  # ==========================================
+  - id: "js_linkage"
+    title: "JS 脚本联动示例"
+    theme: "GREEN"
+
+    items:
+      # ----- RADIO + jsScript -----
+      # 点击后直接执行 JS（示例：切换游戏速度）
+      - id: "speed_normal"
+        name: "速度模式"
+        desc: "正常速度"
+        type: "RADIO"
+        groupId: "speed_mode"
+        default: true
+        jsScript: |-
+          console.log("切换到正常速度模式");
+          // 可以访问全局状态
+          console.log("当前难度: " + this.all.js_linkage.difficulty_easy.selected);
+          "速度已设置为: 正常"
+
+      - id: "speed_fast"
+        name: ""
+        desc: "快速模式"
+        type: "RADIO"
+        groupId: "speed_mode"
+        jsScript: |-
+          console.log("切换到快速模式");
+          // 使用 findById 访问其他组件
+          var autoCollect = this.findById("js_linkage", "auto_collect_js");
+          console.log("自动收集当前状态: " + autoCollect.checked);
+          "速度已设置为: 快速"
+
+      - id: "speed_slow"
+        name: ""
+        desc: "慢速模式"
+        type: "RADIO"
+        groupId: "speed_mode"
+        jsScript: |-
+          console.log("切换到慢速模式");
+          "速度已设置为: 慢速"
+
+      # ----- 分隔线 -----
+      - id: "sep_1"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- CHECKBOX + jsScript -----
+      # 切换时把选中状态传到 JS 并执行
+      - id: "auto_collect_js"
+        name: "自动收集阳光"
+        desc: "启用后自动收集场景中的阳光"
+        type: "CHECKBOX"
+        default: true
+        jsScript: |-
+          // this.checked 表示当前复选框的选中状态
+          console.log("自动收集功能: " + (this.checked ? "启用" : "禁用"));
+          this.checked ? "已启用自动收集" : "已禁用自动收集"
+
+      - id: "show_damage_js"
+        name: "显示伤害数值"
+        desc: "在植物上方显示造成的伤害"
+        type: "CHECKBOX"
+        jsScript: |-
+          console.log("显示伤害数值: " + (this.checked ? "开启" : "关闭"));
+          this.checked ? "已开启伤害显示" : "已关闭伤害显示"
+
+      # ----- 分隔线 -----
+      - id: "sep_2"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- SLIDER + jsScript -----
+      # 拖动结束后把值传到 JS 并执行
+      - id: "sun_value_js"
+        name: "初始阳光值"
+        desc: "设置游戏开始时的初始阳光数量"
+        type: "SLIDER"
+        minValue: 50
+        maxValue: 500
+        defaultValue: 150
+        step: 50
+        valueSuffix: ""
+        jsScript: |-
+          // this.value 表示当前滑动条的值
+          console.log("初始阳光值已设置为: " + this.value);
+          "阳光值已设置为: " + this.value
+
+      - id: "zombie_speed_js"
+        name: "僵尸移动速度"
+        desc: "调整所有僵尸的基础移动速度"
+        type: "SLIDER"
+        minValue: 50
+        maxValue: 200
+        defaultValue: 100
+        step: 10
+        valueSuffix: "%"
+        jsScript: |-
+          console.log("僵尸速度已设置为: " + this.value + "%");
+          "僵尸速度已设置为: " + this.value + "%"
+
+      # ----- 分隔线 -----
+      - id: "sep_3"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- 多组 RADIO 示例 -----
+      # 不同 groupId 的 RADIO 互不干扰
+      - id: "difficulty_easy"
+        name: "难度模式"
+        desc: "简单"
+        type: "RADIO"
+        groupId: "difficulty"
+        default: true
+      - id: "difficulty_normal"
+        name: ""
+        desc: "普通"
+        type: "RADIO"
+        groupId: "difficulty"
+      - id: "difficulty_hard"
+        name: ""
+        desc: "困难"
+        type: "RADIO"
+        groupId: "difficulty"
+
+      # 这是第二组 RADIO，与上面互不干扰
+      - id: "music_off"
+        name: "背景音乐"
+        desc: "关闭"
+        type: "RADIO"
+        groupId: "music"
+        default: true
+      - id: "music_on"
+        name: ""
+        desc: "开启"
+        type: "RADIO"
+        groupId: "music"
+
+      # ----- 分隔线 -----
+      - id: "sep_4"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ==========================================
+      # JS 全局 API 示例（BUTTON 类型）
+      # ==========================================
+
+      # ----- 示例：使用 this.all 访问其他栏目状态 -----
+      # 点击按钮时，根据其他栏目的配置执行不同逻辑
+      - id: "demo_all_access"
+        name: "this.all 全局访问示例"
+        desc: "读取 js_linkage 栏目下所有项的状态"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: |-
+          // 读取 js_linkage 栏目的信息
+          var section = this.all.js_linkage;
+          console.log("栏目标题: " + section.title);
+          console.log("栏目触发方式: " + section.trigger);
+
+          // 读取特定项的状态
+          var speedNormal = this.all.js_linkage.speed_normal;
+          console.log("正常速度是否选中: " + speedNormal.selected);
+
+          var autoCollect = this.all.js_linkage.auto_collect_js;
+          console.log("自动收集是否启用: " + autoCollect.checked);
+
+          var sunValue = this.all.js_linkage.sun_value_js;
+          console.log("阳光值滑块当前值: " + sunValue.value);
+          console.log("阳光值范围: " + sunValue.minValue + " ~ " + sunValue.maxValue);
+
+          // 读取所有选中的 CHECKBOX
+          var checked = section.checkedItems;
+          var checkedList = [];
+          for (var key in checked) {
+              if (checked[key]) checkedList.push(key);
+          }
+          console.log("已勾选: " + checkedList.join(", "));
+
+          "已读取 js_linkage 栏目配置"
+
+      # ----- 示例：使用 this.version 获取版本信息 -----
+      - id: "demo_version_info"
+        name: "this.version 版本信息"
+        desc: "获取当前选择的版本信息"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: |-
+          console.log("版本 ID: " + this.version.id);
+          console.log("版本名称: " + this.version.name);
+          console.log("GameActivity: " + this.version.gameActivity);
+          console.log("游戏 Activity: " + this.gameActivity);
+
+          // 也可以通过栏目获取存档路径
+          var savesSection = this.all.saves;
+          console.log("存档目录: " + savesSection.targetPath);
+
+          "版本信息读取完成"
+
+      # ----- 示例：使用 this.findById 单参数快捷查找 -----
+      # 推荐用法：只传一个参数，自动在 items 中查找，找不到再按 section 查找
+      - id: "demo_findbyid_single"
+        name: "findById 单参数查找"
+        desc: "快捷查找：先找 item，再找 section"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: |-
+          // 单参数快捷查找 - 推荐用法
+          // 1. 先在所有 items 中查找
+          // 2. 找不到则按 section id 查找
+          var item = this.findById("auto_collect_js");
+          if (item) {
+              console.log("找到项: " + item.name);
+              console.log("类型: " + item.type);
+              console.log("选中: " + item.checked);
+          }
+
+          // 找 section
+          var section = this.findById("saves");
+          if (section) {
+              console.log("找到栏目: " + section.title);
+              console.log("目标路径: " + section.targetPath);
+          }
+
+          "快捷查找完成"
+
+      # ----- 示例：遍历栏目下所有项 -----
+      - id: "demo_iterate_items"
+        name: "遍历栏目所有项"
+        desc: "遍历 js_linkage 下的所有项并输出信息"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: |-
+          var section = this.all.js_linkage;
+          var items = section.items;
+
+          var info = [];
+          for (var key in items) {
+              var item = items[key];
+              var status = "";
+              if (item.type === "RADIO") {
+                  status = item.selected ? " [已选中]" : "";
+              } else if (item.type === "CHECKBOX") {
+                  status = item.checked ? " [已勾选]" : "";
+              } else if (item.type === "SLIDER") {
+                  status = " [" + item.value + "]";
+              }
+              info.push(item.name + status);
+          }
+
+          console.log("所有项: " + info.join(" | "));
+          "已遍历 " + Object.keys(items).length + " 个项"
+
+      # ----- 示例：跨栏目状态读取 -----
+      # 从其他栏目（如 saves）读取信息
+      - id: "demo_cross_section"
+        name: "跨栏目状态读取"
+        desc: "从 saves 栏目读取当前存档选择"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: |-
+          // 读取存档栏目的当前选择
+          var savesSection = this.all.saves;
+          console.log("存档栏目: " + savesSection.title);
+          console.log("目标目录: " + savesSection.targetPath);
+
+          // 查找哪个存档被选中
+          var items = savesSection.items;
+          for (var key in items) {
+              var item = items[key];
+              if (item.selected) {
+                  console.log("当前存档: " + item.name);
+                  console.log("存档描述: " + item.desc);
+                  console.log("资源路径: " + item.resolvedPath);
+              }
+          }
+
+          "跨栏目读取完成"
+
+      # ----- 示例：综合应用 - 根据配置执行不同逻辑 -----
+      - id: "demo_conditional_logic"
+        name: "条件执行示例"
+        desc: "根据多个配置项决定执行逻辑"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: |-
+          // 获取各个配置
+          var speedMode = this.all.js_linkage.speed_normal.selected ? "正常" :
+                          this.all.js_linkage.speed_fast.selected ? "快速" : "慢速";
+
+          var autoCollect = this.all.js_linkage.auto_collect_js.checked;
+          var sunValue = this.all.js_linkage.sun_value_js.value;
+          var showDamage = this.all.js_linkage.show_damage_js.checked;
+
+          // 打印汇总
+          console.log("=== 当前配置汇总 ===");
+          console.log("速度模式: " + speedMode);
+          console.log("自动收集: " + (autoCollect ? "启用" : "禁用"));
+          console.log("初始阳光: " + sunValue);
+          console.log("显示伤害: " + (showDamage ? "开启" : "关闭"));
+          console.log("当前版本: " + this.version.name);
+
+          "配置汇总完成"
+
+  # ==========================================
+  # 栏目: 棕色主题 - BROWN（基础浅色主题）
+  # 展示所有组件类型和变体
+  # ==========================================
+  - id: "theme_brown"
+    title: "棕色主题 BROWN"
+    theme: "BROWN"
+    confirmButtonText: "应用"
+
+    items:
+      # ----- RADIO 单选 -----
+      - id: "brown_radio"
+        name: "RADIO 单选"
+        desc: "单选按钮示例"
+        type: "RADIO"
+        default: true
+      - id: "brown_radio_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "RADIO"
+
+      # ----- CHECKBOX 多选 -----
+      - id: "brown_checkbox"
+        name: "CHECKBOX 多选"
+        desc: "多选按钮示例"
+        type: "CHECKBOX"
+        default: true
+      - id: "brown_checkbox_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "CHECKBOX"
+
+      # ----- 分隔线 -----
+      - id: "brown_sep_1"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- BUTTON 普通按钮 -----
+      - id: "brown_btn_blue"
+        name: "BUTTON 蓝色"
+        desc: "蓝色按钮"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "brown_btn_green"
+        name: "BUTTON 绿色"
+        desc: "绿色按钮"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: "true"
+      - id: "brown_btn_orange"
+        name: "BUTTON 橙色"
+        desc: "橙色按钮"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: "true"
+      - id: "brown_btn_purple"
+        name: "BUTTON 紫色"
+        desc: "紫色按钮"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: "true"
+      - id: "brown_btn_red"
+        name: "BUTTON 红色"
+        desc: "红色按钮"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- BUTTON 全宽横条 -----
+      - id: "brown_btn_full_1"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-蓝色"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "brown_btn_full_2"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-红色"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- SLIDER 滑动条 -----
+      - id: "brown_slider"
+        name: "SLIDER 滑动条"
+        desc: "数值调节示例"
+        type: "SLIDER"
+        minValue: 0
+        maxValue: 100
+        defaultValue: 50
+        step: 10
+        valueSuffix: "%"
+
+      # ----- INPUT 输入框 -----
+      - id: "brown_input"
+        name: "INPUT 输入框"
+        desc: "文本输入示例"
+        type: "INPUT"
+        placeholder: "请输入..."
+        inputDefault: "默认文本"
+
+      # ----- INFO 信息框 -----
+      - id: "brown_info"
+        name: "INFO 信息框"
+        desc: "只读信息展示，支持 JS 动态内容"
+        type: "INFO"
+        infoValue: "显示信息内容"
+      - id: "brown_info_with_js"
+        name: "JS 动态信息"
+        desc: "JS 执行后显示返回值"
+        type: "INFO"
+        infoValue: "加载中..."
+        jsScript: |
+          "存档数量: 信息"
+
+  # ==========================================
+  # 栏目: 蓝色主题 - BLUE
+  # ==========================================
+  - id: "theme_blue"
+    title: "蓝色主题 BLUE"
+    theme: "BLUE"
+    confirmButtonText: "应用"
+
+    items:
+      # ----- RADIO 单选 -----
+      - id: "blue_radio"
+        name: "RADIO 单选"
+        desc: "单选按钮示例"
+        type: "RADIO"
+        default: true
+      - id: "blue_radio_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "RADIO"
+
+      # ----- CHECKBOX 多选 -----
+      - id: "blue_checkbox"
+        name: "CHECKBOX 多选"
+        desc: "多选按钮示例"
+        type: "CHECKBOX"
+        default: true
+      - id: "blue_checkbox_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "CHECKBOX"
+
+      # ----- 分隔线 -----
+      - id: "blue_sep_1"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- BUTTON 普通按钮 -----
+      - id: "blue_btn_blue"
+        name: "BUTTON 蓝色"
+        desc: "蓝色按钮"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "blue_btn_green"
+        name: "BUTTON 绿色"
+        desc: "绿色按钮"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: "true"
+      - id: "blue_btn_orange"
+        name: "BUTTON 橙色"
+        desc: "橙色按钮"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: "true"
+      - id: "blue_btn_purple"
+        name: "BUTTON 紫色"
+        desc: "紫色按钮"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: "true"
+      - id: "blue_btn_red"
+        name: "BUTTON 红色"
+        desc: "红色按钮"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- BUTTON 全宽横条 -----
+      - id: "blue_btn_full_1"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-蓝色"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "blue_btn_full_2"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-红色"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- SLIDER 滑动条 -----
+      - id: "blue_slider"
+        name: "SLIDER 滑动条"
+        desc: "数值调节示例"
+        type: "SLIDER"
+        minValue: 0
+        maxValue: 100
+        defaultValue: 50
+        step: 10
+        valueSuffix: "%"
+
+      # ----- INPUT 输入框 -----
+      - id: "blue_input"
+        name: "INPUT 输入框"
+        desc: "文本输入示例"
+        type: "INPUT"
+        placeholder: "请输入..."
+        inputDefault: "默认文本"
+
+      # ----- INFO 信息框 -----
+      - id: "blue_info"
+        name: "INFO 信息框"
+        desc: "只读信息展示"
+        type: "INFO"
+        infoValue: "显示信息内容"
+
+  # ==========================================
+  # 栏目: 绿色主题 - GREEN
+  # ==========================================
+  - id: "theme_green"
+    title: "绿色主题 GREEN"
+    theme: "GREEN"
+    confirmButtonText: "应用"
+
+    items:
+      # ----- RADIO 单选 -----
+      - id: "green_radio"
+        name: "RADIO 单选"
+        desc: "单选按钮示例"
+        type: "RADIO"
+        default: true
+      - id: "green_radio_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "RADIO"
+
+      # ----- CHECKBOX 多选 -----
+      - id: "green_checkbox"
+        name: "CHECKBOX 多选"
+        desc: "多选按钮示例"
+        type: "CHECKBOX"
+        default: true
+      - id: "green_checkbox_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "CHECKBOX"
+
+      # ----- 分隔线 -----
+      - id: "green_sep_1"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- BUTTON 普通按钮 -----
+      - id: "green_btn_blue"
+        name: "BUTTON 蓝色"
+        desc: "蓝色按钮"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "green_btn_green"
+        name: "BUTTON 绿色"
+        desc: "绿色按钮"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: "true"
+      - id: "green_btn_orange"
+        name: "BUTTON 橙色"
+        desc: "橙色按钮"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: "true"
+      - id: "green_btn_purple"
+        name: "BUTTON 紫色"
+        desc: "紫色按钮"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: "true"
+      - id: "green_btn_red"
+        name: "BUTTON 红色"
+        desc: "红色按钮"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- BUTTON 全宽横条 -----
+      - id: "green_btn_full_1"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-蓝色"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "green_btn_full_2"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-红色"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- SLIDER 滑动条 -----
+      - id: "green_slider"
+        name: "SLIDER 滑动条"
+        desc: "数值调节示例"
+        type: "SLIDER"
+        minValue: 0
+        maxValue: 100
+        defaultValue: 50
+        step: 10
+        valueSuffix: "%"
+
+      # ----- INPUT 输入框 -----
+      - id: "green_input"
+        name: "INPUT 输入框"
+        desc: "文本输入示例"
+        type: "INPUT"
+        placeholder: "请输入..."
+        inputDefault: "默认文本"
+
+      # ----- INFO 信息框 -----
+      - id: "green_info"
+        name: "INFO 信息框"
+        desc: "只读信息展示"
+        type: "INFO"
+        infoValue: "显示信息内容"
+
+  # ==========================================
+  # 栏目: 红色主题 - RED
+  # ==========================================
+  - id: "theme_red"
+    title: "红色主题 RED"
+    theme: "RED"
+    confirmButtonText: "应用"
+
+    items:
+      # ----- RADIO 单选 -----
+      - id: "red_radio"
+        name: "RADIO 单选"
+        desc: "单选按钮示例"
+        type: "RADIO"
+        default: true
+      - id: "red_radio_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "RADIO"
+
+      # ----- CHECKBOX 多选 -----
+      - id: "red_checkbox"
+        name: "CHECKBOX 多选"
+        desc: "多选按钮示例"
+        type: "CHECKBOX"
+        default: true
+      - id: "red_checkbox_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "CHECKBOX"
+
+      # ----- 分隔线 -----
+      - id: "red_sep_1"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- BUTTON 普通按钮 -----
+      - id: "red_btn_blue"
+        name: "BUTTON 蓝色"
+        desc: "蓝色按钮"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "red_btn_green"
+        name: "BUTTON 绿色"
+        desc: "绿色按钮"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: "true"
+      - id: "red_btn_orange"
+        name: "BUTTON 橙色"
+        desc: "橙色按钮"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: "true"
+      - id: "red_btn_purple"
+        name: "BUTTON 紫色"
+        desc: "紫色按钮"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: "true"
+      - id: "red_btn_red"
+        name: "BUTTON 红色"
+        desc: "红色按钮"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- BUTTON 全宽横条 -----
+      - id: "red_btn_full_1"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-蓝色"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "red_btn_full_2"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-红色"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- SLIDER 滑动条 -----
+      - id: "red_slider"
+        name: "SLIDER 滑动条"
+        desc: "数值调节示例"
+        type: "SLIDER"
+        minValue: 0
+        maxValue: 100
+        defaultValue: 50
+        step: 10
+        valueSuffix: "%"
+
+      # ----- INPUT 输入框 -----
+      - id: "red_input"
+        name: "INPUT 输入框"
+        desc: "文本输入示例"
+        type: "INPUT"
+        placeholder: "请输入..."
+        inputDefault: "默认文本"
+
+      # ----- INFO 信息框 -----
+      - id: "red_info"
+        name: "INFO 信息框"
+        desc: "只读信息展示"
+        type: "INFO"
+        infoValue: "显示信息内容"
+
+  # ==========================================
+  # 栏目: 紫色主题 - PURPLE
+  # ==========================================
+  - id: "theme_purple"
+    title: "紫色主题 PURPLE"
+    theme: "PURPLE"
+    confirmButtonText: "应用"
+
+    items:
+      # ----- RADIO 单选 -----
+      - id: "purple_radio"
+        name: "RADIO 单选"
+        desc: "单选按钮示例"
+        type: "RADIO"
+        default: true
+      - id: "purple_radio_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "RADIO"
+
+      # ----- CHECKBOX 多选 -----
+      - id: "purple_checkbox"
+        name: "CHECKBOX 多选"
+        desc: "多选按钮示例"
+        type: "CHECKBOX"
+        default: true
+      - id: "purple_checkbox_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "CHECKBOX"
+
+      # ----- 分隔线 -----
+      - id: "purple_sep_1"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- BUTTON 普通按钮 -----
+      - id: "purple_btn_blue"
+        name: "BUTTON 蓝色"
+        desc: "蓝色按钮"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "purple_btn_green"
+        name: "BUTTON 绿色"
+        desc: "绿色按钮"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: "true"
+      - id: "purple_btn_orange"
+        name: "BUTTON 橙色"
+        desc: "橙色按钮"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: "true"
+      - id: "purple_btn_purple"
+        name: "BUTTON 紫色"
+        desc: "紫色按钮"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: "true"
+      - id: "purple_btn_red"
+        name: "BUTTON 红色"
+        desc: "红色按钮"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- BUTTON 全宽横条 -----
+      - id: "purple_btn_full_1"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-蓝色"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "purple_btn_full_2"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-红色"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- SLIDER 滑动条 -----
+      - id: "purple_slider"
+        name: "SLIDER 滑动条"
+        desc: "数值调节示例"
+        type: "SLIDER"
+        minValue: 0
+        maxValue: 100
+        defaultValue: 50
+        step: 10
+        valueSuffix: "%"
+
+      # ----- INPUT 输入框 -----
+      - id: "purple_input"
+        name: "INPUT 输入框"
+        desc: "文本输入示例"
+        type: "INPUT"
+        placeholder: "请输入..."
+        inputDefault: "默认文本"
+
+      # ----- INFO 信息框 -----
+      - id: "purple_info"
+        name: "INFO 信息框"
+        desc: "只读信息展示"
+        type: "INFO"
+        infoValue: "显示信息内容"
+
+  # ==========================================
+  # 栏目: 橙色主题 - ORANGE
+  # ==========================================
+  - id: "theme_orange"
+    title: "橙色主题 ORANGE"
+    theme: "ORANGE"
+    confirmButtonText: "应用"
+
+    items:
+      # ----- RADIO 单选 -----
+      - id: "orange_radio"
+        name: "RADIO 单选"
+        desc: "单选按钮示例"
+        type: "RADIO"
+        default: true
+      - id: "orange_radio_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "RADIO"
+
+      # ----- CHECKBOX 多选 -----
+      - id: "orange_checkbox"
+        name: "CHECKBOX 多选"
+        desc: "多选按钮示例"
+        type: "CHECKBOX"
+        default: true
+      - id: "orange_checkbox_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "CHECKBOX"
+
+      # ----- 分隔线 -----
+      - id: "orange_sep_1"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- BUTTON 普通按钮 -----
+      - id: "orange_btn_blue"
+        name: "BUTTON 蓝色"
+        desc: "蓝色按钮"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "orange_btn_green"
+        name: "BUTTON 绿色"
+        desc: "绿色按钮"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: "true"
+      - id: "orange_btn_orange"
+        name: "BUTTON 橙色"
+        desc: "橙色按钮"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: "true"
+      - id: "orange_btn_purple"
+        name: "BUTTON 紫色"
+        desc: "紫色按钮"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: "true"
+      - id: "orange_btn_red"
+        name: "BUTTON 红色"
+        desc: "红色按钮"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- BUTTON 全宽横条 -----
+      - id: "orange_btn_full_1"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-蓝色"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "orange_btn_full_2"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-红色"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- SLIDER 滑动条 -----
+      - id: "orange_slider"
+        name: "SLIDER 滑动条"
+        desc: "数值调节示例"
+        type: "SLIDER"
+        minValue: 0
+        maxValue: 100
+        defaultValue: 50
+        step: 10
+        valueSuffix: "%"
+
+      # ----- INPUT 输入框 -----
+      - id: "orange_input"
+        name: "INPUT 输入框"
+        desc: "文本输入示例"
+        type: "INPUT"
+        placeholder: "请输入..."
+        inputDefault: "默认文本"
+
+      # ----- INFO 信息框 -----
+      - id: "orange_info"
+        name: "INFO 信息框"
+        desc: "只读信息展示"
+        type: "INFO"
+        infoValue: "显示信息内容"
+
+  # ==========================================
+  # 栏目: 蓝底深色主题 - BLUE_BACKGROUND
+  # ==========================================
+  - id: "theme_blue_bg"
+    title: "蓝底深色 BLUE_BACKGROUND"
+    theme: "BLUE_BACKGROUND"
+    confirmButtonText: "应用"
+
+    items:
+      # ----- RADIO 单选 -----
+      - id: "bluebg_radio"
+        name: "RADIO 单选"
+        desc: "单选按钮示例"
+        type: "RADIO"
+        default: true
+      - id: "bluebg_radio_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "RADIO"
+
+      # ----- CHECKBOX 多选 -----
+      - id: "bluebg_checkbox"
+        name: "CHECKBOX 多选"
+        desc: "多选按钮示例"
+        type: "CHECKBOX"
+        default: true
+      - id: "bluebg_checkbox_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "CHECKBOX"
+
+      # ----- 分隔线 -----
+      - id: "bluebg_sep_1"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- BUTTON 普通按钮 -----
+      - id: "bluebg_btn_blue"
+        name: "BUTTON 蓝色"
+        desc: "蓝色按钮"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "bluebg_btn_green"
+        name: "BUTTON 绿色"
+        desc: "绿色按钮"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: "true"
+      - id: "bluebg_btn_orange"
+        name: "BUTTON 橙色"
+        desc: "橙色按钮"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: "true"
+      - id: "bluebg_btn_purple"
+        name: "BUTTON 紫色"
+        desc: "紫色按钮"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: "true"
+      - id: "bluebg_btn_red"
+        name: "BUTTON 红色"
+        desc: "红色按钮"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- BUTTON 全宽横条 -----
+      - id: "bluebg_btn_full_1"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-蓝色"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "bluebg_btn_full_2"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-红色"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- SLIDER 滑动条 -----
+      - id: "bluebg_slider"
+        name: "SLIDER 滑动条"
+        desc: "数值调节示例"
+        type: "SLIDER"
+        minValue: 0
+        maxValue: 100
+        defaultValue: 50
+        step: 10
+        valueSuffix: "%"
+
+      # ----- INPUT 输入框 -----
+      - id: "bluebg_input"
+        name: "INPUT 输入框"
+        desc: "文本输入示例"
+        type: "INPUT"
+        placeholder: "请输入..."
+        inputDefault: "默认文本"
+
+      # ----- INFO 信息框 -----
+      - id: "bluebg_info"
+        name: "INFO 信息框"
+        desc: "只读信息展示"
+        type: "INFO"
+        infoValue: "显示信息内容"
+
+  # ==========================================
+  # 栏目: 绿底深色主题 - GREEN_BACKGROUND
+  # ==========================================
+  - id: "theme_green_bg"
+    title: "绿底深色 GREEN_BACKGROUND"
+    theme: "GREEN_BACKGROUND"
+    confirmButtonText: "应用"
+
+    items:
+      # ----- RADIO 单选 -----
+      - id: "greenbg_radio"
+        name: "RADIO 单选"
+        desc: "单选按钮示例"
+        type: "RADIO"
+        default: true
+      - id: "greenbg_radio_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "RADIO"
+
+      # ----- CHECKBOX 多选 -----
+      - id: "greenbg_checkbox"
+        name: "CHECKBOX 多选"
+        desc: "多选按钮示例"
+        type: "CHECKBOX"
+        default: true
+      - id: "greenbg_checkbox_2"
+        name: "选项二"
+        desc: "第二个选项"
+        type: "CHECKBOX"
+
+      # ----- 分隔线 -----
+      - id: "greenbg_sep_1"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- BUTTON 普通按钮 -----
+      - id: "greenbg_btn_blue"
+        name: "BUTTON 蓝色"
+        desc: "蓝色按钮"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "greenbg_btn_green"
+        name: "BUTTON 绿色"
+        desc: "绿色按钮"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: "true"
+      - id: "greenbg_btn_orange"
+        name: "BUTTON 橙色"
+        desc: "橙色按钮"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: "true"
+      - id: "greenbg_btn_purple"
+        name: "BUTTON 紫色"
+        desc: "紫色按钮"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: "true"
+      - id: "greenbg_btn_red"
+        name: "BUTTON 红色"
+        desc: "红色按钮"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- BUTTON 全宽横条 -----
+      - id: "greenbg_btn_full_1"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-蓝色"
+        buttonColor: "blue"
+        jsScript: "true"
+      - id: "greenbg_btn_full_2"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "全宽横条-红色"
+        buttonColor: "red"
+        jsScript: "true"
+
+      # ----- SLIDER 滑动条 -----
+      - id: "greenbg_slider"
+        name: "SLIDER 滑动条"
+        desc: "数值调节示例"
+        type: "SLIDER"
+        minValue: 0
+        maxValue: 100
+        defaultValue: 50
+        step: 10
+        valueSuffix: "%"
+
+      # ----- INPUT 输入框 -----
+      - id: "greenbg_input"
+        name: "INPUT 输入框"
+        desc: "文本输入示例"
+        type: "INPUT"
+        placeholder: "请输入..."
+        inputDefault: "默认文本"
+
+      # ----- INFO 信息框 -----
+      - id: "greenbg_info"
+        name: "INFO 信息框"
+        desc: "只读信息展示"
+        type: "INFO"
+        infoValue: "显示信息内容"
+
+# ------------------------------
+# UI 文本配置
+# ------------------------------
+ui:
+  title:
+    topAppBar: "植物大战僵尸2·迷宫拓展版"
+    about: "关于版本"
+    coreFunction: "核心功能"
+    versionManage: "版本管理"
+
+  button:
+    enterGame: "进入游戏"
+    isEnterGameDefaultIcon: true # 是否使用默认图标
+    tutorial: "教程"
+    isTutorialDefaultIcon: true # 是否使用默认图标
+    resetData: "重置数据包"
+    isResetDataDefaultIcon: true # 是否使用默认图标
+    disconnectTheNetworkAndStart: "断网启动"
+    confirmVersion: "选定版本"
+
+  extractor:
+    dialogTitle:  "戴夫的工具箱 | 资源更新"
+    initialLoadingProgressTip: "戴夫正在清点物资清单..."
+    initialProgressTip: "戴夫检测到新的版本波动啦，准备更新物资..."
+    noNeedExtractTip: "戴夫检查了工具箱，暂时没有新物资需要更新~"
+    singleFileProcessingTip: "戴夫正在手忙脚乱整理物资："
+    multiFileProcessingTip: "戴夫正在手忙脚乱整理%d个物资："
+    waitingTip: "戴夫正在整理物资，旅途中稍等片刻~"
+    extractCompleteTip: "物资更新完毕！\n准备好再次迎战僵尸了吗，玩家！\n【%s】"
+    extractFailTipPrefix: "糟糕！戴夫的工具箱出问题了："
+    fileSkipTipPrefix: "戴夫检查到「%s」无需更新，跳过啦~"
+    continueButtonText: "继续物资准备"
+    completeButtonText: "重返战场"
+    toastErrorPrefix: "戴夫的小提示：更新失败啦 → " # 此文本不支持复合颜色
+
+  save:
+    # 弹窗标题
+    presetConfirmTitle: "应用预设存档"
+    presetConfirmMessage: "确定要应用「%s」预设存档吗？\n原有游戏进度将被替换！"
+    deleteConfirmTitle: "删除存档"
+    deleteConfirmMessage: "确定要删除「%s」吗？\n此操作不可恢复。"
+    coverConfirmTitle: "覆盖游戏存档"
+    coverConfirmMessage: "确定要将当前存档覆盖到游戏吗？\n原有游戏进度将被替换！"
+    deleteGameSaveConfirmTitle: "删除游玩存档"
+    deleteGameSaveConfirmMessage: "此操作将永久清空您当前的游戏进度，删除后无法恢复！确定要继续吗？"
+    saveInfoTitle: "存档信息"
+
+    # 输入框标签
+    saveNameLabel: "存档名"
+    saveDescLabel: "存档描述"
+
+    # 按钮文字
+    cancelButton: "取消"
+    confirmButton: "确认"
+    shareButton: "分享所有本地存档"
+    exportButton: "导出游玩存档"
+    importButton: "导入存档到本地"
+    backupButton: "备份游玩存档"
+    coverLocalButton: "使用本地存档进行游玩"
+    deleteGameSaveButton: "删除游玩存档"
+    coverPresetButton: "使用预设存档进行游玩"
+
+    # 提示文字
+    saveNameEmptyTip: "存档名不能为空" # 此文本不支持复合颜色
+    noLocalSaveTip: "暂无本地存档"
+    selectLocalSaveTip: "请先选中要覆盖的本地存档"
+
+    # 操作结果提示（%s 为占位符，运行时替换具体内容）
+    backupSuccessTip: "存档备份成功：%s"
+    backupFailTipPrefix: "备份失败：%s"
+    exportSuccessTip: "存档导出成功"
+    exportFailTipPrefix: "导出失败：%s"
+    importSuccessTip: "存档导入成功"
+    importFailTipPrefix: "导入失败：%s"
+    deleteSuccessTip: "存档删除成功"
+    deleteFailTipPrefix: "删除存档失败：%s"
+    coverSuccessTip: "本地存档覆盖成功"
+    coverFailTipPrefix: "覆盖失败：%s"
+    deleteGameSaveSuccessTip: "当前游玩存档已成功删除"
+    deleteGameSaveFailTipPrefix: "删除游玩存档失败：%s"
+    # 默认存档描述
+    defaultImportNamePrefix: "导入" # 此文本不支持复合颜色
+    defaultBackupDesc: "自动备份" # 此文本不支持复合颜色
+    defaultImportDesc: "手动导入" # 此文本不支持复合颜色
+
+    # 重试按钮文字
+    retryButtonText: "重试"
+
+    # 操作类型中文描述（结果弹窗标题）
+    operation:
+      backup: "备份存档"
+      export: "导出存档"
+      import: "导入存档"
+      delete: "删除存档"
+      deleteGameSave: "删除游玩存档"
+      cover: "覆盖存档"
+      saveMeta: "保存存档信息"
+
+  # 设置弹窗配置
+  settings:
+    title: "戴夫工具箱·设置"
+    solidBackgroundMode: "纯色背景模式"
+    changeTheProfileReadLocation: "更换配置文件读取位置"
+    reloadConfig: "重新读取配置文件"
+    importSmfFile: "导入SMF文件"
+    playBackgroundMusic: "播放背景音乐"
+    resetPacketDeepClearing: "重置数据包时删除smf目录"
+    showNotUpdate: "进入游戏时未检测到更新也进行弹窗"
+
+  # JS 日志面板配置
+  log:
+    panelTitle: "JS 日志"
+    copyLogDesc: "复制日志"
+    clearLogDesc: "清空日志"
+    noLogText: "暂无日志"
+    presetSaveLabel: "预设存档"
+    localSaveLabel: "本地存档"
+
+  # 通用对话框按钮配置
+  dialog:
+    cancel: "取消"
+    confirm: "确定"
+    deleteSaveDesc: "删除存档"
+    editUserNameDesc: "编辑用户名"
+    shareSaveChooserTitle: "分享 PVZ2 存档"
+    sharePackFailedTip: "打包存档失败"
+    noShareableSaveTip: "没有可分享的本地存档"
+
+  # 错误提示文案配置
+  error:
+    jsExecuteErrorTitle: "JS 执行出错"
+    gameActivityInvalid: "设置的游戏Activity有误或不存在"
+    unknownError: "未知错误"
+
+  # 欢迎用户组件配置
+  welcome:
+    greetingTemplate: "欢迎您，%s"
+    editUserNameTitle: "修改用户名"
+    editUserNameHint: "请输入新的用户名"
+
+  # 导出/导入兜底错误
+  noValidDirTip: "未选择有效目录"
+
+
+  # ── 功能属性（背景/视频/音乐/权限等）──
+  # 注意：以下路径字段支持 URL（http:// 或 https://），检测到 URL 则直接使用
+  assets:
+    background: "bg_main.jpg"           # 背景图（支持 URL）
+    isUseSolidColorBackground: true
+    backgroundMusic: "bg_music.wav"       # 背景音乐（支持 URL）
+    isPlayBackgroundMusic: true
+    # CG 开场视频路径（相对于 assets/pvz2tool/video，支持 URL）
+    cgVideoPath: "opening.mp4"
+    # CG 开场视频超时时间，单位毫秒
+    cgVideoLoadTimeout: 5000
+    # CG 开场视频超时或报错是显示的海报图片
+    cgVideoPoster: "bg_main.jpg"
+
+  # ── 音效文件名映射（相对于 assets/pvz2tool/sound/）──
+  # 注意：支持 URL（http:// 或 https://），检测到 URL 则直接使用
+  sounds:
+    # 通用点击/开关（RADIO/CHECKBOX/列表条目等）
+    switchClickPress: "ui_switch_click_press.wav"
+    switchClickRelease: "ui_switch_click_release.wav"
+    switchClick: "ui_switch_click.wav"
+    # 普通按钮（PvzButton）
+    buttonClickPress: "ui_button_click_press.wav"
+    buttonClickRelease: "ui_button_click_release.wav"
+    # 设置/编辑类按钮（小齿轮图标等）
+    buttonSettingsPress: "ui_button_settings_press.wav"
+    buttonSettingsRelease: "ui_button_settings_release.wav"
+    # 关闭按钮（X 按钮）
+    buttonXClosePress: "ui_button_x_close_press.wav"
+    buttonXCloseRelease: "ui_button_x_close_release.wav"
+    # 可折叠面板
+    collapsiblePanelPress: "ui_collapsible_panel_click_press.wav"
+    collapsiblePanelRelease: "ui_collapsible_panel_click_release.wav"
+
+  versionLabel: "版本号："
+  uiVersion: "V2.5.1"
+  authorInfo: |-
+    作者：{{green-shadow:松间烬雪}}
+    特别感谢{{link-red-shadow|https://b23.tv/mVOm6n3:@汽水Boy Dream moon.}}制作调试界面
+  tutorial: |-
+    欢迎使用本应用！以下是详细教程：
+    
+    1. 联网问题
+    最新版联网问题已解决，联网进入游戏若闪屏请狂点下方按钮直到不闪为止
+    2. 安装问题
+    显示系统不匹配安装失败请使用虚拟机（品牌不限），选安卓5-15任意机型即可
+    3. 界面问题
+    老版本全屏时会出现经典的令人难绷画面拉伸伸长，所以默认黑边
+    4. 电脑版本
+    电脑端可以使用安卓模拟器游玩，32位64位系统均可
+    5. 音乐包
+    音乐包的路径：可以使用es或者mt管理器 根目录/Android/data/com.pop cap.pvz2mgtz/files把音乐包里的egypt.rsb.smf替换进去即可，注意因为源码问题所以只能播放一种音乐，请自行选择
+    6. 钻石获取
+    钻石打主线关卡或通过活动获取
+    7. 其他建议
+    执意刷钱的玩家可以洗洗睡了
+    
+    最后祝玩家游玩愉快！
+
+# ------------------------------
+# 公告配置
+# ------------------------------
+announcement:
+  - title: "拓展2.5.1(最新版)"
+    content: |-
+      内容{{red:演示的红色内容}}内容
+  - title: "拓展2.0.0(怀旧版)"
+    content: |-
+      内容

@@ -1,0 +1,290 @@
+{
+  "TutorialStage": {
+    "name": "教程关背景",
+    "code": "TutorialStage"
+  },
+  "FrontLawnStage": {
+    "name": "庭院背景",
+    "code": "FrontLawnStage"
+  },
+  "FrontLawnSpringStage": {
+    "name": "复活节庭院背景",
+    "code": "FrontLawnSpringStage"
+  },
+  "EgyptStage": {
+    "name": "神秘埃及背景",
+    "code": "EgyptStage"
+  },
+  "PirateStage": {
+    "name": "海盗港湾背景",
+    "code": "PirateStage"
+  },
+  "WestStage": {
+    "name": "狂野西部背景",
+    "code": "WestStage"
+  },
+  "KongfuStage": {
+    "name": "功夫世界背景",
+    "code": "KongfuStage"
+  },
+  "KongfuBossStage": {
+    "name": "功夫世界僵王背景",
+    "code": "KongfuBossStage"
+  },
+  "FutureStage": {
+    "name": "未来世界背景",
+    "code": "FutureStage"
+  },
+  "DarkStage": {
+    "name": "黑暗时代背景",
+    "code": "DarkStage"
+  },
+  "TheatreDarkStage": {
+    "name": "剧院惊魂背景",
+    "code": "TheatreDarkStage"
+  },
+  "BeachStage": {
+    "name": "巨浪沙滩背景",
+    "code": "BeachStage"
+  },
+  "BeachSnakeStage": {
+    "name": "巨浪沙滩贪吃蛇背景",
+    "code": "BeachSnakeStage"
+  },
+  "IceageStage": {
+    "name": "冰河世界背景",
+    "code": "IceageStage"
+  },
+  "IceageRiverCrossingStage": {
+    "name": "冰河世界渡渡鸟历险记背景",
+    "code": "IceageRiverCrossingStage"
+  },
+  "IceageEliminateStage": {
+    "name": "冰河世界植物迷阵背景",
+    "code": "IceageEliminateStage"
+  },
+  "SkycityStage": {
+    "name": "天空之城背景",
+    "code": "SkycityStage"
+  },
+  "SkycityPooyanStage": {
+    "name": "天空之城围追堵截背景",
+    "code": "SkycityPooyanStage"
+  },
+  "SkycityFishingStage": {
+    "name": "天空之城一炮当关背景",
+    "code": "SkycityFishingStage"
+  },
+  "SkycityTestStage": {
+    "name": "天空之城测试背景",
+    "code": "SkycityTestStage"
+  },
+  "LostCityStage": {
+    "name": "失落之城背景",
+    "code": "LostCityStage"
+  },
+  "ArenaStage": {
+    "name": "花园对战背景",
+    "code": "ArenaStage"
+  },
+  "ChildrenDayStage": {
+    "name": "儿童节背景",
+    "code": "ChildrenDayStage"
+  },
+  "WhackAMoleStage": {
+    "name": "打地鼠背景",
+    "code": "WhackAMoleStage"
+  },
+  "EightiesStage": {
+    "name": "摇滚年代背景",
+    "code": "EightiesStage"
+  },
+  "DinoStage": {
+    "name": "恐龙危机背景",
+    "code": "DinoStage"
+  },
+  "ModernStage": {
+    "name": "摩登世界背景",
+    "code": "ModernStage"
+  },
+  "SteamStage": {
+    "name": "蒸汽时代背景",
+    "code": "SteamStage"
+  },
+  "RenaiStage": {
+    "name": "复兴时代背景",
+    "code": "RenaiStage"
+  },
+  "HeianStage": {
+    "name": "平安时代背景",
+    "code": "HeianStage"
+  },
+  "SoccerStage": {
+    "name": "世界杯背景",
+    "code": "SoccerStage"
+  },
+  "JoustStage": {
+    "name": "超Z联赛背景",
+    "code": "JoustStage"
+  },
+  "RiftStage": {
+    "name": "潘妮的追击背景",
+    "code": "RiftStage"
+  },
+  "VacationEgyptStage": {
+    "name": "假日神秘埃及背景",
+    "code": "VacationEgyptStage"
+  },
+  "VacationPirateStage": {
+    "name": "假日神秘埃及背景",
+    "code": "VacationPirateStage"
+  },
+  "VacationWestStage": {
+    "name": "假日狂野西部背景",
+    "code": "VacationWestStage"
+  },
+  "VacationKongfuBossStage": {
+    "name": "假日功夫世界背景",
+    "code": "VacationKongfuBossStage"
+  },
+  "VacationFutureStage": {
+    "name": "假日未来世界背景",
+    "code": "VacationFutureStage"
+  },
+  "VacationDarkStage": {
+    "name": "假日黑暗时代背景",
+    "code": "VacationDarkStage"
+  },
+  "VacationLostCityStage": {
+    "name": "假日神秘埃及背景",
+    "code": "VacationLostCityStage"
+  },
+  "TwisterStage": {
+    "name": "回忆之旅庭院白天背景",
+    "code": "TwisterStage"
+  },
+  "SnowModernStage": {
+    "name": "回忆之旅庭院白天雪地背景",
+    "code": "SnowModernStage"
+  },
+  "NightStage": {
+    "name": "回忆之旅庭院夜晚背景",
+    "code": "NightStage"
+  },
+  "SnowNightStage": {
+    "name": "回忆之旅庭院夜晚雪地背景",
+    "code": "SnowNightStage"
+  },
+  "RoofStage": {
+    "name": "回忆之旅屋顶背景",
+    "code": "RoofStage"
+  },
+  "SnowRoofStage": {
+    "name": "回忆之旅雪地屋顶背景",
+    "code": "SnowRoofStage"
+  },
+  "NewYearDaylightStage": {
+    "name": "新年庭院白天背景",
+    "code": "NewYearDaylightStage"
+  },
+  "NewYearNightStage": {
+    "name": "新年庭院夜晚背景",
+    "code": "NewYearNightStage"
+  },
+  "FairyTaleStage": {
+    "name": "童话世界背景",
+    "code": "FairyTaleStage"
+  },
+  "SpringDaylightStage": {
+    "name": "复活节白天背景",
+    "code": "SpringDaylightStage"
+  },
+  "SpringNightStage": {
+    "name": "复活节夜晚背景",
+    "code": "SpringNightStage"
+  },
+  "SummerDaylightStage": {
+    "name": "夏夜白天背景",
+    "code": "SummerDaylightStage"
+  },
+  "SummerNightStage": {
+    "name": "夏夜夜晚背景",
+    "code": "SummerNightStage"
+  },
+  "FrontLawnMowers": {
+    "name": "庭院小推车",
+    "code": "FrontLawnMowers"
+  },
+  "EgyptMowers": {
+    "name": "神秘埃及小推车",
+    "code": "EgyptMowers"
+  },
+  "PirateMowers": {
+    "name": "海盗港湾小推车",
+    "code": "PirateMowers"
+  },
+  "WestMowers": {
+    "name": "狂野西部小推车",
+    "code": "WestMowers"
+  },
+  "KongFuMowers": {
+    "name": "功夫世界小推车",
+    "code": "KongFuMowers"
+  },
+  "FutureMowers": {
+    "name": "未来世界小推车",
+    "code": "FutureMowers"
+  },
+  "BrainMowers": {
+    "name": "未来世界脑子",
+    "code": "BrainMowers"
+  },
+  "DarkMowers": {
+    "name": "黑暗时代小推车",
+    "code": "DarkMowers"
+  },
+  "BeachMowers": {
+    "name": "巨浪沙滩小推车",
+    "code": "BeachMowers"
+  },
+  "IceageMowers": {
+    "name": "冰河世界小推车",
+    "code": "IceageMowers"
+  },
+  "IceageZombossMowers": {
+    "name": "冰河世界僵尸博士小推车",
+    "code": "IceageZombossMowers"
+  },
+  "LostCityMowers": {
+    "name": "失落之城小推车",
+    "code": "LostCityMowers"
+  },
+  "EightiesMowers": {
+    "name": "摇滚年代小推车",
+    "code": "EightiesMowers"
+  },
+  "EightiesZombossMowers": {
+    "name": "摇滚年代僵尸博士小推车",
+    "code": "EightiesZombossMowers"
+  },
+  "DinoMowers": {
+    "name": "恐龙危机小推车",
+    "code": "DinoMowers"
+  },
+  "ModernMowers": {
+    "name": "摩登世界小推车",
+    "code": "ModernMowers"
+  },
+  "SteamMowers": {
+    "name": "蒸汽时代小推车",
+    "code": "SteamMowers"
+  },
+  "RenaiMowers": {
+    "name": "复兴时代小推车",
+    "code": "RenaiMowers"
+  },
+  "HeianMowers": {
+    "name": "平安时代小推车",
+    "code": "HeianMowers"
+  }
+}

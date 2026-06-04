@@ -1,0 +1,2607 @@
+{
+  "tutorial": {
+    "id": 1,
+    "name": "普通僵尸",
+    "code": "tutorial"
+  },
+  "tutorial_armor1": {
+    "id": 2,
+    "name": "路障僵尸",
+    "code": "tutorial_armor1"
+  },
+  "tutorial_armor2": {
+    "id": 3,
+    "name": "铁桶僵尸",
+    "code": "tutorial_armor2"
+  },
+  "tutorial_flag": {
+    "id": 4,
+    "name": "旗子僵尸",
+    "code": "tutorial_flag"
+  },
+  "mummy": {
+    "id": 5,
+    "name": "木乃伊普通僵尸",
+    "code": "mummy"
+  },
+  "mummy_armor1": {
+    "id": 6,
+    "name": "木乃伊路障僵尸",
+    "code": "mummy_armor1"
+  },
+  "mummy_armor2": {
+    "id": 7,
+    "name": "木乃伊铁桶僵尸",
+    "code": "mummy_armor2"
+  },
+  "mummy_flag": {
+    "id": 8,
+    "name": "木乃伊旗子僵尸",
+    "code": "mummy_flag"
+  },
+  "camel_almanac": {
+    "id": 9,
+    "name": "图鉴里的骆驼僵尸",
+    "code": "camel_almanac"
+  },
+  "camel_onehump": {
+    "id": 10,
+    "name": "3部分骆驼僵尸",
+    "code": "camel_onehump"
+  },
+  "camel_twohump": {
+    "id": 11,
+    "name": "4部分骆驼僵尸",
+    "code": "camel_twohump"
+  },
+  "camel_manyhump": {
+    "id": 12,
+    "name": "6部分骆驼僵尸",
+    "code": "camel_manyhump"
+  },
+  "camel_segment": {
+    "id": 13,
+    "name": "1部分骆驼僵尸",
+    "code": "camel_segment"
+  },
+  "camel_onehump_touch": {
+    "id": 14,
+    "name": "木乃伊记忆-3部分骆驼僵尸",
+    "code": "camel_onehump_touch"
+  },
+  "camel_twohump_touch": {
+    "id": 15,
+    "name": "木乃伊记忆-4部分骆驼僵尸",
+    "code": "camel_twohump_touch"
+  },
+  "camel_manyhump_touch": {
+    "id": 16,
+    "name": "木乃伊记忆-6部分骆驼僵尸",
+    "code": "camel_manyhump_touch"
+  },
+  "camel_segment_touch": {
+    "id": 17,
+    "name": "木乃伊记忆-1部分骆驼僵尸",
+    "code": "camel_segment_touch"
+  },
+  "pharaoh": {
+    "id": 18,
+    "name": "法老僵尸",
+    "code": "pharaoh"
+  },
+  "ra": {
+    "id": 19,
+    "name": "太阳神僵尸",
+    "code": "ra"
+  },
+  "tomb_raiser": {
+    "id": 20,
+    "name": "死神僵尸",
+    "code": "tomb_raiser"
+  },
+  "explorer": {
+    "id": 21,
+    "name": "探险家僵尸",
+    "code": "explorer"
+  },
+  "pirate": {
+    "id": 22,
+    "name": "海盗普通僵尸",
+    "code": "pirate"
+  },
+  "pirate_armor1": {
+    "id": 23,
+    "name": "海盗路障僵尸",
+    "code": "pirate_armor1"
+  },
+  "pirate_armor2": {
+    "id": 24,
+    "name": "海盗铁桶僵尸",
+    "code": "pirate_armor2"
+  },
+  "pirate_flag": {
+    "id": 25,
+    "name": "海盗旗子僵尸",
+    "code": "pirate_flag"
+  },
+  "barrelroller": {
+    "id": 26,
+    "name": "滚筒僵尸",
+    "code": "barrelroller"
+  },
+  "cannon": {
+    "id": 27,
+    "name": "小鬼僵尸炮",
+    "code": "cannon"
+  },
+  "pirate_imp": {
+    "id": 28,
+    "name": "海盗小鬼僵尸",
+    "code": "pirate_imp"
+  },
+  "seagull": {
+    "id": 29,
+    "name": "海鸥僵尸",
+    "code": "seagull"
+  },
+  "pirate_captain": {
+    "id": 30,
+    "name": "海盗船长僵尸",
+    "code": "pirate_captain"
+  },
+  "pirate_captain_parrot": {
+    "id": 31,
+    "name": "僵尸鹦鹉",
+    "code": "pirate_captain_parrot"
+  },
+  "washbuckler": {
+    "id": 32,
+    "name": "飞索僵尸",
+    "code": "washbuckler"
+  },
+  "pirate_barrel": {
+    "id": 33,
+    "name": "海盗滚筒",
+    "code": "pirate_barrel"
+  },
+  "cowboy": {
+    "id": 34,
+    "name": "牛仔普通僵尸",
+    "code": "cowboy"
+  },
+  "cowboy_armor1": {
+    "id": 35,
+    "name": "牛仔路障僵尸",
+    "code": "cowboy_armor1"
+  },
+  "cowboy_armor2": {
+    "id": 36,
+    "name": "牛仔铁桶僵尸",
+    "code": "cowboy_armor2"
+  },
+  "cowboy_flag": {
+    "id": 37,
+    "name": "牛仔旗子僵尸",
+    "code": "cowboy_flag"
+  },
+  "prospector": {
+    "id": 38,
+    "name": "淘金僵尸",
+    "code": "prospector"
+  },
+  "west_bullrider": {
+    "id": 39,
+    "name": "骑牛小鬼僵尸",
+    "code": "west_bullrider"
+  },
+  "west_bull": {
+    "id": 40,
+    "name": "机器牛",
+    "code": "west_bull"
+  },
+  "poncho": {
+    "id": 41,
+    "name": "斗篷僵尸",
+    "code": "poncho"
+  },
+  "poncho_no_plate": {
+    "id": 42,
+    "name": "无钢板的斗篷僵尸",
+    "code": "poncho_no_plate"
+  },
+  "poncho_plate": {
+    "id": 43,
+    "name": "有钢板的斗篷僵尸",
+    "code": "poncho_plate"
+  },
+  "piano": {
+    "id": 44,
+    "name": "钢琴僵尸",
+    "code": "piano"
+  },
+  "chicken_farmer": {
+    "id": 45,
+    "name": "鸡贼僵尸",
+    "code": "chicken_farmer"
+  },
+  "chicken": {
+    "id": 46,
+    "name": "僵尸鸡",
+    "code": "chicken"
+  },
+  "mech_cone": {
+    "id": 47,
+    "name": "机甲路障僵尸",
+    "code": "mech_cone"
+  },
+  "football_mech": {
+    "id": 48,
+    "name": "橄榄球机甲僵尸",
+    "code": "football_mech"
+  },
+  "disco_mech": {
+    "id": 49,
+    "name": "迪斯科3000",
+    "code": "disco_mech"
+  },
+  "future": {
+    "id": 50,
+    "name": "未来普通僵尸",
+    "code": "future"
+  },
+  "future_armor1": {
+    "id": 51,
+    "name": "未来路障僵尸",
+    "code": "future_armor1"
+  },
+  "future_armor2": {
+    "id": 52,
+    "name": "未来铁桶僵尸",
+    "code": "future_armor2"
+  },
+  "future_flag": {
+    "id": 53,
+    "name": "未来旗子僵尸",
+    "code": "future_flag"
+  },
+  "future_jetpack": {
+    "id": 54,
+    "name": "喷射器僵尸",
+    "code": "future_jetpack"
+  },
+  "future_gargantuar": {
+    "id": 55,
+    "name": "机甲巨人僵尸",
+    "code": "future_gargantuar"
+  },
+  "future_imp": {
+    "id": 56,
+    "name": "机器虫小鬼僵尸",
+    "code": "future_imp"
+  },
+  "cleopatra": {
+    "id": 57,
+    "name": "埃及艳后僵尸",
+    "code": "cleopatra"
+  },
+  "treasureyeti": {
+    "id": 58,
+    "name": "宝藏雪人僵尸",
+    "code": "treasureyeti"
+  },
+  "kongfu_basic": {
+    "id": 59,
+    "name": "功夫普通僵尸",
+    "code": "kongfu_basic"
+  },
+  "kongfu_basic_armor1": {
+    "id": 60,
+    "name": "功夫路障僵尸",
+    "code": "kongfu_basic_armor1"
+  },
+  "kongfu_basic_armor2": {
+    "id": 61,
+    "name": "功夫铁桶僵尸",
+    "code": "kongfu_basic_armor2"
+  },
+  "kongfu_hammer": {
+    "id": 62,
+    "name": "锤子僵尸",
+    "code": "kongfu_hammer"
+  },
+  "kongfu_selfexplode": {
+    "id": 63,
+    "name": "自爆僵尸",
+    "code": "kongfu_selfexplode"
+  },
+  "kongfu_flag": {
+    "id": 64,
+    "name": "功夫旗子僵尸",
+    "code": "kongfu_flag"
+  },
+  "kongfu_torch": {
+    "id": 65,
+    "name": "功夫火把僵尸",
+    "code": "kongfu_torch"
+  },
+  "kongfu_gong": {
+    "id": 66,
+    "name": "铜锣僵尸",
+    "code": "kongfu_gong"
+  },
+  "kongfu_basic_armor3": {
+    "id": 67,
+    "name": "功夫元帅帽僵尸",
+    "code": "kongfu_basic_armor3"
+  },
+  "kongfu_qigong": {
+    "id": 68,
+    "name": "气功僵尸",
+    "code": "kongfu_qigong"
+  },
+  "kongfu_rocket": {
+    "id": 69,
+    "name": "火箭筒小鬼僵尸",
+    "code": "kongfu_rocket"
+  },
+  "kongfu_drink": {
+    "id": 70,
+    "name": "喝酒僵尸",
+    "code": "kongfu_drink"
+  },
+  "kongfu_monk_cone": {
+    "id": 71,
+    "name": "武僧路障僵尸",
+    "code": "kongfu_monk_cone"
+  },
+  "kongfu_monk_bucket": {
+    "id": 72,
+    "name": "武僧普通僵尸",
+    "code": "kongfu_monk_bucket"
+  },
+  "kongfu_monk_basic": {
+    "id": 73,
+    "name": "武僧铁桶僵尸",
+    "code": "kongfu_monk_basic"
+  },
+  "kongfu_monk_flag": {
+    "id": 74,
+    "name": "武僧旗子僵尸",
+    "code": "kongfu_monk_flag"
+  },
+  "kongfu_strong_bronze": {
+    "id": 75,
+    "name": "大汉铜人",
+    "code": "kongfu_strong_bronze"
+  },
+  "tutorial_gargantuar": {
+    "id": 76,
+    "name": "巨人僵尸",
+    "code": "tutorial_gargantuar"
+  },
+  "tutorial_imp": {
+    "id": 77,
+    "name": "小鬼僵尸",
+    "code": "tutorial_imp"
+  },
+  "egypt_gargantuar": {
+    "id": 78,
+    "name": "埃及巨人僵尸",
+    "code": "egypt_gargantuar"
+  },
+  "egypt_imp": {
+    "id": 79,
+    "name": "埃及小鬼僵尸",
+    "code": "egypt_imp"
+  },
+  "pirate_gargantuar": {
+    "id": 80,
+    "name": "海盗巨人僵尸",
+    "code": "pirate_gargantuar"
+  },
+  "cowboy_gargantuar": {
+    "id": 81,
+    "name": "西部巨人僵尸",
+    "code": "cowboy_gargantuar"
+  },
+  "kongfu_magic_bronze": {
+    "id": 82,
+    "name": "气功铜人",
+    "code": "kongfu_magic_bronze"
+  },
+  "kongfu_agile_bronze": {
+    "id": 83,
+    "name": "侠客铜人",
+    "code": "kongfu_agile_bronze"
+  },
+  "kongfu_monk_drink": {
+    "id": 84,
+    "name": "武僧酒鬼僵尸",
+    "code": "kongfu_monk_drink"
+  },
+  "kongfu_monk_blade": {
+    "id": 85,
+    "name": "武僧持刀僵尸",
+    "code": "kongfu_monk_blade"
+  },
+  "kongfu_monk_imp": {
+    "id": 86,
+    "name": "武僧小鬼僵尸",
+    "code": "kongfu_monk_imp"
+  },
+  "kongfu_monk_torch": {
+    "id": 87,
+    "name": "武僧火把僵尸",
+    "code": "kongfu_monk_torch"
+  },
+  "kongfu_monk_nunchaku": {
+    "id": 88,
+    "name": "武僧双截棍僵尸",
+    "code": "kongfu_monk_nunchaku"
+  },
+  "kongfu_zomboss_qigong": {
+    "id": 89,
+    "name": "气功教主",
+    "code": "kongfu_zomboss_qigong"
+  },
+  "kongfu_zomboss_blade": {
+    "id": 90,
+    "name": "持刀大侠",
+    "code": "kongfu_zomboss_blade"
+  },
+  "kongfu_zomboss_explosive": {
+    "id": 91,
+    "name": "火药魔头",
+    "code": "kongfu_zomboss_explosive"
+  },
+  "zomboss_ice_ball": {
+    "id": 92,
+    "name": "冰球僵尸博士",
+    "code": "zomboss_ice_ball"
+  },
+  "zombossmech_egypt": {
+    "id": 93,
+    "name": "神秘埃及僵尸博士",
+    "code": "zombossmech_egypt"
+  },
+  "zombossmech_pirate": {
+    "id": 94,
+    "name": "海盗港湾僵尸博士",
+    "code": "zombossmech_pirate"
+  },
+  "zombossmech_cowboy": {
+    "id": 95,
+    "name": "狂野西部僵尸博士",
+    "code": "zombossmech_cowboy"
+  },
+  "future_protector": {
+    "id": 96,
+    "name": "电磁盾僵尸",
+    "code": "future_protector"
+  },
+  "future_jetpack_disco": {
+    "id": 97,
+    "name": "喷射器舞者",
+    "code": "future_jetpack_disco"
+  },
+  "zombossmech_future": {
+    "id": 0,
+    "name": "未来世界僵尸博士",
+    "code": "zombossmech_future"
+  },
+  "dark": {
+    "id": 99,
+    "name": "农夫普通僵尸",
+    "code": "dark"
+  },
+  "dark_armor1": {
+    "id": 100,
+    "name": "农夫路障僵尸",
+    "code": "dark_armor1"
+  },
+  "dark_armor2": {
+    "id": 101,
+    "name": "农夫铁桶僵尸",
+    "code": "dark_armor2"
+  },
+  "dark_flag": {
+    "id": 102,
+    "name": "农夫旗子僵尸",
+    "code": "dark_flag"
+  },
+  "dark_armor3": {
+    "id": 103,
+    "name": "骑士僵尸",
+    "code": "dark_armor3"
+  },
+  "dark_wizard": {
+    "id": 104,
+    "name": "魔法师僵尸",
+    "code": "dark_wizard"
+  },
+  "dark_juggler": {
+    "id": 105,
+    "name": "小丑僵尸",
+    "code": "dark_juggler"
+  },
+  "dark_gargantuar": {
+    "id": 106,
+    "name": "黑暗巨人僵尸",
+    "code": "dark_gargantuar"
+  },
+  "dark_imp": {
+    "id": 107,
+    "name": "傀儡小鬼僵尸",
+    "code": "dark_imp"
+  },
+  "dark_imp_dragon": {
+    "id": 108,
+    "name": "火龙小鬼僵尸",
+    "code": "dark_imp_dragon"
+  },
+  "dark_king": {
+    "id": 109,
+    "name": "国王僵尸",
+    "code": "dark_king"
+  },
+  "zombossmech_dark": {
+    "id": 110,
+    "name": "黑暗时代僵尸博士",
+    "code": "zombossmech_dark"
+  },
+  "zombie_target_bottle": {
+    "id": 111,
+    "name": "百步穿僵加血标靶",
+    "code": "zombie_target_bottle"
+  },
+  "zombie_target_arrow_yellow": {
+    "id": 112,
+    "name": "百步穿僵加光箭标靶",
+    "code": "zombie_target_arrow_yellow"
+  },
+  "zombie_target_arrow_blue": {
+    "id": 113,
+    "name": "百步穿僵加散射箭标靶",
+    "code": "zombie_target_arrow_blue"
+  },
+  "dark_archmage": {
+    "id": 114,
+    "name": "大法师僵尸",
+    "code": "dark_archmage"
+  },
+  "dark_cavalry": {
+    "id": 115,
+    "name": "骑兵僵尸",
+    "code": "dark_cavalry"
+  },
+  "dark_cavalry_rider": {
+    "id": 116,
+    "name": "骑兵僵尸的骑士僵尸",
+    "code": "dark_cavalry_rider"
+  },
+  "zombie_towerdefend_normal": {
+    "id": 117,
+    "name": "剧院惊魂-农夫普通僵尸",
+    "code": "zombie_towerdefend_normal"
+  },
+  "zombie_towerdefend_wolf_fire": {
+    "id": 118,
+    "name": "剧院惊魂-狼人火把僵尸",
+    "code": "zombie_towerdefend_wolf_fire"
+  },
+  "zombie_towerdefend_wolf_imp": {
+    "id": 119,
+    "name": "剧院惊魂-狼人小鬼僵尸",
+    "code": "zombie_towerdefend_wolf_imp"
+  },
+  "zombie_towerdefend_boss": {
+    "id": 120,
+    "name": "剧院惊魂-狼人酋长僵尸",
+    "code": "zombie_towerdefend_boss"
+  },
+  "zombie_towerdefend_bucket": {
+    "id": 121,
+    "name": "剧院惊魂-农夫路障僵尸",
+    "code": "zombie_towerdefend_bucket"
+  },
+  "zombie_towerdefend_helmet": {
+    "id": 122,
+    "name": "剧院惊魂-农夫铁桶僵尸",
+    "code": "zombie_towerdefend_helmet"
+  },
+  "zombie_towerdefend_knight": {
+    "id": 123,
+    "name": "剧院惊魂-其实僵尸",
+    "code": "zombie_towerdefend_knight"
+  },
+  "zombie_towerdefend_jester": {
+    "id": 124,
+    "name": "剧院惊魂-小丑僵尸",
+    "code": "zombie_towerdefend_jester"
+  },
+  "zombie_towerdefend_gargantuar": {
+    "id": 125,
+    "name": "剧院惊魂-黑暗巨人僵尸",
+    "code": "zombie_towerdefend_gargantuar"
+  },
+  "zombie_towerdefend_wizard": {
+    "id": 126,
+    "name": "剧院惊魂-魔法师僵尸",
+    "code": "zombie_towerdefend_wizard"
+  },
+  "dark_rogue": {
+    "id": 127,
+    "name": "盗贼僵尸",
+    "code": "dark_rogue"
+  },
+  "zombie_target_archmage": {
+    "id": 128,
+    "name": "剧院惊魂-标靶大法师僵尸",
+    "code": "zombie_target_archmage"
+  },
+  "zombie_target_wizard": {
+    "id": 129,
+    "name": "剧院惊魂-标靶魔法师僵尸",
+    "code": "zombie_target_wizard"
+  },
+  "zombie_target_gargantuar": {
+    "id": 130,
+    "name": "剧院惊魂-标靶黑暗巨人僵尸",
+    "code": "zombie_target_gargantuar"
+  },
+  "zombie_target_arrow_purple": {
+    "id": 131,
+    "name": "剧院惊魂-加紫色箭标靶",
+    "code": "zombie_target_arrow_purple"
+  },
+  "beach": {
+    "id": 132,
+    "name": "飞机头普通僵尸",
+    "code": "beach"
+  },
+  "beach_armor1": {
+    "id": 133,
+    "name": "飞机头路障僵尸",
+    "code": "beach_armor1"
+  },
+  "beach_armor2": {
+    "id": 134,
+    "name": "飞机头铁桶僵尸",
+    "code": "beach_armor2"
+  },
+  "beach_flag": {
+    "id": 135,
+    "name": "沙滩旗子僵尸",
+    "code": "beach_flag"
+  },
+  "beach_fem": {
+    "id": 136,
+    "name": "比基尼普通僵尸",
+    "code": "beach_fem"
+  },
+  "beach_fem_armor1": {
+    "id": 137,
+    "name": "比基尼路障僵尸",
+    "code": "beach_fem_armor1"
+  },
+  "beach_fem_armor2": {
+    "id": 138,
+    "name": "比基尼铁桶僵尸",
+    "code": "beach_fem_armor2"
+  },
+  "beach_snorkel": {
+    "id": 139,
+    "name": "潜水僵尸",
+    "code": "beach_snorkel"
+  },
+  "beach_surfer": {
+    "id": 140,
+    "name": "冲浪僵尸",
+    "code": "beach_surfer"
+  },
+  "beach_imp": {
+    "id": 141,
+    "name": "美人鱼小鬼僵尸",
+    "code": "beach_imp"
+  },
+  "beach_gargantuar": {
+    "id": 142,
+    "name": "深海巨人僵尸",
+    "code": "beach_gargantuar"
+  },
+  "beach_fisherman": {
+    "id": 143,
+    "name": "渔夫僵尸",
+    "code": "beach_fisherman"
+  },
+  "beach_octopus": {
+    "id": 144,
+    "name": "章鱼僵尸",
+    "code": "beach_octopus"
+  },
+  "zombossmech_beach": {
+    "id": 145,
+    "name": "巨浪沙滩僵尸博士",
+    "code": "zombossmech_beach"
+  },
+  "beach_shell": {
+    "id": 146,
+    "name": "贝壳僵尸",
+    "code": "beach_shell"
+  },
+  "lion_dance": {
+    "id": 147,
+    "name": "舞狮僵尸",
+    "code": "lion_dance"
+  },
+  "wealth_god": {
+    "id": 148,
+    "name": "财神僵尸",
+    "code": "wealth_god"
+  },
+  "iceage": {
+    "id": 149,
+    "name": "洞穴普通僵尸",
+    "code": "iceage"
+  },
+  "iceage_armor1": {
+    "id": 150,
+    "name": "洞穴路障僵尸",
+    "code": "iceage_armor1"
+  },
+  "iceage_armor2": {
+    "id": 151,
+    "name": "洞穴铁桶僵尸",
+    "code": "iceage_armor2"
+  },
+  "iceage_armor3": {
+    "id": 152,
+    "name": "冰砖僵尸",
+    "code": "iceage_armor3"
+  },
+  "iceage_flag": {
+    "id": 153,
+    "name": "洞穴旗子僵尸",
+    "code": "iceage_flag"
+  },
+  "iceage_imp": {
+    "id": 154,
+    "name": "洞穴小鬼僵尸",
+    "code": "iceage_imp"
+  },
+  "iceage_gargantuar": {
+    "id": 155,
+    "name": "地懒巨人僵尸",
+    "code": "iceage_gargantuar"
+  },
+  "iceage_hunter": {
+    "id": 156,
+    "name": "猎人僵尸",
+    "code": "iceage_hunter"
+  },
+  "iceage_dodo": {
+    "id": 157,
+    "name": "渡渡鸟骑士僵尸",
+    "code": "iceage_dodo"
+  },
+  "iceage_weaselhoarder": {
+    "id": 158,
+    "name": "冰鼬僵尸",
+    "code": "iceage_weaselhoarder"
+  },
+  "iceage_weasel": {
+    "id": 159,
+    "name": "冰鼬",
+    "code": "iceage_weasel"
+  },
+  "iceage_troglobite": {
+    "id": 160,
+    "name": "穴居僵尸",
+    "code": "iceage_troglobite"
+  },
+  "zombossmech_iceage": {
+    "id": 161,
+    "name": "冰河世界僵尸博士",
+    "code": "zombossmech_iceage"
+  },
+  "iceage_walrus": {
+    "id": 162,
+    "name": "海象僵尸",
+    "code": "iceage_walrus"
+  },
+  "iceage_ski": {
+    "id": 163,
+    "name": "滑雪僵尸",
+    "code": "iceage_ski"
+  },
+  "iceage_chief": {
+    "id": 164,
+    "name": "冰风酋长僵尸",
+    "code": "iceage_chief"
+  },
+  "zombossmech_iceage_eliminate": {
+    "id": 165,
+    "name": "植物迷阵-冰河世界僵尸博士",
+    "code": "zombossmech_iceage_eliminate"
+  },
+  "skycity": {
+    "id": 166,
+    "name": "飞行员普通僵尸",
+    "code": "skycity"
+  },
+  "skycity_armor1": {
+    "id": 167,
+    "name": "飞行员路障僵尸",
+    "code": "skycity_armor1"
+  },
+  "skycity_armor2": {
+    "id": 168,
+    "name": "飞行员铁桶僵尸",
+    "code": "skycity_armor2"
+  },
+  "skycity_armor3": {
+    "id": 169,
+    "name": "飞行员三级防具僵尸",
+    "code": "skycity_armor3"
+  },
+  "skycity_flag": {
+    "id": 170,
+    "name": "飞行员旗子僵尸",
+    "code": "skycity_flag"
+  },
+  "skycity_battleplane": {
+    "id": 171,
+    "name": "战斗机僵尸",
+    "code": "skycity_battleplane"
+  },
+  "skycity_ggtimp": {
+    "id": 172,
+    "name": "飞行员小鬼僵尸",
+    "code": "skycity_ggtimp"
+  },
+  "skycity_gargantuar": {
+    "id": 173,
+    "name": "天空巨人僵尸",
+    "code": "skycity_gargantuar"
+  },
+  "skycity_twinsplane": {
+    "id": 174,
+    "name": "双舱飞机僵尸",
+    "code": "skycity_twinsplane"
+  },
+  "skycity_electric": {
+    "id": 175,
+    "name": "闪电枪僵尸",
+    "code": "skycity_electric"
+  },
+  "invisible_plane": {
+    "id": 176,
+    "name": "仲裁者X型",
+    "code": "invisible_plane"
+  },
+  "air_missile": {
+    "id": 177,
+    "name": "飞弹僵尸的飞弹",
+    "code": "air_missile"
+  },
+  "air_missile_launcher": {
+    "id": 178,
+    "name": "飞弹僵尸",
+    "code": "air_missile_launcher"
+  },
+  "zombossmech_skycity": {
+    "id": 179,
+    "name": "天空之城僵尸博士",
+    "code": "zombossmech_skycity"
+  },
+  "birthday": {
+    "id": 180,
+    "name": "生日普通僵尸",
+    "code": "birthday"
+  },
+  "birthday_flag": {
+    "id": 181,
+    "name": "生日旗子僵尸",
+    "code": "birthday_flag"
+  },
+  "birthday_barrel": {
+    "id": 182,
+    "name": "生日滚桶",
+    "code": "birthday_barrel"
+  },
+  "birthday_barrelroller": {
+    "id": 183,
+    "name": "生日滚桶僵尸",
+    "code": "birthday_barrelroller"
+  },
+  "birthday_gargantuar": {
+    "id": 184,
+    "name": "生日巨人僵尸",
+    "code": "birthday_gargantuar"
+  },
+  "birthday_pharaoh": {
+    "id": 185,
+    "name": "生日法老僵尸",
+    "code": "birthday_pharaoh"
+  },
+  "birthday_juggler": {
+    "id": 186,
+    "name": "生日小丑僵尸",
+    "code": "birthday_juggler"
+  },
+  "birthday_troglobite": {
+    "id": 187,
+    "name": "生日穴居僵尸",
+    "code": "birthday_troglobite"
+  },
+  "birthday_jetpack": {
+    "id": 188,
+    "name": "生日喷射器僵尸",
+    "code": "birthday_jetpack"
+  },
+  "lostcity": {
+    "id": 195,
+    "name": "失落普通僵尸",
+    "code": "lostcity"
+  },
+  "lostcity_armor1": {
+    "id": 196,
+    "name": "失落路障僵尸",
+    "code": "lostcity_armor1"
+  },
+  "lostcity_armor2": {
+    "id": 197,
+    "name": "失落铁桶僵尸",
+    "code": "lostcity_armor2"
+  },
+  "lostcity_flag": {
+    "id": 198,
+    "name": "失落旗子僵尸",
+    "code": "lostcity_flag"
+  },
+  "lostcity_excavator": {
+    "id": 199,
+    "name": "发掘者僵尸",
+    "code": "lostcity_excavator"
+  },
+  "lostcity_jane": {
+    "id": 200,
+    "name": "洋伞僵尸",
+    "code": "lostcity_jane"
+  },
+  "lostcity_gargantuar": {
+    "id": 201,
+    "name": "失落巨人僵尸",
+    "code": "lostcity_gargantuar"
+  },
+  "lostcity_imp": {
+    "id": 202,
+    "name": "失落小鬼僵尸",
+    "code": "lostcity_imp"
+  },
+  "lostcity_lostpilot": {
+    "id": 203,
+    "name": "失落飞行员僵尸",
+    "code": "lostcity_lostpilot"
+  },
+  "lostcity_bug": {
+    "id": 204,
+    "name": "失落昆虫普通僵尸",
+    "code": "lostcity_bug"
+  },
+  "lostcity_bug_armor1": {
+    "id": 205,
+    "name": "失落昆虫路障僵尸",
+    "code": "lostcity_bug_armor1"
+  },
+  "lostcity_bug_armor2": {
+    "id": 206,
+    "name": "失落昆虫铁桶僵尸",
+    "code": "lostcity_bug_armor2"
+  },
+  "lostcity_relichunter": {
+    "id": 207,
+    "name": "失落猎人僵尸",
+    "code": "lostcity_relichunter"
+  },
+  "lostcity_crystalskull": {
+    "id": 208,
+    "name": "考古学家僵尸",
+    "code": "lostcity_crystalskull"
+  },
+  "zombie_pumpkin": {
+    "id": 0,
+    "name": "南瓜头僵尸",
+    "code": "zombie_pumpkin"
+  },
+  "zombie_pumpkin_imp": {
+    "id": 0,
+    "name": "南瓜头小鬼僵尸",
+    "code": "zombie_pumpkin_imp"
+  },
+  "lostcity_impporter": {
+    "id": 209,
+    "name": "搬运工小鬼僵尸",
+    "code": "lostcity_impporter"
+  },
+  "zombossmech_lostcity": {
+    "id": 210,
+    "name": "失落之城僵尸博士",
+    "code": "zombossmech_lostcity"
+  },
+  "lostcity_guide": {
+    "id": 211,
+    "name": "向导僵尸",
+    "code": "lostcity_guide"
+  },
+  "lostcity_doctor": {
+    "id": 212,
+    "name": "医生僵尸",
+    "code": "lostcity_doctor"
+  },
+  "endlesswealth": {
+    "id": 0,
+    "name": "无尽挑战财神僵尸",
+    "code": "endlesswealth"
+  },
+  "feastivus": {
+    "id": 220,
+    "name": "圣诞节普通僵尸",
+    "code": "feastivus"
+  },
+  "feastivus_armor1": {
+    "id": 221,
+    "name": "圣诞节路障僵尸",
+    "code": "feastivus_armor1"
+  },
+  "feastivus_armor2": {
+    "id": 222,
+    "name": "圣诞节铁桶僵尸",
+    "code": "feastivus_armor2"
+  },
+  "feastivus_flag": {
+    "id": 223,
+    "name": "圣诞节旗子僵尸",
+    "code": "feastivus_flag"
+  },
+  "feastivus_imp": {
+    "id": 224,
+    "name": "圣诞节小鬼僵尸",
+    "code": "feastivus_imp"
+  },
+  "feastivus_gargantuar": {
+    "id": 225,
+    "name": "圣诞节巨人僵尸",
+    "code": "feastivus_gargantuar"
+  },
+  "feastivus_camel_onehump": {
+    "id": 226,
+    "name": "3部分圣诞节骆驼僵尸",
+    "code": "feastivus_camel_onehump"
+  },
+  "feastivus_camel_twohump": {
+    "id": 227,
+    "name": "4部分圣诞节骆驼僵尸",
+    "code": "feastivus_camel_twohump"
+  },
+  "feastivus_camel_manyhump": {
+    "id": 228,
+    "name": "6部分圣诞节骆驼僵尸",
+    "code": "feastivus_camel_manyhump"
+  },
+  "feastivus_camel_segment": {
+    "id": 229,
+    "name": "1部分圣诞节骆驼僵尸",
+    "code": "feastivus_camel_segment"
+  },
+  "feastivus_swashbuckler": {
+    "id": 230,
+    "name": "盗金飞索僵尸",
+    "code": "feastivus_swashbuckler"
+  },
+  "feastivus_poncho": {
+    "id": 231,
+    "name": "圣诞节斗篷僵尸",
+    "code": "feastivus_poncho"
+  },
+  "feastivus_piano": {
+    "id": 232,
+    "name": "圣诞节钢琴僵尸",
+    "code": "feastivus_piano"
+  },
+  "eighties": {
+    "id": 240,
+    "name": "摇滚普通僵尸",
+    "code": "eighties"
+  },
+  "eighties_armor1": {
+    "id": 241,
+    "name": "摇滚路障僵尸",
+    "code": "eighties_armor1"
+  },
+  "eighties_armor2": {
+    "id": 242,
+    "name": "摇滚铁桶僵尸",
+    "code": "eighties_armor2"
+  },
+  "eighties_imp": {
+    "id": 243,
+    "name": "摇滚小鬼僵尸",
+    "code": "eighties_imp"
+  },
+  "eighties_punk": {
+    "id": 244,
+    "name": "朋克僵尸",
+    "code": "eighties_punk"
+  },
+  "eighties_mc": {
+    "id": 245,
+    "name": "说唱僵尸",
+    "code": "eighties_mc"
+  },
+  "eighties_breakdancer": {
+    "id": 246,
+    "name": "霹雳舞僵尸",
+    "code": "eighties_breakdancer"
+  },
+  "eighties_glitter": {
+    "id": 247,
+    "name": "闪动僵尸",
+    "code": "eighties_glitter"
+  },
+  "eighties_boombox": {
+    "id": 248,
+    "name": "收音机僵尸",
+    "code": "eighties_boombox"
+  },
+  "eighties_arcade": {
+    "id": 249,
+    "name": "街机僵尸",
+    "code": "eighties_arcade"
+  },
+  "eighties_bass": {
+    "id": 250,
+    "name": "贝斯手僵尸",
+    "code": "eighties_bass"
+  },
+  "eighties_gargantuar": {
+    "id": 251,
+    "name": "重金属巨人僵尸",
+    "code": "eighties_gargantuar"
+  },
+  "eighties_flag": {
+    "id": 252,
+    "name": "摇滚旗子僵尸",
+    "code": "eighties_flag"
+  },
+  "eighties_8bit": {
+    "id": 253,
+    "name": "8位普通僵尸",
+    "code": "eighties_8bit"
+  },
+  "eighties_8bit_armor1": {
+    "id": 0,
+    "name": "8位路障僵尸",
+    "code": "eighties_8bit_armor1"
+  },
+  "eighties_8bit_armor2": {
+    "id": 0,
+    "name": "8位铁桶僵尸",
+    "code": "eighties_8bit_armor2"
+  },
+  "zombossmech_eighties": {
+    "id": 254,
+    "name": "摇滚年代僵尸博士",
+    "code": "zombossmech_eighties"
+  },
+  "dino": {
+    "id": 260,
+    "name": "侏罗纪普通僵尸",
+    "code": "dino"
+  },
+  "dino_armor1": {
+    "id": 261,
+    "name": "侏罗纪路障僵尸",
+    "code": "dino_armor1"
+  },
+  "dino_armor2": {
+    "id": 262,
+    "name": "侏罗纪铁桶僵尸",
+    "code": "dino_armor2"
+  },
+  "dino_armor3": {
+    "id": 263,
+    "name": "侏罗纪龙骨化石僵尸",
+    "code": "dino_armor3"
+  },
+  "dino_bully": {
+    "id": 264,
+    "name": "侏罗纪野人僵尸",
+    "code": "dino_bully"
+  },
+  "dino_flag": {
+    "id": 265,
+    "name": "侏罗纪旗子僵尸",
+    "code": "dino_flag"
+  },
+  "dino_imp": {
+    "id": 266,
+    "name": "侏罗纪小鬼僵尸",
+    "code": "dino_imp"
+  },
+  "dino_gargantuar": {
+    "id": 267,
+    "name": "侏罗纪巨人僵尸",
+    "code": "dino_gargantuar"
+  },
+  "dino_pushegg": {
+    "id": 268,
+    "name": "推蛋小鬼僵尸",
+    "code": "dino_pushegg"
+  },
+  "dino_pushptero": {
+    "id": 0,
+    "name": "推翼龙蛋小鬼僵尸",
+    "code": "dino_pushptero"
+  },
+  "dino_pushbronto": {
+    "id": 0,
+    "name": "推雷龙蛋小鬼僵尸",
+    "code": "dino_pushbronto"
+  },
+  "dino_pushtyranno": {
+    "id": 0,
+    "name": "推霸王龙蛋小鬼僵尸",
+    "code": "dino_pushtyranno"
+  },
+  "dino_pushzomshell": {
+    "id": 0,
+    "name": "推僵尸蛋小鬼僵尸",
+    "code": "dino_pushzomshell"
+  },
+  "dino_stealegg": {
+    "id": 269,
+    "name": "偷蛋小鬼僵尸",
+    "code": "dino_stealegg"
+  },
+  "dino_stealptero": {
+    "id": 0,
+    "name": "偷翼龙蛋小鬼僵尸",
+    "code": "dino_stealptero"
+  },
+  "dino_stealbronto": {
+    "id": 0,
+    "name": "偷雷龙蛋小鬼僵尸",
+    "code": "dino_stealbronto"
+  },
+  "dino_stealtyranno": {
+    "id": 0,
+    "name": "偷霸王龙蛋小鬼僵尸",
+    "code": "dino_stealtyranno"
+  },
+  "dino_stealzomshell": {
+    "id": 0,
+    "name": "偷僵尸蛋小鬼僵尸",
+    "code": "dino_stealzomshell"
+  },
+  "dino_eggshell": {
+    "id": 271,
+    "name": "蛋壳小鬼僵尸",
+    "code": "dino_eggshell"
+  },
+  "zombossmech_dino": {
+    "id": 272,
+    "name": "恐龙危机僵尸博士",
+    "code": "zombossmech_dino"
+  },
+  "modern_solar_truck": {
+    "id": 280,
+    "name": "太阳能车僵尸",
+    "code": "modern_solar_truck"
+  },
+  "modern_miner": {
+    "id": 289,
+    "name": "矿工僵尸",
+    "code": "modern_miner"
+  },
+  "explosion_proof": {
+    "id": 282,
+    "name": "防爆警察僵尸",
+    "code": "explosion_proof"
+  },
+  "newspaper_veteran": {
+    "id": 283,
+    "name": "周日刊僵尸",
+    "code": "newspaper_veteran"
+  },
+  "modern_superfanimp": {
+    "id": 284,
+    "name": "粉丝小鬼僵尸",
+    "code": "modern_superfanimp"
+  },
+  "modern_balloon": {
+    "id": 285,
+    "name": "气球僵尸",
+    "code": "modern_balloon"
+  },
+  "modern_allstar": {
+    "id": 286,
+    "name": "全明星僵尸",
+    "code": "modern_allstar"
+  },
+  "beghouled_newspaper": {
+    "id": 287,
+    "name": "宝石迷阵报纸僵尸",
+    "code": "beghouled_newspaper"
+  },
+  "modern_newspaper": {
+    "id": 288,
+    "name": "报纸僵尸",
+    "code": "modern_newspaper"
+  },
+  "zombossmech_modern_egypt": {
+    "id": 0,
+    "name": "摩登世界神秘埃及僵尸博士",
+    "code": "zombossmech_modern_egypt"
+  },
+  "zombossmech_modern_pirate": {
+    "id": 0,
+    "name": "摩登世界海盗港湾僵尸博士",
+    "code": "zombossmech_modern_pirate"
+  },
+  "zombossmech_modern_cowboy": {
+    "id": 0,
+    "name": "摩登世界狂野西部僵尸博士",
+    "code": "zombossmech_modern_cowboy"
+  },
+  "zombossmech_modern_future": {
+    "id": 0,
+    "name": "摩登世界未来世界僵尸博士",
+    "code": "zombossmech_modern_future"
+  },
+  "zombossmech_modern_dark": {
+    "id": 0,
+    "name": "摩登世界黑暗时代僵尸博士",
+    "code": "zombossmech_modern_dark"
+  },
+  "zombossmech_modern_beach": {
+    "id": 0,
+    "name": "摩登世界巨浪沙滩僵尸博士",
+    "code": "zombossmech_modern_beach"
+  },
+  "zombossmech_modern_iceage": {
+    "id": 0,
+    "name": "摩登世界冰河世界僵尸博士",
+    "code": "zombossmech_modern_iceage"
+  },
+  "zombossmech_modern_lostcity": {
+    "id": 0,
+    "name": "摩登世界失落之城僵尸博士",
+    "code": "zombossmech_modern_lostcity"
+  },
+  "zombossmech_modern_eighties": {
+    "id": 0,
+    "name": "摩登世界摇滚年代僵尸博士",
+    "code": "zombossmech_modern_eighties"
+  },
+  "zombossmech_modern_dino": {
+    "id": 0,
+    "name": "摩登世界恐龙危机僵尸博士",
+    "code": "zombossmech_modern_dino"
+  },
+  "steam_gentleman": {
+    "id": 290,
+    "name": "绅士僵尸",
+    "code": "steam_gentleman"
+  },
+  "steam_worker": {
+    "id": 0,
+    "name": "工人普通僵尸",
+    "code": "steam_worker"
+  },
+  "steam_armor1": {
+    "id": 0,
+    "name": "工人路障僵尸",
+    "code": "steam_armor1"
+  },
+  "steam_armor2": {
+    "id": 0,
+    "name": "工人铁桶僵尸",
+    "code": "steam_armor2"
+  },
+  "steam_flag": {
+    "id": 0,
+    "name": "工人旗子僵尸",
+    "code": "steam_flag"
+  },
+  "steam_gargantuar": {
+    "id": 0,
+    "name": "监工巨人僵尸",
+    "code": "steam_gargantuar"
+  },
+  "steam_imp": {
+    "id": 0,
+    "name": "工人小鬼僵尸",
+    "code": "steam_imp"
+  },
+  "zombossmech_steam": {
+    "id": 0,
+    "name": "蒸汽时代僵尸博士",
+    "code": "zombossmech_steam"
+  },
+  "steam_stove": {
+    "id": 300,
+    "name": "锅炉僵尸",
+    "code": "steam_stove"
+  },
+  "steam_coal_miner": {
+    "id": 301,
+    "name": "煤矿僵尸",
+    "code": "steam_coal_miner"
+  },
+  "renai_carver": {
+    "id": 310,
+    "name": "雕刻家小鬼僵尸",
+    "code": "renai_carver"
+  },
+  "renai_gargantuar": {
+    "id": 311,
+    "name": "贵族巨人僵尸",
+    "code": "renai_gargantuar"
+  },
+  "renai_perfumer": {
+    "id": 312,
+    "name": "调香师僵尸",
+    "code": "renai_perfumer"
+  },
+  "renai_ballet": {
+    "id": 313,
+    "name": "芭蕾舞四人组",
+    "code": "renai_ballet"
+  },
+  "renai_gliding": {
+    "id": 314,
+    "name": "飞行器僵尸",
+    "code": "renai_gliding"
+  },
+  "renai_worker": {
+    "id": 0,
+    "name": "贵族普通僵尸",
+    "code": "renai_worker"
+  },
+  "renai_armor1": {
+    "id": 0,
+    "name": "贵族路障僵尸",
+    "code": "renai_armor1"
+  },
+  "renai_armor2": {
+    "id": 0,
+    "name": "贵族铁桶僵尸",
+    "code": "renai_armor2"
+  },
+  "renai_flag": {
+    "id": 0,
+    "name": "贵族旗子僵尸",
+    "code": "renai_flag"
+  },
+  "renai_ballet_mid": {
+    "id": 0,
+    "name": "芭蕾舞僵尸召唤的僵尸",
+    "code": "renai_ballet_mid"
+  },
+  "renai_ballet_imp": {
+    "id": 0,
+    "name": "芭蕾舞小鬼僵尸",
+    "code": "renai_ballet_imp"
+  },
+  "imppear_imp": {
+    "id": 0,
+    "name": "小黄梨小鬼僵尸",
+    "code": "imppear_imp"
+  },
+  "vase_gargantuar": {
+    "id": 0,
+    "name": "花瓶巨人僵尸",
+    "code": "vase_gargantuar"
+  },
+  "roman": {
+    "id": 315,
+    "name": "罗马普通僵尸",
+    "code": "roman"
+  },
+  "roman_armor1": {
+    "id": 316,
+    "name": "罗马路障僵尸",
+    "code": "roman_armor1"
+  },
+  "roman_armor2": {
+    "id": 317,
+    "name": "罗马铁桶僵尸",
+    "code": "roman_armor2"
+  },
+  "roman_armor3": {
+    "id": 318,
+    "name": "罗马百夫长僵尸",
+    "code": "roman_armor3"
+  },
+  "roman_armor4": {
+    "id": 319,
+    "name": "罗马石像僵尸",
+    "code": "roman_armor4"
+  },
+  "roman_flag": {
+    "id": 320,
+    "name": "罗马旗子僵尸",
+    "code": "roman_flag"
+  },
+  "roman_medusa": {
+    "id": 321,
+    "name": "美杜莎僵尸",
+    "code": "roman_medusa"
+  },
+  "zombie_statue": {
+    "id": 0,
+    "name": "美杜莎僵尸的雕像",
+    "code": "zombie_statue"
+  },
+  "zombossmech_future_rift": {
+    "id": 0,
+    "name": "潘妮的追击未来世界僵尸博士",
+    "code": "zombossmech_future_rift"
+  },
+  "zombossmech_egypt_rift": {
+    "id": 0,
+    "name": "潘妮的追击神秘埃及僵尸博士",
+    "code": "zombossmech_egypt_rift"
+  },
+  "zombossmech_cowboy_rift": {
+    "id": 0,
+    "name": "潘妮的追击狂野西部僵尸博士",
+    "code": "zombossmech_cowboy_rift"
+  },
+  "zombossmech_pirate_rift": {
+    "id": 0,
+    "name": "潘妮的追击海盗港湾僵尸博士",
+    "code": "zombossmech_pirate_rift"
+  },
+  "zombossmech_dark_rift": {
+    "id": 0,
+    "name": "潘妮的追击黑暗时代僵尸博士",
+    "code": "zombossmech_dark_rift"
+  },
+  "zombossmech_beach_rift": {
+    "id": 0,
+    "name": "潘妮的追击巨浪沙滩僵尸博士",
+    "code": "zombossmech_beach_rift"
+  },
+  "zombossmech_iceage_rift": {
+    "id": 0,
+    "name": "潘妮的追击冰河世界僵尸博士",
+    "code": "zombossmech_iceage_rift"
+  },
+  "zombossmech_lostcity_rift": {
+    "id": 0,
+    "name": "潘妮的追击失落之城僵尸博士",
+    "code": "zombossmech_lostcity_rift"
+  },
+  "zombossmech_dino_rift": {
+    "id": 0,
+    "name": "潘妮的追击蒸汽时代僵尸博士",
+    "code": "zombossmech_dino_rift"
+  },
+  "pvpskill_bomb": {
+    "id": 500,
+    "name": "PVP技能-空投炸弹",
+    "code": "pvpskill_bomb"
+  },
+  "pvpskill_aid": {
+    "id": 501,
+    "name": "PVP技能-僵尸血包",
+    "code": "pvpskill_aid"
+  },
+  "pvpskill_sleep": {
+    "id": 502,
+    "name": "PVP技能-催眠烟雾",
+    "code": "pvpskill_sleep"
+  },
+  "pvpskill_invisible": {
+    "id": 503,
+    "name": "PVP技能-战争迷雾",
+    "code": "pvpskill_invisible"
+  },
+  "pvpskill_zombiefood": {
+    "id": 504,
+    "name": "PVP技能-瘟疫药剂",
+    "code": "pvpskill_zombiefood"
+  },
+  "pvp_change": {
+    "id": 505,
+    "name": "PVP普通僵尸",
+    "code": "pvp_change"
+  },
+  "pvp_dead": {
+    "id": 506,
+    "name": "PVP死神僵尸",
+    "code": "pvp_dead"
+  },
+  "pvp_wizard": {
+    "id": 507,
+    "name": "PVP魔法师僵尸",
+    "code": "pvp_wizard"
+  },
+  "pvp_imp(RTID)": {
+    "id": 508,
+    "name": "PVP小鬼僵尸",
+    "code": "pvp_imp(RTID)"
+  },
+  "pvp_shadowimp": {
+    "id": 509,
+    "name": "PVP幻影小鬼僵尸",
+    "code": "pvp_shadowimp"
+  },
+  "pvp_gargantuar": {
+    "id": 510,
+    "name": "PVP巨人僵尸",
+    "code": "pvp_gargantuar"
+  },
+  "pvpskill_rage": {
+    "id": 511,
+    "name": "PVP技能-狂暴药水",
+    "code": "pvpskill_rage"
+  },
+  "pvp_nurse": {
+    "id": 512,
+    "name": "PVP医生僵尸",
+    "code": "pvp_nurse"
+  },
+  "pvp_cannon": {
+    "id": 513,
+    "name": "PVP小鬼僵尸炮",
+    "code": "pvp_cannon"
+  },
+  "pvp_seagull": {
+    "id": 514,
+    "name": "PVP海鸥僵尸",
+    "code": "pvp_seagull"
+  },
+  "pvp_hammer": {
+    "id": 515,
+    "name": "PVP大锤僵尸",
+    "code": "pvp_hammer"
+  },
+  "pvp_monk_drink": {
+    "id": 516,
+    "name": "PVP武僧酒鬼僵尸",
+    "code": "pvp_monk_drink"
+  },
+  "pvp_cannonimp": {
+    "id": 517,
+    "name": "PVP小鬼僵尸炮的小鬼僵尸",
+    "code": "pvp_cannonimp"
+  },
+  "pvp_pirate_captain": {
+    "id": 518,
+    "name": "PVP海盗船长僵尸",
+    "code": "pvp_pirate_captain"
+  },
+  "pvp_chicken_farmer": {
+    "id": 519,
+    "name": "PVP鸡贼僵尸",
+    "code": "pvp_chicken_farmer"
+  },
+  "pvp_football_mech": {
+    "id": 520,
+    "name": "PVP橄榄球机甲僵尸",
+    "code": "pvp_football_mech"
+  },
+  "pvp_chicken": {
+    "id": 521,
+    "name": "PVP僵尸鸡",
+    "code": "pvp_chicken"
+  },
+  "children_ballon": {
+    "id": 1001,
+    "name": "儿童节气球僵尸",
+    "code": "children_ballon"
+  },
+  "children_schoolbag": {
+    "id": 1002,
+    "name": "儿童节书包僵尸",
+    "code": "children_schoolbag"
+  },
+  "children_toycar": {
+    "id": 1003,
+    "name": "儿童节碰碰车僵尸",
+    "code": "children_toycar"
+  },
+  "children_toygun": {
+    "id": 1004,
+    "name": "儿童节泡泡枪僵尸",
+    "code": "children_toygun"
+  },
+  "children_airbubble": {
+    "id": 1005,
+    "name": "儿童节泡泡枪的泡泡",
+    "code": "children_airbubble"
+  },
+  "children_lollipops": {
+    "id": 1006,
+    "name": "儿童节棒棒糖僵尸",
+    "code": "children_lollipops"
+  },
+  "roman_imp": {
+    "id": 1007,
+    "name": "罗马小鬼僵尸",
+    "code": "roman_imp"
+  },
+  "roman_gargantuar": {
+    "id": 1008,
+    "name": "罗马巨人僵尸",
+    "code": "roman_gargantuar"
+  },
+  "roman_shield_almanac": {
+    "id": 1009,
+    "name": "图鉴里的罗马盾牌僵尸",
+    "code": "roman_shield_almanac"
+  },
+  "roman_shield_triad": {
+    "id": 1010,
+    "name": "3部分罗马盾牌僵尸",
+    "code": "roman_shield_triad"
+  },
+  "roman_shield_pair": {
+    "id": 1011,
+    "name": "2部分罗马盾牌僵尸",
+    "code": "roman_shield_pair"
+  },
+  "roman_segment": {
+    "id": 0,
+    "name": "1部分罗马盾牌僵尸",
+    "code": "roman_segment"
+  },
+  "roman_shield_top": {
+    "id": 0,
+    "name": "罗马举盾僵尸",
+    "code": "roman_shield_top"
+  },
+  "roman_ballista": {
+    "id": 0,
+    "name": "罗马攻城车",
+    "code": "roman_ballista"
+  },
+  "roman_healer": {
+    "id": 1012,
+    "name": "治愈者僵尸",
+    "code": "roman_healer"
+  },
+  "zombie_snowpea": {
+    "id": 1013,
+    "name": "寒冰豌豆僵尸",
+    "code": "zombie_snowpea"
+  },
+  "zombie_gatlingpea": {
+    "id": 1014,
+    "name": "机枪豌豆僵尸",
+    "code": "zombie_gatlingpea"
+  },
+  "heian_worker": {
+    "id": 1020,
+    "name": "武士僵尸",
+    "code": "heian_worker"
+  },
+  "heian_armor1": {
+    "id": 1021,
+    "name": "武士路障僵尸",
+    "code": "heian_armor1"
+  },
+  "heian_armor2": {
+    "id": 1022,
+    "name": "武士铁桶僵尸",
+    "code": "heian_armor2"
+  },
+  "heian_flag": {
+    "id": 1023,
+    "name": "武士旗帜僵尸",
+    "code": "heian_flag"
+  },
+  "heian_gargantuar": {
+    "id": 1024,
+    "name": "将军巨人僵尸",
+    "code": "heian_gargantuar"
+  },
+  "heian_hanabi": {
+    "id": 1025,
+    "name": "花火僵尸",
+    "code": "heian_hanabi"
+  },
+  "heian_ninja": {
+    "id": 1026,
+    "name": "忍者小鬼僵尸",
+    "code": "heian_ninja"
+  },
+  "gum": {
+    "id": 0,
+    "name": "粘液桉果的粘液",
+    "code": "gum"
+  },
+  "poison_gum": {
+    "id": 0,
+    "name": "粘液桉果的毒粘液",
+    "code": "poison_gum"
+  },
+  "spring": {
+    "id": 1027,
+    "name": "复活节普通僵尸",
+    "code": "spring"
+  },
+  "spring_armor1": {
+    "id": 1028,
+    "name": "复活节路障僵尸",
+    "code": "spring_armor1"
+  },
+  "spring_armor2": {
+    "id": 1029,
+    "name": "复活节铁桶僵尸",
+    "code": "spring_armor2"
+  },
+  "spring_flag": {
+    "id": 1030,
+    "name": "复活节旗子僵尸",
+    "code": "spring_flag"
+  },
+  "spring_camel_onehump": {
+    "id": 1031,
+    "name": "3部分复活节骆驼僵尸",
+    "code": "spring_camel_onehump"
+  },
+  "spring_camel_twohump": {
+    "id": 1032,
+    "name": "4部分复活节骆驼僵尸",
+    "code": "spring_camel_twohump"
+  },
+  "spring_camel_manyhump": {
+    "id": 1033,
+    "name": "6部分复活节骆驼僵尸",
+    "code": "spring_camel_manyhump"
+  },
+  "spring_camel_segment": {
+    "id": 1034,
+    "name": "1部分复活节骆驼僵尸",
+    "code": "spring_camel_segment"
+  },
+  "spring_poncho": {
+    "id": 1035,
+    "name": "复活节斗篷僵尸",
+    "code": "spring_poncho"
+  },
+  "spring_wizard": {
+    "id": 1036,
+    "name": "复活节魔法师僵尸",
+    "code": "spring_wizard"
+  },
+  "spring_gargantuar": {
+    "id": 1037,
+    "name": "复活节巨人僵尸",
+    "code": "spring_gargantuar"
+  },
+  "spring_gargantuar_af": {
+    "id": 1038,
+    "name": "愚人节复活节巨人僵尸",
+    "code": "spring_gargantuar_af"
+  },
+  "spring_imp": {
+    "id": 1039,
+    "name": "复活节小鬼僵尸",
+    "code": "spring_imp"
+  },
+  "spring_imp_af": {
+    "id": 1040,
+    "name": "愚人节复活节小鬼僵尸",
+    "code": "spring_imp_af"
+  },
+  "heian_sushi": {
+    "id": 0,
+    "name": "寿司师傅僵尸",
+    "code": "heian_sushi"
+  },
+  "heian_onmyoji": {
+    "id": 1041,
+    "name": "阴阳师僵尸",
+    "code": "heian_onmyoji"
+  },
+  "heian_akinndo": {
+    "id": 1042,
+    "name": "蓑衣僵尸",
+    "code": "heian_akinndo"
+  },
+  "radiated_small": {
+    "id": 0,
+    "name": "地星发射井辐射小鬼僵尸",
+    "code": "radiated_small"
+  },
+  "radiated_mid": {
+    "id": 0,
+    "name": "地星发射井辐射普通僵尸",
+    "code": "radiated_mid"
+  },
+  "radiated_large": {
+    "id": 0,
+    "name": "地星发射井辐射巨人僵尸",
+    "code": "radiated_large"
+  },
+  "elite_roman_ballista": {
+    "id": 0,
+    "name": "精英罗马攻城车",
+    "code": "elite_roman_ballista"
+  },
+  "elite_roman_ballista_pvz1_normal": {
+    "id": 0,
+    "name": "回忆之旅简单-精英罗马攻城车",
+    "code": "elite_roman_ballista_pvz1_normal"
+  },
+  "elite_roman_ballista_pvz1_hard": {
+    "id": 0,
+    "name": "回忆之旅困难-精英罗马攻城车",
+    "code": "elite_roman_ballista_pvz1_hard"
+  },
+  "elite_roman_healer": {
+    "id": 0,
+    "name": "精英治愈者僵尸",
+    "code": "elite_roman_healer"
+  },
+  "elite_roman_healer_pvz1_normal": {
+    "id": 0,
+    "name": "回忆之旅简单精英治愈者僵尸",
+    "code": "elite_roman_healer_pvz1_normal"
+  },
+  "elite_roman_healer_pvz1_hard": {
+    "id": 0,
+    "name": "回忆之旅困难精英治愈者僵尸",
+    "code": "elite_roman_healer_pvz1_hard"
+  },
+  "elite_skycity_electric": {
+    "id": 0,
+    "name": "精英闪电枪僵尸",
+    "code": "elite_skycity_electric"
+  },
+  "elite_skycity_electric_pvz1_normal": {
+    "id": 0,
+    "name": "回忆之旅简单精英闪电枪僵尸",
+    "code": "elite_skycity_electric_pvz1_normal"
+  },
+  "elite_skycity_electric_pvz1_hard": {
+    "id": 0,
+    "name": "回忆之旅困难精英闪电枪僵尸",
+    "code": "elite_skycity_electric_pvz1_hard"
+  },
+  "elite_heian_onmyoji": {
+    "id": 0,
+    "name": "精英阴阳师僵尸",
+    "code": "elite_heian_onmyoji"
+  },
+  "elite_heian_onmyoji_pvz1_normal": {
+    "id": 0,
+    "name": "回忆之旅简单精英阴阳师僵尸",
+    "code": "elite_heian_onmyoji_pvz1_normal"
+  },
+  "elite_heian_onmyoji_pvz1_hard": {
+    "id": 0,
+    "name": "回忆之旅困难精英阴阳师僵尸",
+    "code": "elite_heian_onmyoji_pvz1_hard"
+  },
+  "turkeypult_basic": {
+    "id": 0,
+    "name": "火鸡投手的火鸡",
+    "code": "turkeypult_basic"
+  },
+  "turkeypult_turkzilla": {
+    "id": 0,
+    "name": "火鸡投手大招的火鸡",
+    "code": "turkeypult_turkzilla"
+  },
+  "turkeypult_turkzilla_avatar": {
+    "id": 0,
+    "name": "火鸡投手装扮大招的火鸡",
+    "code": "turkeypult_turkzilla_avatar"
+  },
+  "turkeypult_turkzilla_lv5": {
+    "id": 0,
+    "name": "火鸡投手5阶的火鸡",
+    "code": "turkeypult_turkzilla_lv5"
+  },
+  "wave_airbubble": {
+    "id": 0,
+    "name": "回忆之旅泡泡",
+    "code": "wave_airbubble"
+  },
+  "wave_elecshieldgenerator": {
+    "id": 0,
+    "name": "回忆之旅改良电磁盾僵尸",
+    "code": "wave_elecshieldgenerator"
+  },
+  "lny": {
+    "id": 1043,
+    "name": "新年僵尸",
+    "code": "lny"
+  },
+  "lny_flag": {
+    "id": 1044,
+    "name": "新年旗子僵尸",
+    "code": "lny_flag"
+  },
+  "lny_armor1": {
+    "id": 1045,
+    "name": "新年路障僵尸",
+    "code": "lny_armor1"
+  },
+  "lny_armor2": {
+    "id": 1046,
+    "name": "新年铁桶僵尸",
+    "code": "lny_armor2"
+  },
+  "lny_camel_onehump": {
+    "id": 1047,
+    "name": "3部分新年骆驼僵尸",
+    "code": "lny_camel_onehump"
+  },
+  "lny_camel_twohump": {
+    "id": 1048,
+    "name": "4部分新年骆驼僵尸",
+    "code": "lny_camel_twohump"
+  },
+  "lny_camel_manyhump": {
+    "id": 1049,
+    "name": "6部分新年骆驼僵尸",
+    "code": "lny_camel_manyhump"
+  },
+  "lny_camel_segment": {
+    "id": 1050,
+    "name": "1部分新年骆驼僵尸",
+    "code": "lny_camel_segment"
+  },
+  "lny_imp": {
+    "id": 1051,
+    "name": "新年粉丝小鬼僵尸",
+    "code": "lny_imp"
+  },
+  "general_caesar_phase1": {
+    "id": 1052,
+    "name": "凯撒僵尸1号",
+    "code": "general_caesar_phase1"
+  },
+  "general_caesar_phase2": {
+    "id": 1053,
+    "name": "凯撒僵尸2号",
+    "code": "general_caesar_phase2"
+  },
+  "general_caesar_phase3": {
+    "id": 1054,
+    "name": "凯撒僵尸3号",
+    "code": "general_caesar_phase3"
+  },
+  "fairy_tale": {
+    "id": 0,
+    "name": "扑克牌普通僵尸",
+    "code": "fairy_tale"
+  },
+  "fairy_tale_flag": {
+    "id": 0,
+    "name": "扑克牌旗帜僵尸",
+    "code": "fairy_tale_flag"
+  },
+  "fairy_tale_armor1": {
+    "id": 0,
+    "name": "扑克牌路障僵尸",
+    "code": "fairy_tale_armor1"
+  },
+  "fairy_tale_armor2": {
+    "id": 0,
+    "name": "扑克牌铁桶僵尸",
+    "code": "fairy_tale_armor2"
+  },
+  "fairy_tale_gargantuar": {
+    "id": 0,
+    "name": "护卫巨人僵尸",
+    "code": "fairy_tale_gargantuar"
+  },
+  "fairy_tale_imp": {
+    "id": 0,
+    "name": "红皇后小鬼僵尸",
+    "code": "fairy_tale_imp"
+  },
+  "fairy_tale_knight": {
+    "id": 0,
+    "name": "骑兵僵尸",
+    "code": "fairy_tale_knight"
+  },
+  "fairy_tale_knight_rider": {
+    "id": 0,
+    "name": "骑士僵尸",
+    "code": "fairy_tale_knight_rider"
+  },
+  "fairy_tale_witch": {
+    "id": 0,
+    "name": "女巫僵尸",
+    "code": "fairy_tale_witch"
+  },
+  "summer_basic": {
+    "id": 0,
+    "name": "夏夜普通僵尸",
+    "code": "summer_basic"
+  },
+  "summer_armor1": {
+    "id": 0,
+    "name": "夏夜路障僵尸",
+    "code": "summer_armor1"
+  },
+  "summer_armor2": {
+    "id": 0,
+    "name": "夏夜铁桶僵尸",
+    "code": "summer_armor2"
+  },
+  "summer_bug": {
+    "id": 0,
+    "name": "夏夜昆虫普通僵尸",
+    "code": "summer_bug"
+  },
+  "summer_bug_armor1": {
+    "id": 0,
+    "name": "夏夜昆虫路障僵尸",
+    "code": "summer_bug_armor1"
+  },
+  "summer_bug_armor2": {
+    "id": 0,
+    "name": "夏夜昆虫铁桶僵尸",
+    "code": "summer_bug_armor2"
+  },
+  "summer_gargantuar": {
+    "id": 0,
+    "name": "夏夜巨人僵尸",
+    "code": "summer_gargantuar"
+  },
+  "summer_imp": {
+    "id": 0,
+    "name": "香肠小鬼僵尸",
+    "code": "summer_imp"
+  },
+  "card_game_enemy_pirate_imp": {
+    "id": 0,
+    "name": "牌面纷争敌方海盗小鬼僵尸",
+    "code": "card_game_enemy_pirate_imp"
+  },
+  "card_game_enemy_cannon_pirate_imp": {
+    "id": 0,
+    "name": "牌面纷争敌方海盗小鬼炮小鬼僵尸",
+    "code": "card_game_enemy_cannon_pirate_imp"
+  },
+  "card_game_enemy_chicken": {
+    "id": 0,
+    "name": "牌面纷争敌方僵尸鸡",
+    "code": "card_game_enemy_chicken"
+  },
+  "card_game_enemy_disco_mech": {
+    "id": 0,
+    "name": "牌面纷争敌方迪斯科3000",
+    "code": "card_game_enemy_disco_mech"
+  },
+  "card_game_enemy_future_protector": {
+    "id": 0,
+    "name": "牌面纷争敌方电磁盾僵尸",
+    "code": "card_game_enemy_future_protector"
+  },
+  "card_game_enemy_skycity_battleplane": {
+    "id": 0,
+    "name": "牌面纷争敌方战斗机僵尸",
+    "code": "card_game_enemy_skycity_battleplane"
+  },
+  "card_game_enemy_heian_gargantuar": {
+    "id": 0,
+    "name": "牌面纷争敌方将军巨人僵尸",
+    "code": "card_game_enemy_heian_gargantuar"
+  },
+  "card_game_enemy_heian_ninja": {
+    "id": 0,
+    "name": "牌面纷争敌方忍者小鬼僵尸",
+    "code": "card_game_enemy_heian_ninja"
+  },
+  "card_game_enemy_fairy_tale_gargantuar": {
+    "id": 0,
+    "name": "牌面纷争敌方近卫巨人僵尸",
+    "code": "card_game_enemy_fairy_tale_gargantuar"
+  },
+  "cardgame_tutorial": {
+    "id": 0,
+    "name": "牌面纷争普通僵尸",
+    "code": "cardgame_tutorial"
+  },
+  "cardgame_tutorial_armor2": {
+    "id": 0,
+    "name": "牌面纷争铁桶僵尸",
+    "code": "cardgame_tutorial_armor2"
+  },
+  "cardgame_chicken": {
+    "id": 0,
+    "name": "牌面纷争僵尸鸡",
+    "code": "cardgame_chicken"
+  },
+  "cardgame_weasel": {
+    "id": 0,
+    "name": "牌面纷争冰鼬",
+    "code": "cardgame_weasel"
+  },
+  "cardgame_electric": {
+    "id": 0,
+    "name": "牌面纷争闪电枪僵尸",
+    "code": "cardgame_electric"
+  },
+  "cardgame_electric_advanced": {
+    "id": 0,
+    "name": "牌面纷争高级闪电枪僵尸",
+    "code": "cardgame_electric_advanced"
+  },
+  "cardgame_protector": {
+    "id": 0,
+    "name": "牌面纷争电磁盾僵尸",
+    "code": "cardgame_protector"
+  },
+  "cardgame_cavalry": {
+    "id": 0,
+    "name": "牌面纷争骑兵僵尸",
+    "code": "cardgame_cavalry"
+  },
+  "cardgame_selfexplode": {
+    "id": 0,
+    "name": "牌面纷争自爆僵尸",
+    "code": "cardgame_selfexplode"
+  },
+  "cardgame_mech_cone": {
+    "id": 0,
+    "name": "牌面纷争机甲路障僵尸",
+    "code": "cardgame_mech_cone"
+  },
+  "cardgame_future_gargantuar": {
+    "id": 0,
+    "name": "牌面纷争机甲巨人僵尸",
+    "code": "cardgame_future_gargantuar"
+  },
+  "cardgame_disco_mech": {
+    "id": 0,
+    "name": "牌面纷争迪斯科3000",
+    "code": "cardgame_disco_mech"
+  },
+  "cardgame_battleplane": {
+    "id": 0,
+    "name": "牌面纷争战斗机僵尸",
+    "code": "cardgame_battleplane"
+  },
+  "new_pvp_tutorial": {
+    "id": 400000,
+    "name": "双人对决普通僵尸",
+    "code": "new_pvp_tutorial"
+  },
+  "new_pvp_chicken": {
+    "id": 400001,
+    "name": "双人对决僵尸鸡",
+    "code": "new_pvp_chicken"
+  },
+  "new_pvp_beghouled_newspaper": {
+    "id": 400002,
+    "name": "双人对决报纸僵尸",
+    "code": "new_pvp_beghouled_newspaper"
+  },
+  "new_pvp_zombie_gatlingpea": {
+    "id": 400003,
+    "name": "双人对决机枪豌豆僵尸",
+    "code": "new_pvp_zombie_gatlingpea"
+  },
+  "new_pvp_modern_allstar": {
+    "id": 400004,
+    "name": "双人对决全明星僵尸",
+    "code": "new_pvp_modern_allstar"
+  },
+  "new_pvp_future_protector": {
+    "id": 400005,
+    "name": "双人对决电磁盾僵尸",
+    "code": "new_pvp_future_protector"
+  },
+  "new_pvp_beach_octopus": {
+    "id": 400006,
+    "name": "双人对决章鱼僵尸",
+    "code": "new_pvp_beach_octopus"
+  },
+  "new_pvp_kongfu_strong_bronze": {
+    "id": 400007,
+    "name": "双人对决功夫铜人僵尸",
+    "code": "new_pvp_kongfu_strong_bronze"
+  },
+  "new_pvp_tutorial_armor2": {
+    "id": 400008,
+    "name": "双人对决铁桶僵尸",
+    "code": "new_pvp_tutorial_armor2"
+  },
+  "new_pvp_modern_miner": {
+    "id": 400009,
+    "name": "双人对决矿工僵尸",
+    "code": "new_pvp_modern_miner"
+  },
+  "new_pvp_iceage_weasel": {
+    "id": 400010,
+    "name": "双人对决冰鼬",
+    "code": "new_pvp_iceage_weasel"
+  },
+  "new_pvp_roman_ballista": {
+    "id": 400011,
+    "name": "双人对决罗马攻城车僵尸",
+    "code": "new_pvp_roman_ballista"
+  },
+  "new_pvp_tutorial_armor1": {
+    "id": 400012,
+    "name": "双人对决路障僵尸",
+    "code": "new_pvp_tutorial_armor1"
+  },
+  "new_pvp_explorer": {
+    "id": 400013,
+    "name": "双人对决探险家僵尸",
+    "code": "new_pvp_explorer"
+  },
+  "new_pvp_west_bullrider": {
+    "id": 400014,
+    "name": "双人对决骑牛小鬼僵尸",
+    "code": "new_pvp_west_bullrider"
+  },
+  "new_pvp_west_bull": {
+    "id": 400015,
+    "name": "双人对决机器牛",
+    "code": "new_pvp_west_bull"
+  },
+  "new_pvp_dark_wizard": {
+    "id": 400016,
+    "name": "双人对决魔法师僵尸",
+    "code": "new_pvp_dark_wizard"
+  },
+  "new_pvp_modern_balloon": {
+    "id": 400017,
+    "name": "双人对决气球僵尸",
+    "code": "new_pvp_modern_balloon"
+  },
+  "new_pvp_renai_gliding": {
+    "id": 400018,
+    "name": "双人对决飞行器僵尸",
+    "code": "new_pvp_renai_gliding"
+  },
+  "new_pvp_zombie_explodenut": {
+    "id": 400019,
+    "name": "双人对决爆炸坚果僵尸",
+    "code": "new_pvp_zombie_explodenut"
+  },
+  "new_pvp_tutorial_gargantuar": {
+    "id": 400020,
+    "name": "双人对决巨人僵尸",
+    "code": "new_pvp_tutorial_gargantuar"
+  },
+  "new_pvp_iceage_armor3": {
+    "id": 400021,
+    "name": "双人对决冰砖僵尸",
+    "code": "new_pvp_iceage_armor3"
+  },
+  "new_pvp_zombie_snowpea": {
+    "id": 400022,
+    "name": "双人对决寒冰射手僵尸",
+    "code": "new_pvp_zombie_snowpea"
+  },
+  "new_pvp_beach_shell": {
+    "id": 400023,
+    "name": "双人对决贝壳僵尸",
+    "code": "new_pvp_beach_shell"
+  },
+  "new_pvp_dino_bully": {
+    "id": 400024,
+    "name": "双人对决侏罗纪野人僵尸",
+    "code": "new_pvp_dino_bully"
+  },
+  "new_pvp_lostcity_excavator": {
+    "id": 400025,
+    "name": "双人对决失落发掘者",
+    "code": "new_pvp_lostcity_excavator"
+  },
+  "new_pvp_children_ballon": {
+    "id": 400026,
+    "name": "双人对决儿童节气球僵尸",
+    "code": "new_pvp_children_ballon"
+  },
+  "new_pvp_iceage_dodo": {
+    "id": 400027,
+    "name": "双人对决渡渡鸟骑士僵尸",
+    "code": "new_pvp_iceage_dodo"
+  },
+  "new_pvp_beach_surfer": {
+    "id": 400028,
+    "name": "双人对决冲浪僵尸",
+    "code": "new_pvp_beach_surfer"
+  },
+  "new_pvp_zombie_jalapeno": {
+    "id": 400029,
+    "name": "双人对决火爆辣椒僵尸",
+    "code": "new_pvp_zombie_jalapeno"
+  },
+  "new_pvp_heian_onmyoji": {
+    "id": 400030,
+    "name": "双人对决阴阳师僵尸",
+    "code": "new_pvp_heian_onmyoji"
+  },
+  "new_pvp_kongfu_drink": {
+    "id": 400031,
+    "name": "双人对决喝酒僵尸",
+    "code": "new_pvp_kongfu_drink"
+  },
+  "new_pvp_dark_rogue": {
+    "id": 400032,
+    "name": "双人对决盗贼僵尸",
+    "code": "new_pvp_dark_rogue"
+  },
+  "new_pvp_children_toycar": {
+    "id": 400033,
+    "name": "双人对决玩具车僵尸",
+    "code": "new_pvp_children_toycar"
+  },
+  "new_pvp_kongfu_selfexplode": {
+    "id": 400034,
+    "name": "双人对决自爆僵尸",
+    "code": "new_pvp_kongfu_selfexplode"
+  },
+  "new_pvp_roman_healer": {
+    "id": 400035,
+    "name": "双人对决治愈者僵尸",
+    "code": "new_pvp_roman_healer"
+  },
+  "new_pvp_heian_ninja": {
+    "id": 400036,
+    "name": "双人对决忍者小鬼僵尸",
+    "code": "new_pvp_heian_ninja"
+  },
+  "new_pvp_iceage_hunter": {
+    "id": 400037,
+    "name": "双人对决猎人僵尸",
+    "code": "new_pvp_iceage_hunter"
+  },
+  "new_pvp_newspaper_veteran": {
+    "id": 400038,
+    "name": "双人对决周日版僵尸",
+    "code": "new_pvp_newspaper_veteran"
+  },
+  "new_pvp_lostcity_jane": {
+    "id": 400039,
+    "name": "双人对决洋伞僵尸",
+    "code": "new_pvp_lostcity_jane"
+  },
+  "new_pvp_iceage_chief": {
+    "id": 400040,
+    "name": "双人对决冰风酋长僵尸",
+    "code": "new_pvp_iceage_chief"
+  },
+  "new_pvp_mech_cone": {
+    "id": 400041,
+    "name": "双人对决机甲路障僵尸",
+    "code": "new_pvp_mech_cone"
+  },
+  "new_pvp_lostcity_crystalskull": {
+    "id": 400042,
+    "name": "双人对决考古学家僵尸",
+    "code": "new_pvp_lostcity_crystalskull"
+  },
+  "new_pvp_steam_gentleman": {
+    "id": 400043,
+    "name": "双人对决绅士僵尸",
+    "code": "new_pvp_steam_gentleman"
+  },
+  "new_pvp_iceage_troglobite": {
+    "id": 400044,
+    "name": "双人对决穴居僵尸",
+    "code": "new_pvp_iceage_troglobite"
+  },
+  "new_pvp_eighties_glitter": {
+    "id": 400045,
+    "name": "双人对决闪动僵尸",
+    "code": "new_pvp_eighties_glitter"
+  },
+  "new_pvp_kongfu_monk_blade": {
+    "id": 400046,
+    "name": "双人对决大刀武僧僵尸",
+    "code": "new_pvp_kongfu_monk_blade"
+  },
+  "new_pvp_kongfu_monk_torch": {
+    "id": 400047,
+    "name": "双人对决火把武僧僵尸",
+    "code": "new_pvp_kongfu_monk_torch"
+  },
+  "new_pvp_chicken_farmer": {
+    "id": 400048,
+    "name": "双人对决鸡贼僵尸",
+    "code": "new_pvp_chicken_farmer"
+  },
+  "new_pvp_dark_juggler": {
+    "id": 400049,
+    "name": "双人对决小丑僵尸",
+    "code": "new_pvp_dark_juggler"
+  },
+  "new_pvp_eighties_punk": {
+    "id": 400050,
+    "name": "双人对决朋克僵尸",
+    "code": "new_pvp_eighties_punk"
+  },
+  "new_pvp_roman_armor4": {
+    "id": 400051,
+    "name": "双人对决石像僵尸",
+    "code": "new_pvp_roman_armor4"
+  },
+  "new_pvp_dark_imp_dragon": {
+    "id": 400052,
+    "name": "双人对决恶龙僵尸",
+    "code": "new_pvp_dark_imp_dragon"
+  },
+  "new_pvp_heian_hanabi": {
+    "id": 400053,
+    "name": "双人对决花火僵尸",
+    "code": "new_pvp_heian_hanabi"
+  },
+  "new_pvp_kongfu_gong": {
+    "id": 400054,
+    "name": "双人对决功夫铜锣僵尸",
+    "code": "new_pvp_kongfu_gong"
+  },
+  "new_pvp_dark_cavalry": {
+    "id": 400055,
+    "name": "双人对决骑兵僵尸",
+    "code": "new_pvp_dark_cavalry"
+  },
+  "new_pvp_lostcity_bug": {
+    "id": 400056,
+    "name": "双人对决失落昆虫僵尸",
+    "code": "new_pvp_lostcity_bug"
+  },
+  "new_pvp_pirate_captain": {
+    "id": 400057,
+    "name": "双人对决海盗船长僵尸",
+    "code": "new_pvp_pirate_captain"
+  },
+  "new_pvp_kongfu_hammer": {
+    "id": 400058,
+    "name": "双人对决锤子僵尸",
+    "code": "new_pvp_kongfu_hammer"
+  },
+  "new_pvp_lostcity_doctor": {
+    "id": 400059,
+    "name": "双人对决失落医生僵尸",
+    "code": "new_pvp_lostcity_doctor"
+  },
+  "new_pvp_kongfu_qigong": {
+    "id": 400060,
+    "name": "双人对决功夫气功僵尸",
+    "code": "new_pvp_kongfu_qigong"
+  },
+  "new_pvp_dark": {
+    "id": 400061,
+    "name": "双人对决农夫僵尸",
+    "code": "new_pvp_dark"
+  },
+  "new_pvp_tomb_raiser": {
+    "id": 400062,
+    "name": "双人对决死神僵尸",
+    "code": "new_pvp_tomb_raiser"
+  },
+  "new_pvp_barrelroller": {
+    "id": 400063,
+    "name": "双人对决滚桶僵尸",
+    "code": "new_pvp_barrelroller"
+  },
+  "new_pvp_prospector": {
+    "id": 400064,
+    "name": "双人对决淘金僵尸",
+    "code": "new_pvp_prospector"
+  },
+  "new_pvp_eighties_breakdancer": {
+    "id": 400065,
+    "name": "双人对决霹雳舞僵尸",
+    "code": "new_pvp_eighties_breakdancer"
+  }
+}

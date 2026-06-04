@@ -1,0 +1,38 @@
+{
+  "poweruppinchzombie": {
+    "name": "剪刀指",
+    "code": "poweruppinchzombie"
+  },
+  "powerupflickzombie": {
+    "name": "浮空指",
+    "code": "powerupflickzombie"
+  },
+  "powerupwizardfinger": {
+    "name": "电击指",
+    "code": "powerupwizardfinger"
+  },
+  "poweruptacticalcuke": {
+    "name": "战术黄瓜",
+    "code": "poweruptacticalcuke"
+  },
+  "monthlycard_tacticalcuke": {
+    "name": "月卡战术黄瓜",
+    "code": "monthlycard_tacticalcuke"
+  },
+  "powerupdangerroomtacticalcuke": {
+    "name": "无尽挑战战术黄瓜",
+    "code": "powerupdangerroomtacticalcuke"
+  },
+  "powerupvasebreakerreveal": {
+    "name": "花瓶终结者查罐指",
+    "code": "powerupvasebreakerreveal"
+  },
+  "powerupvasebreakerbutter": {
+    "name": "花瓶终结者黄油指",
+    "code": "powerupvasebreakerbutter"
+  },
+  "powerupvasebreakermove": {
+    "name": "花瓶终结者移罐指",
+    "code": "powerupvasebreakermove"
+  }
+}

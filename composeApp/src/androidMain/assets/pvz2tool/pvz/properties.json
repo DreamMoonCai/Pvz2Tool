@@ -1,0 +1,350 @@
+{
+  "unique_fertilizer": {
+    "id": 21001,
+    "shardId": 22001,
+    "name": "珍惜的肥料",
+    "code": "unique_fertilizer"
+  },
+  "unique_drum": {
+    "id": 21002,
+    "shardId": 22002,
+    "name": "时空铁桶",
+    "code": "unique_drum"
+  },
+  "unique_accelerate": {
+    "id": 21003,
+    "shardId": 22003,
+    "name": "加速花盆",
+    "code": "unique_accelerate"
+  },
+  "unique_regeneration": {
+    "id": 21004,
+    "shardId": 22004,
+    "name": "万能的医药箱",
+    "code": "unique_regeneration"
+  },
+  "unique_sunmoney": {
+    "id": 21005,
+    "shardId": 22005,
+    "name": "聚光花盆",
+    "code": "unique_sunmoney"
+  },
+  "unique_clock": {
+    "id": 21006,
+    "shardId": 22006,
+    "name": "戴夫的闹钟",
+    "code": "unique_clock"
+  },
+  "unique_cost": {
+    "id": 21007,
+    "shardId": 22007,
+    "name": "太阳能花盆",
+    "code": "unique_cost"
+  },
+  "unique_explode": {
+    "id": 21008,
+    "shardId": 22008,
+    "name": "超能火药桶",
+    "code": "unique_explode"
+  },
+  "unique_torch": {
+    "id": 21009,
+    "shardId": 22009,
+    "name": "燃烧的火把",
+    "code": "unique_torch"
+  },
+  "unique_snowflake": {
+    "id": 21010,
+    "shardId": 22010,
+    "name": "闪耀雪花挂坠",
+    "code": "unique_snowflake"
+  },
+  "unique_pole": {
+    "id": 21011,
+    "shardId": 22011,
+    "name": "巨人的电线杆",
+    "code": "unique_pole"
+  },
+  "unique_duck": {
+    "id": 21012,
+    "shardId": 22012,
+    "name": "小黄鸭游泳圈",
+    "code": "unique_duck"
+  },
+  "epic_fertilizer": {
+    "id": 21013,
+    "shardId": 22013,
+    "name": "高级的肥料",
+    "code": "epic_fertilizer"
+  },
+  "epic_drum": {
+    "id": 21014,
+    "shardId": 22014,
+    "name": "精致的铁桶",
+    "code": "epic_drum"
+  },
+  "epic_regeneration": {
+    "id": 21015,
+    "shardId": 22015,
+    "name": "高级的医药箱",
+    "code": "epic_regeneration"
+  },
+  "epic_clock": {
+    "id": 21016,
+    "shardId": 22016,
+    "name": "精巧的闹钟",
+    "code": "epic_clock"
+  },
+  "epic_explode": {
+    "id": 21017,
+    "shardId": 22017,
+    "name": "高级火药桶",
+    "code": "epic_explode"
+  },
+  "epic_torch": {
+    "id": 21018,
+    "shardId": 22018,
+    "name": "精致的火把",
+    "code": "epic_torch"
+  },
+  "epic_snowflake": {
+    "id": 21019,
+    "shardId": 22019,
+    "name": "精致雪花挂坠",
+    "code": "epic_snowflake"
+  },
+  "epic_pole": {
+    "id": 21020,
+    "shardId": 22020,
+    "name": "坚固的电线杆",
+    "code": "epic_pole"
+  },
+  "magic_fertilizer": {
+    "id": 21021,
+    "shardId": 22021,
+    "name": "普通的肥料",
+    "code": "magic_fertilizer"
+  },
+  "magic_drum": {
+    "id": 21022,
+    "shardId": 22022,
+    "name": "普通的铁桶",
+    "code": "magic_drum"
+  },
+  "magic_regeneration": {
+    "id": 21023,
+    "shardId": 22023,
+    "name": "普通的医药箱",
+    "code": "magic_regeneration"
+  },
+  "magic_torch": {
+    "id": 21024,
+    "shardId": 22024,
+    "name": "普通的火把",
+    "code": "magic_torch"
+  },
+  "magic_snowflake": {
+    "id": 21025,
+    "shardId": 22025,
+    "name": "普通雪花挂坠",
+    "code": "magic_snowflake"
+  },
+  "magic_pole": {
+    "id": 21026,
+    "shardId": 22026,
+    "name": "普通的电线杆",
+    "code": "magic_pole"
+  },
+  "normal_fertilizer": {
+    "id": 21027,
+    "shardId": 22027,
+    "name": "过期的肥料",
+    "code": "normal_fertilizer"
+  },
+  "normal_drum": {
+    "id": 21028,
+    "shardId": 22028,
+    "name": "损坏的铁桶",
+    "code": "normal_drum"
+  },
+  "normal_regeneration": {
+    "id": 21029,
+    "shardId": 22029,
+    "name": "损坏的医药箱",
+    "code": "normal_regeneration"
+  },
+  "epic_cost": {
+    "id": 21030,
+    "shardId": 22030,
+    "name": "节能罐",
+    "code": "epic_cost"
+  },
+  "super_clock": {
+    "id": 21050,
+    "shardId": 22050,
+    "name": "紫色手套",
+    "code": "super_clock"
+  },
+  "super_clock_1": {
+    "id": 21051,
+    "shardId": 22051,
+    "name": "红蜡烛",
+    "code": "super_clock_1"
+  },
+  "super_clock_2": {
+    "id": 21052,
+    "shardId": 22052,
+    "name": "白蜡烛",
+    "code": "super_clock_2"
+  },
+  "super_clock_3": {
+    "id": 21053,
+    "shardId": 22053,
+    "name": "太阳锅盔",
+    "code": "super_clock_3"
+  },
+  "super_clock_4": {
+    "id": 21054,
+    "shardId": 22054,
+    "name": "月亮锅盔",
+    "code": "super_clock_4"
+  },
+  "super_clock_5": {
+    "id": 21055,
+    "shardId": 22055,
+    "name": "公主冰冠",
+    "code": "super_clock_5"
+  },
+  "super_clock_6": {
+    "id": 21056,
+    "shardId": 22056,
+    "name": "女王冰冠",
+    "code": "super_clock_6"
+  },
+  "super_clock_7": {
+    "id": 21057,
+    "shardId": 22057,
+    "name": "牛仔手套",
+    "code": "super_clock_7"
+  },
+  "super_clock_8": {
+    "id": 21058,
+    "shardId": 22058,
+    "name": "聚能电池",
+    "code": "super_clock_8"
+  },
+  "super_clock_9": {
+    "id": 21059,
+    "shardId": 22059,
+    "name": "节能电池",
+    "code": "super_clock_9"
+  },
+  "super_clock_10": {
+    "id": 21060,
+    "shardId": 22060,
+    "name": "强效杀虫剂",
+    "code": "super_clock_10"
+  },
+  "super_clock_11": {
+    "id": 21061,
+    "shardId": 22061,
+    "name": "杀虫剂",
+    "code": "super_clock_11"
+  },
+  "super_clock_12": {
+    "id": 21062,
+    "shardId": 22062,
+    "name": "大爆竹",
+    "code": "super_clock_12"
+  },
+  "super_clock_13": {
+    "id": 21063,
+    "shardId": 22063,
+    "name": "爆竹",
+    "code": "super_clock_13"
+  },
+  "super_clock_14": {
+    "id": 21064,
+    "shardId": 22064,
+    "name": "小时钟",
+    "code": "super_clock_14"
+  },
+  "super_clock_15": {
+    "id": 21065,
+    "shardId": 22065,
+    "name": "加速时钟",
+    "code": "super_clock_15"
+  },
+  "super_clock_16": {
+    "id": 21066,
+    "shardId": 22066,
+    "name": "警用电击棍",
+    "code": "super_clock_16"
+  },
+  "super_clock_17": {
+    "id": 21067,
+    "shardId": 22067,
+    "name": "电击棍",
+    "code": "super_clock_17"
+  },
+  "painkiller_1": {
+    "id": 21068,
+    "shardId": 22068,
+    "name": "止痛剂",
+    "code": "painkiller_1"
+  },
+  "painkiller_2": {
+    "id": 21069,
+    "shardId": 22069,
+    "name": "止痛片",
+    "code": "painkiller_2"
+  },
+  "slingshot_1": {
+    "id": 21070,
+    "shardId": 22070,
+    "name": "金属弹弓",
+    "code": "slingshot_1"
+  },
+  "slingshot_2": {
+    "id": 21071,
+    "shardId": 22071,
+    "name": "木质弹弓",
+    "code": "slingshot_2"
+  },
+  "magic_book_1": {
+    "id": 21072,
+    "shardId": 22072,
+    "name": "高阶魔法书",
+    "code": "magic_book_1"
+  },
+  "magic_book_2": {
+    "id": 21073,
+    "shardId": 22073,
+    "name": "学徒魔法书",
+    "code": "magic_book_2"
+  },
+  "sun_gear_1": {
+    "id": 21074,
+    "shardId": 22074,
+    "name": "阳光齿轮",
+    "code": "sun_gear_1"
+  },
+  "travel_together_1": {
+    "id": 21075,
+    "shardId": 22075,
+    "name": "时间胶囊",
+    "code": "travel_together_1"
+  },
+  "hero_cape_1": {
+    "id": 21076,
+    "shardId": 22076,
+    "name": "降魔披风",
+    "code": "hero_cape_1"
+  },
+  "candy_basket": {
+    "id": 21077,
+    "shardId": 22077,
+    "name": "糖果篮子",
+    "code": "candy_basket"
+  }
+}
