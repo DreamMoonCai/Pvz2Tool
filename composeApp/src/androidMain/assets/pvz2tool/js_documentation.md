@@ -37,6 +37,7 @@
 | `path.pvz2tool.smf` | `路径.工具.SMF` |
 | `path.pvz2tool.section` | `路径.工具.资源` |
 | `path.pvz2tool.jsDir` | `路径.工具.JS目录` |
+| `path.toInternalPath()` | `路径.转换为内部路径()` |
 | `path.resolve()` | `路径.解析路径()` |
 | `path.resolveUri()` | `路径.解析URI()` |
 
@@ -93,12 +94,22 @@
 |------|----------|------|
 | `file.resolve()` | `file.解析()` | 解析占位符路径，返回文件对象 |
 | `file.readBytes()` | `file.读字节()` | 读取字节数组 |
-| `file.readText()` | `file.读文本()` | 读取文本 |
+| `file.readText()` | `file.读文本()` | 读取文本（UTF-8） |
 | `file.writeBytes()` | `file.写字节()` | 写入字节数组 |
-| `file.writeText()` | `file.写文本()` | 写入文本 |
-| `file.copy()` | `file.复制()` | 复制文件 |
-| `file.delete()` | `file.删除()` | 删除文件 |
+| `file.writeText()` | `file.写文本()` | 写入文本（UTF-8） |
+| `file.appendText()` | `file.追加文本()` | 追加文本（UTF-8） |
+| `file.copy()` | `file.复制()` / `file.复制到()` | 通过解压管线复制文件（toPath 为目标目录） |
+| `file.rename()` | `file.重命名()` / `file.移动到()` | 重命名/移动文件 |
+| `file.delete()` | `file.删除()` | 删除文件或目录 |
 | `file.exists()` | `file.存在()` | 检查文件是否存在 |
+| `file.list()` | `file.列表()` | 列出目录子项，返回文件对象数组 |
+| `file.mkdir()` | `file.创建目录()` / `file.mkdirs()` | 创建目录（含父目录） |
+| `file.size()` | `file.大小()` / `file.length()` / `file.长度()` | 文件大小（字节） |
+| `file.isDirectory()` | `file.是目录()` | 是否为目录 |
+| `file.isFile()` | `file.是文件()` | 是否为文件 |
+| `file.lastModified()` | `file.修改时间()` | 最后修改时间（Unix 毫秒） |
+| `file.extension()` | `file.扩展名()` | 扩展名（不含点） |
+| `file.parent()` | `file.父目录()` | 父目录路径（无则为 null） |
 
 #### pvz 对象
 | 英文 | 中文别名 | 说明 |
@@ -159,6 +170,7 @@
 | `this.value` | `this.值` | SLIDER/INPUT/INFO 值（可读写） |
 | `this.setValue()` | `this.设置值()` | 设置栏目项值 |
 | `this.call()` | `this.调用()` | 主动触发指定项目ID的JS |
+| `this.refresh()` | `this.刷新()` | 刷新整个界面（触发 UI 重组，使 this 中对 state 的修改立即生效） |
 
 #### this.version
 | 英文 | 中文别名 |
@@ -222,6 +234,7 @@
 | `ptx` | PTX | PTX 纹理编解码 | 局部 |
 | `pvz` | 植物大战僵尸 | 数字加密/存档操作/游戏数据访问 | 全局 |
 | `ui` | 界面 | 弹窗、进度条、解压 | 全局 |
+| `js` | JS执行器 | 动态执行JS代码/文件 | 全局 |
 | `assets` | 资源 | 工具箱资源访问（本地优先+URL支持） | 全局 |
 | `storage` | 存储 | 持久化键值存储 | 全局 |
 | `data` | 数据 | SMF 数据访问（通过 smfList 配置） | 局部 |
@@ -310,6 +323,46 @@ var savePath = path.解析路径("$GAME_SAVES/SeedChooserUserData.rton");
 **示例**：
 ```javascript
 var uri = path.resolveUri("$WORK_DIR/data.bin");
+```
+
+#### path.toInternalPath / path.转换为内部路径
+
+将 JS 占位符路径转换为 `AssetExtractorHolder.resource()` 可使用的 `internalPath`（即 assets 内的相对路径，不含 `pvz2tool/` 前缀）。
+
+转换规则：
+- `$WORK_DIR` → `""` 或 `subPath`（对应 `pvz2tool/` 根目录或其子路径）
+- `$SMF/xxx` → `version/assetPath/xxx`（不存在则降级到 `version/baseAssetPath`）
+- `$ITEM/xxx` → `version/id/sectionId/itemId/xxx`（不存在则降级到 `$SMF`，再降级到 `baseAssetPath`）
+- `$JS_DIR/xxx` → `version/enterGamePath` 的父目录（不存在则逐级向上降级）
+- `/absolute/path` → `absolute/path`（去掉开头 `/`）
+- `relative/path` → `relative/path`（相对路径原样返回）
+
+**参数**：
+- `placeholderPath` (string): 包含占位符的路径
+
+**返回**：string | null - internalPath（不含 `pvz2tool/` 前缀），无法转换时返回 null
+
+**示例**：
+```javascript
+// $WORK_DIR → 空字符串（对应 pvz2tool/ 根目录）
+var internal1 = path.toInternalPath("$WORK_DIR"); // ""
+
+// $WORK_DIR/xxx → xxx（对应 pvz2tool/xxx）
+var internal2 = path.toInternalPath("$WORK_DIR/scripts/main.js"); // "scripts/main.js"
+
+// $SMF → version 的 assetPath
+var internal3 = path.toInternalPath("$SMF"); // "version/new/smf"
+
+// $ITEM → item 的资源路径（支持降级）
+var internal4 = path.toInternalPath("$ITEM/config.json");
+// → "version/1.0.0/secret/mapeditor/config.json"（若存在）
+// → 降级到 "version/new/smf/config.json"（若不存在）
+
+// 配合 ui.extract 使用
+ui.extract(
+    [path.toInternalPath("$ITEM/resources.rsb.smf")],
+    "$WORK_DIR/output"
+);
 ```
 
 ---
@@ -1049,141 +1102,300 @@ let all = storage.getAll();
 
 `file` 对象提供通用文件读写功能，支持占位符路径解析。
 
-### 方法
+> **说明**：所有 API 同时支持英文和中文两种调用方式。
 
-#### file.resolve / file.解析
+---
 
-将占位符路径解析为文件对象，支持链式调用。
+### 一、顶层简写方法（传路径，直接返回结果）
 
-**参数**：
-- `placeholderPath` (string): 包含占位符的路径
+> **路径不存在时的行为**：
+> 顶层简写方法（如 `file.readText(path)`、`file.size(path)` 等）在路径不存在时会**抛出异常**。
+> 若需要优雅处理"路径可能不存在"的场景，请使用 `file.resolve(path)`（返回中性对象，写操作可成功，读操作抛异常）。
 
-**返回**：文件对象
-
-**文件对象属性**：
-
-| 属性 | 中文别名 | 说明 |
-|------|----------|------|
-| `path` | `路径` | 解析后的绝对路径 |
-| `readBytes()` | `读字节()` | 读取字节数组 |
-| `readText()` | `读文本()` | 读取文本 |
-| `writeBytes(bytes)` | `写字节(bytes)` | 写入字节数组 |
-| `writeText(text)` | `写文本(text)` | 写入文本 |
-| `copyTo(toPath)` | `复制到(toPath)` | 复制到目标路径 |
-| `delete()` | `删除()` | 删除文件 |
-| `exists()` | `存在()` | 检查文件是否存在 |
-
-**示例**：
-```javascript
-// 链式调用
-let bytes = file.resolve("$SMF/packages/icon.bin").readBytes();
-file.resolve("$SMF/packages/output.bin").writeBytes(bytes);
-
-// 创建文件对象后多次操作
-let fileObj = file.resolve("$SMF/data.bin");
-let bytes1 = fileObj.readBytes();
-fileObj.writeBytes(modifiedBytes);
-```
+以下方法直接传入占位符路径，无需先 `resolve()`。
 
 #### file.readBytes / file.读字节
 
-读取文件为字节数组（简写方式，同步操作）。
+读取文件为字节数组。
 
-**参数**：
-- `placeholderPath` (string): 包含占位符的文件路径
-
+**参数**：`placeholderPath` (string)
 **返回**：Uint8Array
 
-**示例**：
 ```javascript
 let bytes = file.readBytes("$ITEM/config.bin");
-console.log("文件大小:", bytes.length);
 ```
 
 #### file.readText / file.读文本
 
-读取文件为文本（简写方式，UTF-8，同步操作）。
+读取文件为文本（UTF-8）。
 
-**参数**：
-- `placeholderPath` (string): 包含占位符的文件路径
-
+**参数**：`placeholderPath` (string)
 **返回**：string
 
-**示例**：
 ```javascript
 let text = file.readText("$ITEM/config.txt");
-console.log("配置:", text);
 ```
 
 #### file.writeBytes / file.写字节
 
-写入字节数组到文件（简写方式，同步操作）。
+写入字节数组到文件。
 
-**参数**：
-- `placeholderPath` (string): 目标文件路径
-- `bytes` (Uint8Array): 要写入的字节数组
+**参数**：`placeholderPath` (string), `bytes` (Uint8Array)
 
-**示例**：
 ```javascript
 file.writeBytes("$ITEM/output.bin", bytes);
 ```
 
 #### file.writeText / file.写文本
 
-写入文本到文件（简写方式，UTF-8，同步操作）。
+写入文本到文件（UTF-8）。
 
-**参数**：
-- `placeholderPath` (string): 目标文件路径
-- `text` (string): 要写入的文本
+**参数**：`placeholderPath` (string), `text` (string)
 
-**示例**：
 ```javascript
-file.writeText("$ITEM/config.txt", "hello world");
+file.writeText("$ITEM/config.txt", "hello");
 ```
 
-#### file.copy / file.复制
+#### file.appendText / file.追加文本
 
-复制文件（同步操作）。
+追加文本到文件末尾（UTF-8），文件不存在则自动创建。
 
-**参数**：
-- `fromPath` (string): 源文件路径
-- `toPath` (string): 目标文件路径
+**参数**：`placeholderPath` (string), `text` (string)
+
+```javascript
+file.appendText("$WORK_DIR/log.txt", "new line\n");
+```
+
+#### file.copy / file.复制 / file.复制到
+
+通过解压管线（extract）复制文件。源路径会先转换为 `internalPath`（支持 `$SMF`/`$ITEM`/`$JS_DIR` 降级规则），然后以原文件名解压到目标目录中。
+
+> **注意**：`toPath` 表示**目标目录**（而非目标文件路径），源文件会以原文件名复制到该目录下。
+
+**参数**：`fromPath` (string), `toPath` (string)
 
 **示例**：
 ```javascript
-file.copy("$SMF/source.bin","$SMF/target.bin");
+// 将 SMF 中的文件复制到工作目录
+file.copy("$SMF/source.bin", "$WORK_DIR/output/");
+
+// 将 ITEM 资源复制到指定目录（支持降级）
+file.copy("$ITEM/config.bin", "$WORK_DIR/extracted/");
+```
+
+**等价实现**：
+```javascript
+var internalPath = path.toInternalPath(fromPath);
+var targetFile = file.resolve(toPath);
+file.mkdir(toPath); // 确保目标目录存在
+ui.extract([internalPath], toPath, "");
+```
+
+#### file.rename / file.重命名 / file.移动到
+
+重命名或移动文件/目录。
+
+**参数**：`fromPath` (string), `toPath` (string)
+**返回**：boolean
+
+```javascript
+file.rename("$WORK_DIR/old.txt", "$WORK_DIR/new.txt");
 ```
 
 #### file.delete / file.删除
 
-删除文件（同步操作）。
+删除文件或目录。
 
-**参数**：
-- `placeholderPath` (string): 要删除的文件路径
+**参数**：`placeholderPath` (string)
+**返回**：boolean
 
-**返回**：boolean - 是否删除成功
-
-**示例**：
 ```javascript
-let deleted = file.delete("$ITEM/temp.bin");
-console.log("删除结果:", deleted);
+file.delete("$ITEM/temp.bin");
 ```
 
 #### file.exists / file.存在
 
-检查文件是否存在（同步操作）。
+检查文件是否存在。
 
-**参数**：
-- `placeholderPath` (string): 要检查的文件路径
-
+**参数**：`placeholderPath` (string)
 **返回**：boolean
+
+```javascript
+if (file.exists("$ITEM/config.txt")) { ... }
+```
+
+#### file.list / file.列表
+
+列出目录下的直接子项，返回文件对象数组。
+
+- 使用 `listDirectory()` 实现，**不拷贝 assets/SAF 内容到缓存**，只返回子项名列表
+- 返回的文件对象使用**占位符路径**（如 `$SMF/xxx`），而非缓存路径
+- 路径不是目录或不存在时返回 `null`
+- 目录为空时返回空数组 `[]`
+
+**参数**：`placeholderPath` (string)
+**返回**：Array\<文件对象\> | null
 
 **示例**：
 ```javascript
-let exists = file.exists("$ITEM/config.txt");
-if (exists) {
-    console.log("文件存在");
+let children = file.list("$SMF/packages/");
+if (children) {
+    for (let f of children) {
+        console.log(f.name, f.isFile);
+    }
 }
+```
+
+#### file.mkdir / file.创建目录 / file.mkdirs
+
+创建目录（包括所有不存在的父目录）。
+
+**参数**：`placeholderPath` (string)
+**返回**：boolean
+
+```javascript
+file.mkdir("$WORK_DIR/subdir/");
+```
+
+#### file.size / file.大小 / file.length / file.长度
+
+获取文件大小（字节），目录返回 0。
+
+**参数**：`placeholderPath` (string)
+**返回**：number
+
+```javascript
+let sz = file.size("$ITEM/data.bin");
+```
+
+#### file.isDirectory / file.是目录
+
+检查路径是否为目录。
+
+**参数**：`placeholderPath` (string)
+**返回**：boolean
+
+```javascript
+if (file.isDirectory("$SMF/packages/")) { ... }
+```
+
+#### file.isFile / file.是文件
+
+检查路径是否为文件。
+
+**参数**：`placeholderPath` (string)
+**返回**：boolean
+
+#### file.lastModified / file.修改时间
+
+获取最后修改时间（Unix 毫秒时间戳）。
+
+**参数**：`placeholderPath` (string)
+**返回**：number
+
+#### file.extension / file.扩展名
+
+获取扩展名（不含开头的点），无扩展名返回空字符串。
+
+**参数**：`placeholderPath` (string)
+**返回**：string
+
+```javascript
+let ext = file.extension("$ITEM/data.bin"); // "bin"
+```
+
+#### file.parent / file.父目录
+
+获取父目录路径，无父目录返回 `null`。
+
+**参数**：`placeholderPath` (string)
+**返回**：string | null
+
+```javascript
+let p = file.parent("$ITEM/config.txt"); // "$ITEM"
+```
+
+---
+
+### 二、file.resolve — 文件对象
+
+`file.resolve(path)` 根据路径类型返回不同的文件对象，API 不同：
+
+- **路径存在且为目录** → 返回**目录对象**（`isDirectory=true`）：提供 `list()`、`mkdir()`，不提供文件读写 API
+- **路径存在且为文件** → 返回**文件对象**（`isFile=true`）：提供 `readText()`、`writeText()`、`copyTo()` 等文件 API，不提供 `list()`、`mkdir()`
+- **路径不存在** → 返回**中性对象**：提供全部 API，属性返回默认值（`size=0`、`exists=false`），写操作可成功（自动创建），读操作会抛异常
+
+```javascript
+let f = file.resolve("$SMF/packages/icon.bin");
+let bytes = f.readBytes();
+f.writeBytes(modified);
+```
+
+#### 文件对象属性
+
+| 属性 | 中文别名 | 类型 | 说明 |
+|------|----------|------|------|
+| `name` | `文件名` | string | 文件名（不含目录部分） |
+| `normalizePath` | `规范路径` | string | 占位符路径（如 `$SMF/xxx`），与传入 `file.resolve()` 的路径对应 |
+| `path` | `路径` | string | 解析后的绝对路径（缓存文件显示占位符路径） |
+| `internalPath` | `内部路径` | string | assets 内部路径（供 `AssetExtractorHolder.resource()` / `ui.extract` 使用，通过 `path.toInternalPath()` 同逻辑计算） |
+| `size` | `大小` | number | 文件大小（字节），目录返回 0 |
+| `isDirectory` | `是目录` | boolean | 是否为目录 |
+| `isFile` | `是文件` | boolean | 是否为文件 |
+| `lastModified` | `修改时间` | number | 最后修改时间（Unix 毫秒） |
+| `extension` | `扩展名` | string | 扩展名（不含点），无则返回 `""` |
+| `parent` | `父目录` | string\|null | 父目录绝对路径，无则为 `null` |
+
+#### 文件对象方法
+
+> **注意**：`file.resolve(path)` 根据路径类型返回不同的对象，API 不同：
+> - **目录对象**（`isDirectory=true`）：提供 `list()`、`mkdir()`，**不提供** `readText()`、`readBytes()`、`writeText()`、`writeBytes()`、`copyTo()`、`appendText()`
+> - **文件对象**（`isFile=true`）：提供 `readText()`、`readBytes()`、`writeText()`、`writeBytes()`、`copyTo()`、`appendText()`，**不提供** `list()`、`mkdir()`
+> - **中性对象**（路径不存在）：提供全部 API，属性返回默认值（`size=0`、`isDirectory=false`、`isFile=false`、`exists=false`），写操作可成功（自动创建），读操作会抛异常
+
+| 方法 | 中文别名 | 说明 |
+|------|----------|------|
+| `readBytes()` | `读字节()` | （仅文件对象）读取字节数组 |
+| `readText()` | `读文本()` | （仅文件对象）读取文本（UTF-8） |
+| `writeBytes(bytes)` | `写字节(bytes)` | （仅文件对象）写入字节数组 |
+| `writeText(text)` | `写文本(text)` | （仅文件对象）写入文本（UTF-8） |
+| `appendText(text)` | `追加文本(text)` | （仅文件对象）追加文本 |
+| `copyTo(toPath)` | `复制到(toPath)` | （仅文件对象）通过解压管线复制文件到目标目录 |
+| `renameTo(newPath)` | `重命名到(newPath)` / `移动到(newPath)` | 重命名/移动（文件/目录均支持） |
+| `delete()` | `删除()` | 删除（文件/目录均支持） |
+| `exists()` | `存在()` | 是否存在（文件/目录均支持） |
+| `mkdir()` / `mkdirs()` | `创建目录()` | （仅目录对象）创建目录（含父目录） |
+| `list()` | `列表()` | （仅目录对象）列出子项，返回文件对象数组 |
+
+#### 完整示例
+
+```javascript
+// 读取文件信息
+let f = file.resolve("$SMF/packages/icon.bin");
+console.log("名称:", f.name);
+console.log("大小:", f.size, "字节");
+console.log("扩展名:", f.extension);
+console.log("修改时间:", new Date(f.lastModified));
+console.log("父目录:", f.parent);
+
+// 链式读写
+file.resolve("$SMF/data.bin").writeBytes(
+    file.resolve("$SMF/data_backup.bin").readBytes()
+);
+
+// 遍历目录
+let children = file.resolve("$SMF/packages/").list();
+for (let child of children) {
+    console.log(child.name, child.isFile ? "文件" : "目录");
+}
+
+// 创建目录后写入
+let dir = file.resolve("$WORK_DIR/output/");
+dir.mkdir();
+dir.resolve("result.txt").writeText("done");
+
+// 重命名
+file.resolve("$WORK_DIR/old.txt").renameTo("$WORK_DIR/new.txt");
 ```
 
 
@@ -1302,6 +1514,71 @@ ui.extract(
     "$GAME_SMF"
 );
 ```
+
+## 8.5. js - JS 执行器
+
+`js` 对象提供在 JS 脚本中动态执行其他 JS 代码或 JS 文件的能力。
+
+> **别名**：`js.run()` / `js.运行()` / `js.call()` / `js.执行()` 均可访问同一方法。
+
+### 方法
+
+#### js.run / js.运行 / js.call / js.执行
+
+动态执行 JS 表达式或 JS 文件。
+
+**参数**：
+- `expr` (string): JS 表达式或 JS 文件路径（以 `.js` 结尾）
+
+**执行逻辑**：
+1. **如果 `expr` 以 `.js` 结尾**：
+   - 优先从 `assets/js/` 目录读取 JS 文件并执行
+   - 如果找不到文件，则尝试从工作目录读取
+   - 如果都找不到，则直接编译执行 `expr` 字符串
+2. **如果 `expr` 不以 `.js` 结尾**：
+   - 直接编译执行 `expr` 表达式
+
+**返回**：any - JS 执行结果
+
+**示例**：
+```javascript
+// 执行 JS 表达式
+var result = js.run("1 + 2");  // 3
+var result2 = js.run("new Date().getFullYear()");  // 当前年份
+
+// 执行 assets/js/ 目录下的 JS 文件
+js.run("test.js");  // 执行 assets/js/test.js
+js.运行("test.js");  // 中文别名
+
+// 混用中英文
+js.call("test.js");
+js.执行("1 + 2");
+```
+
+### 完整示例
+
+```javascript
+// 示例1：执行简单表达式
+var sum = js.run("var a = 1; var b = 2; a + b;");
+console.log("结果：" + sum);  // 3
+
+// 示例2：执行 JS 文件（assets/js/ 目录下）
+// 假设 assets/js/helper.js 内容：
+// var helper = { add: (a, b) => a + b };
+// helper;
+js.run("helper.js");  // 执行后返回 helper 对象
+
+// 示例3：动态生成并执行代码
+var code = "var x = 10; x * 2;";
+var result = js.run(code);  // 20
+
+// 示例4：在 BUTTON 中使用
+// jsScript: |
+//   var year = js.run("new Date().getFullYear()");
+//   "当前年份：" + year;
+```
+
+---
 
 ## 9. assets - 资源访问
 
@@ -1484,6 +1761,8 @@ data.dynamic.packages.npcs.load()  // 加载 npcs.rton
 | `modifiedPath` | `修改路径` | modified 目录中的镜像路径 |
 | `load()` | `加载()` | 同步加载文件内容为 JS 对象 |
 | `save()` | `保存()` | 同步保存修改到 modified 目录 |
+| `readBytes()` | `读字节()` | 同步读取文件为字节数组 |
+| `writeBytes(bytes)` | `写字节(bytes)` | 同步写入字节数组 |
 
 ### 通用二进制文件对象
 
@@ -1921,14 +2200,10 @@ npcs.save();
 
 ---
 
-*文档版本: 1.7*
-*最后更新: 2026-05-05*
-*新增：pvz 数据访问 API（植物、僵尸、强化道具等16类游戏数据）*
-*新增：pvz.plants/all、pvz.zombies/all 等数据访问接口*
-*新增：数据属性中英文别名支持（id/编号、name/昵称、code/代号等）*
-*新增：$SMF 和 path.pvz2tool.smf 指向版本目录*
-*新增：$ITEM 和 path.pvz2tool.section 指向所在资源目录*
-*新增：$JS_DIR 和 path.pvz2tool.jsDir 指向所在JS目录*
-*新增：版本隔离的状态管理说明*
-*补充：path 对象完整路径说明*
-*补充：config_documentation.md UI 配置完整字段*
+*文档版本: 1.9*
+*最后更新: 2026-06-08*
+*新增：path.toInternalPath() / path.转换为内部路径() 函数文档*
+*新增：file.copy/file.复制 改用 JsUiManager.extract 解压管线（toPath 改为目标目录）*
+*新增：file.resolve() 按文件/目录类型拆分 API（目录对象不含文件API，文件对象不含目录API）*
+*新增：file.resolve() 路径不存在时返回中性对象（提供全部API，属性返回默认值）*
+*补充：file.list 改用 listDirectory() 实现（不拷贝缓存，返回占位符路径）*

@@ -3,12 +3,22 @@ package io.github.dreammooncai.pvz2tool.controller
 import eu.iamkonstantin.kotlin.gadulka.GadulkaPlayer
 import androidx.core.net.toUri
 import eu.iamkonstantin.kotlin.gadulka.isPlaying
+import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.Pvz2ToolConfig
 
 object SoundController {
     private val playerMap = mutableMapOf<String, GadulkaPlayer>()
 
-    fun playSound(url: String?,volume: Float = 1f) {
+    // 全局音效音量（0.0 ~ 1.0），设置时同步更新所有已存在的播放器
+    var globalSfxVolume: Float
+        get() = InitializePvz2.initialSfxMusicVolume
+        set(value) {
+            val v = value.coerceIn(0f, 1f)
+            playerMap.values.forEach { it.setVolume(v) }
+            InitializePvz2.saveSfxMusicVolume(v)
+        }
+
+    fun playSound(url: String?, volume: Float = globalSfxVolume) {
         if (url == null) return
 
         val player = playerMap.getOrPut(url) {
@@ -21,7 +31,7 @@ object SoundController {
         player.play(url)
     }
 
-    fun playSoundFromAssets(fileName: String, volume: Float = 1f) {
+    fun playSoundFromAssets(fileName: String, volume: Float = globalSfxVolume) {
         // URL 直接使用
         if (fileName.startsWith("http://") || fileName.startsWith("https://")) {
             playSound(fileName, volume)

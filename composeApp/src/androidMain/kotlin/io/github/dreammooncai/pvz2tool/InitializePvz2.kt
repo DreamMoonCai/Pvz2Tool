@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Typeface
 import android.net.Uri
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -110,11 +111,11 @@ object InitializePvz2 {
         // ========== 关键修正：基于YamlPathSegment准确识别sections列表 ==========
         // 判断逻辑：
         // 1. 当前节点是YamlList（列表）
-        // 2. 路径中包含 MapElementKey(key = "sections") 这个segment
+        // 2. 路径的【最后一层】是 MapElementKey(key = "sections")（而非路径中任意位置包含sections）
         val isSectionsList = baseNode is YamlList && localNode is YamlList &&
-                baseNode.path.segments.any { segment ->
+                baseNode.path.segments.lastOrNull()?.let { segment ->
                     segment is YamlPathSegment.MapElementKey && segment.key == "sections"
-                }
+                } ?: false
 
         if (isSectionsList) {
             // 触发sections专属合并逻辑（按ID匹配，保留其他栏目）
@@ -368,11 +369,37 @@ object InitializePvz2 {
         settings["isBgMusicOn"] = state
     }
 
+    var initialBgMusicVolume by mutableFloatStateOf(0.8f)
+
+    fun initBgMusicVolume() {
+        if (::config.isInitialized)
+            initialBgMusicVolume = settings["initialBgMusicVolume",0.8f]
+    }
+
+    fun saveBgMusicVolume(state: Float) {
+        initialBgMusicVolume = state
+        settings["initialBgMusicVolume"] = state
+    }
+
+    var initialSfxMusicVolume by mutableFloatStateOf(1f)
+
+    fun initSfxMusicVolume() {
+        if (::config.isInitialized)
+            initialSfxMusicVolume = settings["initialSfxMusicVolume",1f]
+    }
+
+    fun saveSfxMusicVolume(state: Float) {
+        initialSfxMusicVolume = state
+        settings["initialSfxMusicVolume"] = state
+    }
+
     // 初始化入口
     fun init(context: Context = ContextUtil.getCurrentActivity() ?: ContextUtil.context) {
         this.context = context
         runCatching {
             initConfig()
+            initBgMusicVolume()
+            initSfxMusicVolume()
             initBgMusicOn()
         }.onFailure { e -> errorScreenState = Pvz2ErrorScreenState("初始化配置失败",e) }
     }

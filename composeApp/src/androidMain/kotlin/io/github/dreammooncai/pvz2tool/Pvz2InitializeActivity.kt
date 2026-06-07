@@ -27,6 +27,7 @@ import io.github.dreammooncai.manager.FilePickerManager
 import io.github.dreammooncai.pvz2tool.controller.RestoreNetworkFloatingController
 import io.github.dreammooncai.pvz2tool.js.JsSmfDataManager
 import io.github.dreammooncai.pvz2tool.js.code.JsPvz
+import io.github.dreammooncai.pvz2tool.js.code.PvzToolGlobals
 import io.github.dreammooncai.pvz2tool.service.LocalVpnService
 import io.github.dreammooncai.pvz2tool.ui.main.*
 import io.github.dreammooncai.pvz2tool.ui.music.rememberBackgroundMusicState
@@ -130,7 +131,12 @@ class Pvz2InitializeActivity : ComponentActivity() {
                 } else {
                     "file:///android_asset/${Pvz2ToolConfig.PATH_NAME}/$audioPath".toUri().toString()
                 }
-                val bgMusicState = rememberBackgroundMusicState(audioUrl, initialVolume = 0.8f)
+                val bgMusicState = rememberBackgroundMusicState(audioUrl, initialVolume = InitializePvz2.initialBgMusicVolume)
+
+                // 将 bgMusicState 注入 PvzToolGlobals，供 JS audio API 访问
+                LaunchedEffect(bgMusicState) {
+                    PvzToolGlobals.bgMusicState = bgMusicState
+                }
 
                 LaunchedEffect(InitializePvz2.isBgMusicOn) {
                     if (InitializePvz2.isBgMusicOn) {

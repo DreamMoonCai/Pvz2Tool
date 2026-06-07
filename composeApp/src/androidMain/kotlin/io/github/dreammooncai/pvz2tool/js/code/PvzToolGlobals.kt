@@ -11,6 +11,7 @@ import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.Pvz2ToolConfig
+import io.github.dreammooncai.pvz2tool.controller.SoundController
 import io.github.dreammooncai.pvz2tool.js.JsConsole
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
@@ -20,14 +21,21 @@ import io.github.dreammooncai.pvz2tool.js.orNull
 import io.github.dreammooncai.pvz2tool.pop.plugin.crypt.Pvz2NumberCrypt
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
+import io.github.dreammooncai.pvz2tool.ui.music.BackgroundMusicState
 import io.github.dreammooncai.util.getAssetLastModified
 import io.github.dreammooncai.util.isAssetDirExist
 import io.github.dreammooncai.util.isAssetFileExist
 import io.github.dreammooncai.util.openUriInputStreamOrAssetNull
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
 import android.util.Base64 as AndroidBase64
 
 object PvzToolGlobals {
+
+    // 持有 BackgroundMusicState 引用，供 audio 对象访问（由 Pvz2InitializeActivity 注入）
+    var bgMusicState: BackgroundMusicState? = null
 
     val ui = Object("ui") {
         // 提示弹窗（单按钮）：ui.alert(title, message) -> void
@@ -243,6 +251,39 @@ object PvzToolGlobals {
         }
     }
 
+    // ======================== 音频控制 API ========================
+    val audio = Object("audio") {
+        // 获取背景音乐音量：audio.getBgmVolume() -> number (0.0 ~ 1.0)
+        listOf("getBgmVolume".js, "获取背景音乐音量".js).func {
+            (bgMusicState?.currentVolume ?: 1.0f).js
+        }
+
+        // 设置背景音乐音量：audio.setBgmVolume(volume) -> void
+        // volume: 0.0（静音）~ 1.0（最大）
+        listOf("setBgmVolume".js, "设置背景音乐音量".js).func(FunctionParam("volume")) { args ->
+            val volume = toNumber(args[0]).toFloat().coerceIn(0f, 1f)
+            withContext(Dispatchers.Main) {
+                bgMusicState?.setVolume(volume)
+                Undefined
+            }
+        }
+
+        // 获取音效音量：audio.getSfxVolume() -> number (0.0 ~ 1.0)
+        listOf("getSfxVolume".js, "获取音效音量".js).func {
+            SoundController.globalSfxVolume.js
+        }
+
+        // 设置音效音量：audio.setSfxVolume(volume) -> void
+        // volume: 0.0（静音）~ 1.0（最大），同步更新所有已存在的音效播放器
+        listOf("setSfxVolume".js, "设置音效音量".js).func(FunctionParam("volume")) { args ->
+            val volume = toNumber(args[0]).toFloat().coerceIn(0f, 1f)
+            withContext(Dispatchers.Main) {
+                SoundController.globalSfxVolume = volume
+                Undefined
+            }
+        }
+    }
+
     @Suppress("UNCHECKED_CAST")
     private suspend fun ScriptRuntime.out(message : List<Any?>, out : (Any?) -> Unit) : JsAny {
         if (message.isEmpty() || (message[0] as List<*>).isEmpty()) {
@@ -270,6 +311,9 @@ object PvzToolGlobals {
         }
         listOf("assets".js, "资源".js).forEach { key ->
             runtime.set(key, assets, VariableType.Global)
+        }
+        listOf("audio".js, "音频".js).forEach { key ->
+            runtime.set(key, audio, VariableType.Global)
         }
         runtime.get("Number".js)?.get("prototype".js, runtime)?.let { it as? JsObject }?.let { prototype ->
             listOf("encrypt".js, "加密".js).forEach { key ->

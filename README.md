@@ -182,7 +182,7 @@ zlib.unpack("$ITEM/compressed.zlib", "$WORK_DIR/decompressed.bin")
 zlib.pack("$WORK_DIR/data.bin", "$WORK_DIR/data.zlib")
 
 // RSB 打包/解包
-rsb.ウンpack("$ITEM/main.rsb", "$WORK_DIR/extracted/", {
+rsb.pack("$ITEM/main.rsb", "$WORK_DIR/extracted/", {
     compression: true,            // 解压 ZLib 内容
     autoGunzip: true,             // 自动 .gz 解压
     convertRtonToJson: true       // RTON → JSON 自动转换

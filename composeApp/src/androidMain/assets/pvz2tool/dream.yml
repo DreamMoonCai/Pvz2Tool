@@ -84,6 +84,40 @@ versionsTheme: "BROWN"
 # ------------------------------
 sections:
   # ==========================================
+  # 栏目: 音频设置
+  # 控制背景音乐和音效音量
+  # ==========================================
+  - id: "audio_settings"
+    title: "音频设置"
+    theme: "TEAL"
+
+    items:
+      # ----- 背景音乐音量 -----
+      - id: "bgm_volume"
+        name: "背景音乐音量"
+        desc: "控制背景音乐的音量大小"
+        type: "SLIDER"
+        minValue: 0.0
+        maxValue: 1.0
+        step: 0.01
+        defaultValue: 0.8
+        valueSuffix: ""
+        jsScript: |-
+          audio.setBgmVolume(this.value);
+
+      # ----- 音效音量 -----
+      - id: "sfx_volume"
+        name: "音效音量"
+        desc: "控制按钮音效等音量大小"
+        type: "SLIDER"
+        minValue: 0.0
+        maxValue: 1.0
+        step: 0.01
+        defaultValue: 1.0
+        valueSuffix: ""
+        jsScript: |-
+          audio.setSfxVolume(this.value);
+  # ==========================================
   # 栏目 1: 存档管理
   # 类型: 单选 (RADIO)
   # 目标: 自定义目录
@@ -140,7 +174,7 @@ sections:
         jsScript: |-
           var saves = pvz.saves.load();
           var datas = saves.objects[0].objdata
-          datas.psla.length
+          datas.p.length
 
 
   # ==========================================
@@ -240,6 +274,83 @@ sections:
         name: ""
         desc: "3. 功能开关实时生效，不同版本功能不同"
         type: "DESCRIPTION"
+
+
+  # ==========================================
+  # 栏目: JS 执行器测试
+  # 测试新增的 js.run()/js.call()/js.执行() API
+  # ==========================================
+  - id: "js_executor_demo"
+    title: "JS 执行器测试"
+    theme: "PURPLE"
+
+    items:
+      # ----- 测试1：执行简单表达式 -----
+      - id: "js_exec_expr"
+        name: "执行表达式"
+        desc: "测试 js.run() 执行简单 JS 表达式"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: |-
+          var result = js.run("1 + 2");
+          "1 + 2 = " + result;
+
+      # ----- 测试2：执行 JS 文件 -----
+      - id: "js_exec_file"
+        name: "执行 JS 文件"
+        desc: "测试 js.run('test.js') 从 assets/js/ 执行文件"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: |-
+          var result = js.run("demo.js");
+          "执行 demo.js 结果：" + result;
+
+      # ----- 测试3：混合中英文 -----
+      - id: "js_exec_cn"
+        name: "中文别名测试"
+        desc: "测试 js.运行()/js.执行() 中文别名"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: |-
+          var r1 = js.运行("new Date().getFullYear()");
+          var r2 = js.执行("Math.PI");
+          "年份：" + r1 + "，PI：" + r2;
+
+      # ----- 测试4：动态生成代码 -----
+      - id: "js_exec_dynamic"
+        name: "动态代码生成"
+        desc: "测试动态生成 JS 代码并执行"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: |-
+          var a = 10;
+          var b = 20;
+          var code = "var x = " + a + "; var y = " + b + "; x + y;";
+          var result = js.run(code);
+          "动态执行结果：" + result;
+
+      # ----- 分隔线 -----
+      - id: "js_sep_1"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- 测试5：在 DESCRIPTION 中使用 {{js:}} 标签 -----
+      - id: "js_desc_demo"
+        name: "DESCRIPTION 动态文本"
+        desc: "当前年份：{{js:new Date().getFullYear()}}"
+        type: "DESCRIPTION"
+
+      # ----- 测试6：在 INFO 中使用 JS -----
+      - id: "js_info_demo"
+        name: "INFO 动态信息"
+        desc: "查看 JS 执行器测试结果"
+        type: "INFO"
+        infoValue: "点击测试按钮查看结果"
+        jsScript: |-
+          var year = js.run("new Date().getFullYear()");
+          var pi = js.run("Math.PI.toFixed(2)");
+          "年份：" + year + "\nPI 值：" + pi;
 
   # ==========================================
   # 栏目 4: JS 工具

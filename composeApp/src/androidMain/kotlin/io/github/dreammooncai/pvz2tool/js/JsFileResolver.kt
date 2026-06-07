@@ -162,37 +162,110 @@ open class JsFileResolver(
     )
 
 
-    // ======================== 公开 API ========================
+    // ======================== 新增：占位符路径转 internalPath ========================
 
     /**
-     * 将占位符前缀解析为实际绝对路径字符串（用于 rton/rsb/ptx 等需要 String 路径的原生方法）。
-     * - `$SMF` → 基于当前 JS 执行上下文中按钮的 assetPath 动态解析
-     * - `$GAME_SAVES` → 从配置 sections[id="saves"].targetPath 解析
-     * - 其他占位符 → 基于 SAF workDir 解析
+     * 将 JS 占位符路径转换为 [AssetExtractorHolder.resource] 可使用的 internalPath。
      *
-     * 若无法解析（如 SAF 权限不足），返回 null。
+     * 转换规则：
+     * - `$SMF` / `$SMF/xxx`       → `version/assetPath[/xxx]`（如 `version/new/smf/files/ver.txt`）
+     * - `$ITEM` / `$ITEM/xxx`     → `version/id/sectionId/itemId[/xxx]`（降级到 `$SMF`）
+     * - `$JS_DIR` / `$JS_DIR/xxx`   → `version/enterGamePath[/xxx]`
+     * - `$WORK_DIR` / `$WORK_DIR/xxx` → `""`（本地工作目录，无 assets 对应路径，返回 null）
+     * - `/absolute/path`            → `absolute/path`（去掉开头 `/`，补 `pvz2tool/` 前缀由调用方负责）
+     * - `relative/path`           → `relative/path`（相对路径，原样返回）
+     *
+     * **降级规则**（与 [resolveSmfDocumentFile] 一致）：
+     * 1. 优先查找 primaryPath（版本专属目录）
+     * 2. 若不存在，回退到 fallbackPath（baseAssetPath）
+     * 3. 仍未找到，回退到 fallbackRootPath
+     *
+     * @return internalPath（不含 `pvz2tool/` 前缀），若无法转换（如 `$WORK_DIR`）则返回 null。
      */
-    fun resolveToPath(placeholderPath: String, context: Context): String? {
-        // $SMF 特殊处理：从当前 JS 执行上下文中读取 assetPath
-        if (placeholderPath == SMF ||
-            placeholderPath.startsWith("$SMF/") ||
-            placeholderPath == ITEM ||
-            placeholderPath.startsWith("$ITEM/") ||
-            placeholderPath == JS_DIR ||
-            placeholderPath.startsWith("$JS_DIR/")) {
-            return resolveSmfPath(placeholderPath, context)
+    fun resolveToInternalPath(placeholderPath: String, context: Context): String? {
+        // 规范化：裸相对路径（不以 / 或 $ 开头）自动补充 $WORK_DIR/ 前缀
+        val path = if (placeholderPath.startsWith("/") || placeholderPath.startsWith("$")) {
+            placeholderPath
+        } else {
+            "$WORK_DIR/$placeholderPath"
         }
-        // $GAME_SMF 特殊处理：rootDirectory + config.smfDirectory
-        if (placeholderPath == GAME_SMF || placeholderPath.startsWith("$GAME_SMF/")) {
-            return resolveGameSmfPath(placeholderPath)
+        val activeCtx = jsContext ?: return null
+
+        val basePlaceholder = when {
+            path.startsWith(WORK_DIR) -> WORK_DIR
+            path.startsWith(JS_DIR) -> JS_DIR
+            path.startsWith(ITEM) -> ITEM
+            path.startsWith(SMF) -> SMF
+            path.startsWith("/") -> return path
+            else -> return path // 相对路径原样返回
         }
 
-        val parsed = parsePlaceholder(placeholderPath) ?: return null
-        val prefix = parsed.first
-        val relativePath = parsed.second
-        val docFile = resolve(prefix, relativePath, context) ?: return null
-        return documentFileToFile(docFile)?.absolutePath
+        // $WORK_DIR 对应 assets/pvz2tool/ 根目录
+        if (basePlaceholder == WORK_DIR) {
+            val subPath = path.removePrefix(WORK_DIR).trimStart('/')
+            return subPath.ifEmpty { "" }
+        }
+
+        val version = activeCtx.version
+
+        // 计算 primaryPath / fallbackPath / fallbackRootPath（与 resolveSmfDocumentFile 一致）
+        val (primaryPath, fallbackPath, fallbackRootPath) = when (basePlaceholder) {
+            ITEM -> {
+                val section = activeCtx.section
+                val item = activeCtx.item
+                if (section != null && item != null) {
+                    Triple(item.resolvePath(section, version), version.resolveAssetPath(), version.baseAssetPath)
+                } else {
+                    Triple(version.resolveAssetPath(), version.baseAssetPath, null)
+                }
+            }
+            JS_DIR -> {
+                val section = activeCtx.section
+                val item = activeCtx.item
+                if (section != null && item != null) {
+                    val itemPath = item.resolveJsPath(section, version).substringBeforeLast('/')
+                    Triple(itemPath, section.resolveJsPath(version).substringBeforeLast('/'), version.resolveEnterGamePath().substringBeforeLast('/'))
+                } else if (section != null) {
+                    Triple(section.resolveJsPath(version).substringBeforeLast('/'), version.resolveEnterGamePath().substringBeforeLast('/'), null)
+                } else {
+                    Triple(version.resolveEnterGamePath().substringBeforeLast('/'), null, null)
+                }
+            }
+            else -> { // SMF
+                Triple(version.resolveAssetPath(), version.baseAssetPath, null)
+            }
+        }
+
+        val subPath = path.removePrefix(basePlaceholder).trimStart('/')
+
+        // 按优先级尝试：primary → fallback → fallbackRoot（与 resolveSmfDocumentFile 一致）
+        // 检查 asset 中是否存在 base + subPath（文件或目录）
+        fun assetPathExists(assetRelativeBase: String): Boolean {
+            val fullAssetPath = if (assetRelativeBase.isEmpty())
+                subPath
+            else if (subPath.isEmpty())
+                assetRelativeBase
+            else
+                "$assetRelativeBase/$subPath"
+            return try {
+                // 先尝试作为文件打开
+                context.assets.open(fullAssetPath).use { true }
+            } catch (_: Exception) {
+                // 不是文件，尝试作为目录
+                context.assets.list(fullAssetPath) != null
+            }
+        }
+
+        val chosenBase = listOfNotNull(primaryPath, fallbackPath, fallbackRootPath)
+            .firstOrNull { it.isNotEmpty() && assetPathExists(it) }
+
+        if (chosenBase == null) return null
+
+        val result = if (subPath.isEmpty()) chosenBase else "$chosenBase/$subPath"
+        return if (result.isEmpty()) null else result
     }
+
+    // ======================== 公开 API ========================
 
     /**
      * 将占位符前缀解析为 [DocumentFile]。
@@ -222,7 +295,7 @@ open class JsFileResolver(
      */
     fun resolve(path: String, context: Context): DocumentFile? {
         // $SMF 特殊处理
-        if (path == SMF || path.startsWith("$SMF/") || path == ITEM || path.startsWith("$ITEM/") || path == JS_DIR || path.startsWith("$JS_DIR/")) {
+        if (path == SMF || path.startsWith("$SMF/") || path == ITEM || path.startsWith("$ITEM/") || path == JS_DIR || path.startsWith("$JS_DIR/") || path == WORK_DIR || path.startsWith("$WORK_DIR/")) {
             val docFile = resolveSmfDocumentFile(path, context) ?: return null
             return docFile
         }
@@ -243,16 +316,6 @@ open class JsFileResolver(
     }
 
     // ======================== $SMF 特殊解析 ========================
-
-    /**
-     * 解析 $SMF 路径（基于当前执行上下文中的 item.assetPath）。
-     * - "$SMF"         → workDir/<item.assetPath>
-     * - "$SMF/main.rton" → workDir/<item.assetPath>/main.rton
-     */
-    private fun resolveSmfPath(placeholderPath: String, context: Context): String? {
-        val docFile = resolveSmfDocumentFile(placeholderPath, context) ?: return null
-        return documentFileToFile(docFile)?.absolutePath
-    }
 
     /**
      * $SMF 和 $ITEM 解析实现。
@@ -278,6 +341,7 @@ open class JsFileResolver(
         val version = activeCtx.version
 
         val basePlaceholder = when {
+            placeholderPath.startsWith(WORK_DIR) -> WORK_DIR
             placeholderPath.startsWith(JS_DIR) -> JS_DIR
             placeholderPath.startsWith(ITEM) -> ITEM
             else -> SMF
@@ -306,6 +370,8 @@ open class JsFileResolver(
                     Triple(version.resolveAssetPath(),version.baseAssetPath,null)
                 }
             }
+            placeholderPath.startsWith(WORK_DIR) -> Triple("",null,null)
+
             else -> Triple(version.resolveAssetPath(),version.baseAssetPath,null)
         }
 
@@ -347,17 +413,6 @@ open class JsFileResolver(
     }
 
     // ======================== $GAME_SMF 特殊解析 ========================
-
-    /**
-     * 解析 $GAME_SMF 路径（游戏目录的 smf）。
-     * - "$GAME_SMF"           → rootDirectory/<config.smfDirectory>
-     * - "$GAME_SMF/main.rton" → rootDirectory/<config.smfDirectory>/main.rton
-     */
-    private fun resolveGameSmfPath(placeholderPath: String): String? {
-        val relative = placeholderPath.removePrefix(GAME_SMF).trimStart('/')
-        val gameSmf = jsContext?.section?.resolveTargetDirectory() ?: InitializePvz2.config.getSmfDirectoryFile()
-        return gameSmf.resolve(relative).absolutePath
-    }
 
     /**
      * 游戏目录 smf：rootDirectory + config.smfDirectory。

@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import eu.iamkonstantin.kotlin.gadulka.GadulkaPlayer
 import eu.iamkonstantin.kotlin.gadulka.GadulkaPlayerState
 import eu.iamkonstantin.kotlin.gadulka.rememberGadulkaLiveState
+import io.github.dreammooncai.pvz2tool.InitializePvz2
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -64,6 +65,7 @@ class BackgroundMusicState(
         targetVolume = volume
         currentVolume = volume
         player.setVolume(volume)
+        InitializePvz2.saveBgMusicVolume(volume)
     }
 }
 

@@ -33,12 +33,34 @@ import io.github.dreammooncai.pvz2tool.pop.image.ptx.Ptx
 import io.github.dreammooncai.pvz2tool.pop.image.ptx.PtxFormat
 import io.github.dreammooncai.pvz2tool.pop.plugin.io.CoroutineBinaryStream
 import io.github.dreammooncai.pvz2tool.pop.rton.RTON
+import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import java.io.File
 
 class PvzToolContexts(
     private val runtime: ScriptRuntime,
     private val access: JsFileAccess
 ) {
+
+    val js = Object("js") {
+        listOf("run".js,"运行".js,"call".js,"执行".js).func(FunctionParam("expr")) { args ->
+            val expr = toString(args[0])
+            try {
+                val result = if (expr.endsWith(".js")) {
+                    val jsFile = AssetExtractorHolder.openInputStream("js/$expr")
+                    jsFile?.use { jsFile ->
+                        val jsCode = jsFile.bufferedReader().readText()
+                        PvzToolJsEngine.getJSEngine().compile(jsCode).invoke(this)
+                    } ?: access.resolveInput(expr, InitializePvz2.context)?.file?.readText()?.let { PvzToolJsEngine.getJSEngine().compile(it).invoke(this) } ?: PvzToolJsEngine.getJSEngine().compile(expr).invoke(this)
+                } else {
+                    PvzToolJsEngine.getJSEngine().compile(expr).invoke(this)
+                }
+                result
+            } catch (e: Exception) {
+                JsConsole.error("错误:",e)
+                throw e
+            }
+        }
+    }
 
     val path = Object("path") {
 
@@ -73,13 +95,20 @@ class PvzToolContexts(
         // path.resolve(placeholder) → 绝对路径字符串
         listOf("resolve".js, "解析路径".js).func("placeholderPath") { args ->
             val p = toString(args[0])
-            (access.resolver.resolveToPath(p, InitializePvz2.context) ?: "").js
+            access.resolveInput(p, InitializePvz2.context)?.file?.absolutePath?.js
         }
 
         // path.resolveUri(placeholder) → URI 字符串
         listOf("resolveUri".js, "解析URI".js).func("placeholderPath") { args ->
             val p = toString(args[0])
             (access.resolver.resolve(p, InitializePvz2.context)?.uri?.toString() ?: "").js
+        }
+
+        // path.toInternalPath(placeholder) → internalPath（供 AssetExtractorHolder.resource() 使用）
+        // 将 $SMF/xxx 等占位符路径转换为 pvz2tool/xxx 格式的 internalPath。
+        listOf("toInternalPath".js, "转换为内部路径".js).func("placeholderPath") { args ->
+            val p = toString(args[0])
+            (access.resolver.resolveToInternalPath(p, InitializePvz2.context) ?: "").js
         }
     }
 
@@ -99,14 +128,10 @@ class PvzToolContexts(
             val outputPath = toString(args[1])
             val ctx = InitializePvz2.context
 
-            val inputFile = access.resolveInputOrThrow(inputPath, ctx)
             val outputHandle = access.resolveOutputOrThrow(outputPath, ctx)
-
-            try {
+            access.resolveInputOrThrow(inputPath, ctx).use { inputFile ->
                 RTON.decodeAuto(inputFile.file.absolutePath, outputHandle.targetFile.absolutePath)
                 outputHandle.commit()
-            } finally {
-                if (inputFile.isCache) inputFile.file.delete()
             }
             Undefined
         }
@@ -119,14 +144,10 @@ class PvzToolContexts(
             val outputPath = toString(args[1])
             val ctx = InitializePvz2.context
 
-            val inputFile = access.resolveInputOrThrow(inputPath, ctx)
             val outputHandle = access.resolveOutputOrThrow(outputPath, ctx)
-
-            try {
+            access.resolveInputOrThrow(inputPath, ctx).use { inputFile ->
                 RTON.encodeAuto(inputFile.file.absolutePath, outputHandle.targetFile.absolutePath)
                 outputHandle.commit()
-            } finally {
-                if (inputFile.isCache) inputFile.file.delete()
             }
             Undefined
         }
@@ -136,45 +157,45 @@ class PvzToolContexts(
             val outputPath = args.getOrNull(1).orNull?.let { toString(it) }
             val ctx = InitializePvz2.context
 
-            val inputFile = access.resolveInputOrThrow(inputPath, ctx)
-
             val tempJson = File.createTempFile("rton_load_", ".json", ctx.cacheDir).apply { deleteOnExit() }
+
             try {
-                val isJson = inputFile.file.extension.lowercase() == "json"
-                val jsonContent = if (isJson) {
-                    inputFile.file.readText()
-                } else {
-                    RTON.decodeAuto(inputFile.file.absolutePath, tempJson.absolutePath)
-                    tempJson.readText()
+                access.resolveInputOrThrow(inputPath, ctx).use { inputFile ->
+                    val isJson = inputFile.file.extension.lowercase() == "json"
+                    val jsonContent = if (isJson) {
+                        inputFile.file.readText()
+                    } else {
+                        RTON.decodeAuto(inputFile.file.absolutePath, tempJson.absolutePath)
+                        tempJson.readText()
+                    }
+
+                    val jsonObj = PvzToolJsEngine.parse(jsonContent) as JsObject
+
+                    jsonObj.set("__rtonPath__".js,inputPath.js,this@func)
+
+                    // 注入 save()（不可枚举）
+                    val saveFunc = Callable { args ->
+                        val rtonPath = args.getOrNull(0).orNull?.let { toString(it) } ?: outputPath ?: toString(
+                            jsonObj.get("__rtonPath__".js, this)
+                        )
+                        jsonObj.delete("__rtonPath__".js,this)
+                        rtonSaveImpl(rtonPath, PvzToolJsEngine.stringify(jsonObj,4))
+                    }
+                    listOf("save".js, "保存".js).forEach { key ->
+                        jsonObj.setProperty(
+                            key,
+                            JsPropertyAccessor.Value(saveFunc),
+                            this@func,
+                            enumerable = false,
+                            configurable = true,
+                            writable = false
+                        )
+                    }
+
+                    jsonObj
                 }
-
-                val jsonObj = PvzToolJsEngine.parse(jsonContent) as JsObject
-
-                jsonObj.set("__rtonPath__".js,inputPath.js,this@func)
-
-                // 注入 save()（不可枚举）
-                val saveFunc = Callable { args ->
-                    val rtonPath = args.getOrNull(0).orNull?.let { toString(it) } ?: outputPath ?: toString(
-                        jsonObj.get("__rtonPath__".js, this)
-                    )
-                    jsonObj.delete("__rtonPath__".js,this)
-                    rtonSaveImpl(rtonPath, PvzToolJsEngine.stringify(jsonObj,4))
-                }
-                listOf("save".js, "保存".js).forEach { key ->
-                    jsonObj.setProperty(
-                        key,
-                        JsPropertyAccessor.Value(saveFunc),
-                        this@func,
-                        enumerable = false,
-                        configurable = true,
-                        writable = false
-                    )
-                }
-
-                jsonObj
             } finally {
                 tempJson.delete()
-                if (inputFile.isCache) inputFile.file.delete()
             }
         }
 
@@ -200,19 +221,16 @@ class PvzToolContexts(
             val ctx = InitializePvz2.context
             JsConsole.info("rsb.unpack: $inFilePath → $outFolderPath")
 
-            val inputFile = access.resolveInputOrThrow(inFilePath, ctx)
             val outputHandle = access.resolveOutputOrThrow(outFolderPath, ctx)
 
             val entries = options?.entries(runtime)?.associate { (key, value) ->
                 key to value
             }
-            try {
+            access.resolveInputOrThrow(inFilePath, ctx).use { inputFile ->
                 Rsb.unpack(inputFile.file, outputHandle.targetFile) {
                     setConfig(this@func,entries)
                 }
                 outputHandle.commit()
-            } finally {
-                if (inputFile.isCache) inputFile.file.delete()
             }
             Undefined
         }
@@ -228,20 +246,16 @@ class PvzToolContexts(
             val ctx = InitializePvz2.context
             JsConsole.info("rsb.pack: $inFolderPath → $outFilePath")
 
-            val inFolder = access.resolveInputOrThrow(inFolderPath, ctx)
             val outputHandle = access.resolveOutputOrThrow(outFilePath, ctx)
 
             val entries = options?.entries(runtime)?.associate { (key, value) ->
                 key to value
             }
-
-            try {
+            access.resolveInputOrThrow(inFolderPath, ctx).use { inFolder ->
                 Rsb.pack(inFolder.file, outputHandle.targetFile) {
                     setConfig(this@func, entries)
                 }
                 outputHandle.commit()
-            } finally {
-                if (inFolder.isCache) inFolder.file.delete()
             }
             Undefined
         }
@@ -290,13 +304,10 @@ class PvzToolContexts(
             val outputPath = toString(args[1])
             val ctx = InitializePvz2.context
 
-            val inputFile = access.resolveInputOrThrow(inputPath, ctx)
             val outputHandle = access.resolveOutputOrThrow(outputPath, ctx)
-            try {
+            access.resolveInputOrThrow(inputPath, ctx).use { inputFile ->
                 Ptx.decode(inputFile.file, outputHandle.targetFile, true)
                 outputHandle.commit()
-            } finally {
-                if (inputFile.isCache) inputFile.file.delete()
             }
             Undefined
         }
@@ -311,14 +322,10 @@ class PvzToolContexts(
             val fmtName    = toString(args[2])
             val ctx = InitializePvz2.context
 
-            val inputFile = access.resolveInputOrThrow(inputPath, ctx)
             val outputHandle = access.resolveOutputOrThrow(outputPath, ctx)
-
-            try {
+            access.resolveInputOrThrow(inputPath, ctx).use { inputFile ->
                 Ptx.encode(inputFile.file, outputHandle.targetFile, PtxFormat.valueOf(fmtName))
                 outputHandle.commit()
-            } finally {
-                if (inputFile.isCache) inputFile.file.delete()
             }
             Undefined
         }
@@ -333,13 +340,10 @@ class PvzToolContexts(
             val outFilePath = toString(args[1])
             val ctx = InitializePvz2.context
 
-            val inputFile = access.resolveInputOrThrow(inFilePath, ctx)
             val outputHandle = access.resolveOutputOrThrow(outFilePath, ctx)
-            try {
+            access.resolveInputOrThrow(inFilePath, ctx).use { inputFile ->
                 Zlib.unpack(inputFile.file,outputHandle.targetFile)
                 outputHandle.commit()
-            } finally {
-                if (inputFile.isCache) inputFile.file.delete()
             }
             Undefined
         }
@@ -356,14 +360,10 @@ class PvzToolContexts(
             val isChineseMode = args[3].toBoolean()
             val ctx = InitializePvz2.context
 
-            val inFolder = access.resolveInputOrThrow(inFilePath, ctx)
             val outputHandle = access.resolveOutputOrThrow(outFilePath, ctx)
-
-            try {
+            access.resolveInputOrThrow(inFilePath, ctx).use { inFolder ->
                 Zlib.pack(inFolder.file,outputHandle.targetFile, CompressionLevel.valueOf(levelName),isChineseMode)
                 outputHandle.commit()
-            } finally {
-                if (inFolder.isCache) inFolder.file.delete()
             }
             Undefined
         }
@@ -536,6 +536,9 @@ class PvzToolContexts(
     }
 
     suspend fun attached() {
+        listOf("js".js, "JS".js).forEach { key ->
+            runtime.set(key, js, VariableType.Local)
+        }
         listOf("path".js, "路径".js).forEach { key ->
             runtime.set(key, path, VariableType.Local)
         }

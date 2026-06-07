@@ -18,6 +18,7 @@ import io.github.dreammooncai.pvz2tool.js.JsConsole
 import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
 import io.github.dreammooncai.pvz2tool.ui.main.DynamicSectionState
+import io.github.dreammooncai.pvz2tool.ui.main.PvzLocalSaveManager
 import kotlin.collections.iterator
 
 private val config get() = InitializePvz2.config
@@ -78,6 +79,12 @@ class JsToolContext(
         listOf("call".js, "调用".js).func("itemId") { args ->
             val itemId = toString(args[0])
             onCallJs?.invoke(this,itemId)
+        }
+
+        // 刷新界面
+        listOf("refresh".js, "刷新".js).func {
+            PvzLocalSaveManager.triggerRefresh()
+            Undefined
         }
     }
     
@@ -195,6 +202,12 @@ class JsToolContext(
                     itemId.js eq value.js
                 }
             }
+
+            listOf("descriptionValues".js, "描述值".js) eq Object("descriptionValues") {
+                for ((itemId, value) in state?.descriptionValues ?: emptyMap()) {
+                    itemId.js eq value.js
+                }
+            }
         }
     }
     
@@ -290,6 +303,18 @@ class JsToolContext(
             SectionType.INFO -> {
                 listOf("value".js, "值".js) eq JsPropertyAccessor.BackedField(
                     getter = Callable { (state.infoValues[item.id] ?: item.infoValue ?: "-").js },
+                    setter = Callable { args ->
+                        val jsValue = args.getOrNull(0) ?: return@Callable Undefined
+                        val newValue = toString(jsValue)
+                        onStateChange?.invoke(section, item, newValue)
+                        Undefined
+                    }
+                )
+            }
+
+            SectionType.DESCRIPTION -> {
+                listOf("value".js, "值".js) eq JsPropertyAccessor.BackedField(
+                    getter = Callable { (state.descriptionValues[item.id] ?: item.desc.orEmpty().ifEmpty { item.name } ?: "-").js },
                     setter = Callable { args ->
                         val jsValue = args.getOrNull(0) ?: return@Callable Undefined
                         val newValue = toString(jsValue)

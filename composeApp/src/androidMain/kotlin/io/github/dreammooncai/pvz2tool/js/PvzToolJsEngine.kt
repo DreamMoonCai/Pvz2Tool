@@ -76,7 +76,7 @@ object PvzToolJsEngine {
         version: VersionDef,
         sectionStates: Map<String, DynamicSectionState>,
         onRunJsListener: (suspend ScriptRuntime.(section: DynamicSection?,item: SectionItem?) -> Unit)? = null,
-        onStateChange: ((section: DynamicSection, item: SectionItem, newValue: Any) -> Unit)?
+        onStateChange: ((section: DynamicSection, item: SectionItem, newValue: Any) -> Unit)?,
     ): JsAny? {
         val itemPair = JsToolContext.findItemById(targetItemId)
         if (itemPair == null) {
@@ -102,7 +102,7 @@ object PvzToolJsEngine {
         version: VersionDef,
         sectionStates: Map<String, DynamicSectionState>,
         onRunJsListener: (suspend ScriptRuntime.(section: DynamicSection?,item: SectionItem?) -> Unit)? = null,
-        onStateChange: ((section: DynamicSection, item: SectionItem, newValue: Any) -> Unit)?
+        onStateChange: ((section: DynamicSection, item: SectionItem, newValue: Any) -> Unit)?,
     ): JsAny? = try {
         // 为目标 item 创建上下文
         val targetAccess = JsFileAccess(targetSection, targetItem, version)
@@ -114,7 +114,7 @@ object PvzToolJsEngine {
             onStateChange = onStateChange,
             onCallJs = { targetItemId ->
                 callJsFunction(targetItemId,version,sectionStates,onRunJsListener,onStateChange)
-            }
+            },
         )
 
         val job = JSFunction(
@@ -152,9 +152,6 @@ object PvzToolJsEngine {
         } else {
             JsConsole.success("完成")
         }
-        if (targetSection != null && resultStr.isNotBlank() && targetItem?.type == SectionType.INFO) {
-            onStateChange?.invoke(targetSection, targetItem, resultStr)
-        }
         result
     } catch (e: Exception) {
         JsConsole.error("错误:",e)
@@ -181,33 +178,38 @@ object PvzToolJsEngine {
         updateSectionState: ((String, (DynamicSectionState) -> DynamicSectionState) -> Unit)? = null,
     ): String {
         JsConsole.info("执行: ${item?.displayName ?: section?.title}")
-        return runCatching {
-            getJSEngine().runtime.callJsFunction(script,section,item,version,sectionStates,onRunJsListener) { section, item, newValue ->
-                updateSectionState?.invoke(section.id) { s: DynamicSectionState ->
-                    when (item.type) {
-                        SectionType.INPUT -> s.copy(inputValues = s.inputValues + (item.id to newValue.toString()))
-                        SectionType.RADIO -> s.copy(
-                            selectedPresetItemIds = if (newValue as? Boolean ?: newValue.toString().toBoolean()) s.selectedPresetItemIds + (item.groupId to item.id)
-                            else section.items.filter { it.type == SectionType.RADIO }
-                                .groupBy { it.groupId }
-                                .mapValues { (_, items) ->
-                                    items.find { it.default }?.id ?: items.firstOrNull()?.id
-                                }
-                                .filterValues { it != null }
-                                .mapValues { it.value!! }
-                        )
-                        SectionType.CHECKBOX -> s.copy(
-                            checkedItemIds = if (newValue as? Boolean ?: newValue.toString().toBoolean()) s.checkedItemIds + item.id
-                            else s.checkedItemIds - item.id
-                        )
+        return try {
+            runCatching {
+                getJSEngine().runtime.callJsFunction(script,section,item,version,sectionStates,onRunJsListener) { section, item, newValue ->
+                    updateSectionState?.invoke(section.id) { s: DynamicSectionState ->
+                        when (item.type) {
+                            SectionType.INPUT -> s.copy(inputValues = s.inputValues + (item.id to newValue.toString()))
+                            SectionType.RADIO -> s.copy(
+                                selectedPresetItemIds = if (newValue as? Boolean ?: newValue.toString().toBoolean()) s.selectedPresetItemIds + (item.groupId to item.id)
+                                else section.items.filter { it.type == SectionType.RADIO }
+                                    .groupBy { it.groupId }
+                                    .mapValues { (_, items) ->
+                                        items.find { it.default }?.id ?: items.firstOrNull()?.id
+                                    }
+                                    .filterValues { it != null }
+                                    .mapValues { it.value!! }
+                            )
+                            SectionType.CHECKBOX -> s.copy(
+                                checkedItemIds = if (newValue as? Boolean ?: newValue.toString().toBoolean()) s.checkedItemIds + item.id
+                                else s.checkedItemIds - item.id
+                            )
 
-                        SectionType.SLIDER -> s.copy(sliderValues = s.sliderValues + (item.id to (newValue as? Float ?: newValue.toString().toFloat())))
-                        SectionType.INFO ->  s.copy(infoValues = s.infoValues + (item.id to newValue.toString()))
-                        else -> s
+                            SectionType.SLIDER -> s.copy(sliderValues = s.sliderValues + (item.id to (newValue as? Float ?: newValue.toString().toFloat())))
+                            SectionType.INFO ->  s.copy(infoValues = s.infoValues + (item.id to newValue.toString()))
+                            SectionType.DESCRIPTION ->  s.copy(descriptionValues = s.descriptionValues + (item.id to newValue.toString()))
+                            else -> s
+                        }
                     }
-                }
-            }?.toString() ?: ""
-        }.getOrDefault("")
+                }?.toString() ?: ""
+            }.getOrDefault("")
+        } finally {
+            JsFileAccess.cacheFileList.toList().forEach { file -> file.close() }
+        }
     }
 
     /**
@@ -249,7 +251,7 @@ object PvzToolJsEngine {
                     set(it, data, VariableType.Local)
                 }
             },
-            updateSectionState = updateSectionState
+            updateSectionState = updateSectionState,
         )
     }
 

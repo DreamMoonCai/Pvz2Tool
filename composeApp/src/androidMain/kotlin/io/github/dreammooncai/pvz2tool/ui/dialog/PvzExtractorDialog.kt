@@ -247,7 +247,7 @@ class AssetResourceExtractor(
                 }
 
                 // 4. 第一轮处理
-                updateProgress(0, textConfig.initialLoadingProgressTip)
+                updateProgress(0, textConfig.initialLoadingProgressTip, isComplete = true)
                 processBatch(needExtractFiles)
 
                 // 5. 【新增】重试循环逻辑
@@ -673,7 +673,7 @@ class AssetResourceExtractor(
         if (!info.needExtract) {
             val displayName = info.targetDocument.name ?: "未知文件"
             val sectionLabel = if (info.sectionName.isNotEmpty()) "【${info.sectionName}】" else ""
-            updateProgress(0, String.format("${sectionLabel}${textConfig.fileSkipTipPrefix}", displayName))
+            updateProgress(0, String.format("${sectionLabel}${textConfig.fileSkipTipPrefix}", displayName), isComplete = true)
             onFileSkipped?.invoke(info)
         }
         list.add(info)
@@ -759,7 +759,7 @@ class AssetResourceExtractor(
     private fun handleError(e: Exception) {
         activeProcessingFiles.clear()
         val errorMsg = "${textConfig.extractFailTipPrefix}${e.message ?: "未知错误"}"
-        updateProgress(0, errorMsg)
+        updateProgress(0, errorMsg, isComplete = true)
         Log.e(TAG, "解压失败", e)
         scope.launch(Dispatchers.Main) {
             Toast.makeText(context, "${textConfig.toastErrorPrefix}${e.message}", Toast.LENGTH_LONG).show()
@@ -774,7 +774,7 @@ class AssetResourceExtractor(
             isNotUpdate = isNotUpdate,
             isContinue = this.onDismissListener == null
         )
-        if (isComplete) {
+        if (isComplete && progress >= 100) {
             onCompleteListener?.let { listener ->
                 onCompleteListener = null
                 listener(uiState.value)

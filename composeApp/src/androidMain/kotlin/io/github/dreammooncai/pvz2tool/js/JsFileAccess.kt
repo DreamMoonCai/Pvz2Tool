@@ -30,17 +30,65 @@ open class JsFileAccess(
                 item: SectionItem?,
                 version: VersionDef): this(JsFileResolver(ActiveJsContext(section, item, version)))
 
+    /**
+     * 实例方法：规范化路径（委托给 companion object 的实现）。
+     * 裸相对路径（不以 / 或 $ 开头）自动补充 $WORK_DIR/ 前缀。
+     */
+    open fun normalizePath(path: String): String = Companion.normalizePath(path)
+
     companion object : JsFileAccess(JsFileResolver) {
+
+        val cacheFileList = mutableListOf<InputFile>()
+
+        /**
+         * 规范化路径：裸相对路径（不以 / 或 $ 开头）自动补充 $WORK_DIR/ 前缀。
+         * 例如 "version" → "$WORK_DIR/version"
+         */
+        override fun normalizePath(path: String): String {
+            if (path.startsWith("/") || path.startsWith("$")) return path
+            return "${JsFileResolver.WORK_DIR}/$path"
+        }
 
         /**
          * 将 DocumentFile 复制到缓存目录
          */
         private fun copyToCache(docFile: DocumentFile, context: Context): InputFile? {
             return try {
-                val cacheFile = File(cacheDir, "${UUID.randomUUID()}_${docFile.name ?: "temp"}")
+                val cacheFile = File(cacheDir, "${UUID.randomUUID()}_${docFile.name ?: "temp"}").apply { deleteOnExit() }
                 val data = JsFileResolver.readFromDocumentFile(docFile, context)
                 cacheFile.writeBytes(data)
                 InputFile(cacheFile, isCache = true, sourceDoc = docFile)
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        /**
+         * 将 DocumentFile 目录复制到缓存目录。
+         * - 文件 → 复制内容
+         * - 子目录 → 创建空占位目录（用户可对子目录再调 list() 展开）
+         * 返回指向缓存目录的 InputFile。
+         */
+        private fun copyDirectoryToCache(docDir: DocumentFile, context: Context): InputFile? {
+            return try {
+                val cacheDirFile = File(cacheDir, "${UUID.randomUUID()}_${docDir.name ?: "dir"}").apply {
+                    mkdirs()
+                    deleteOnExit()
+                }
+                docDir.listFiles()?.forEach { child ->
+                    val target = File(cacheDirFile, child.name ?: "temp")
+                    if (child.isDirectory) {
+                        target.mkdirs()
+                    } else {
+                        try {
+                            val data = JsFileResolver.readFromDocumentFile(child, context)
+                            target.writeBytes(data)
+                        } catch (_: Exception) {
+                            // 跳过无法读取的子文件
+                        }
+                    }
+                }
+                InputFile(cacheDirFile, isCache = true, sourceDoc = docDir)
             } catch (e: Exception) {
                 null
             }
@@ -51,6 +99,43 @@ open class JsFileAccess(
          */
         fun clearCache() {
             cacheDir.listFiles()?.forEach { it.delete() }
+        }
+
+        /**
+         * 将 asset 目录复制到缓存目录。用 [assets.list] 区分文件/子目录：
+         * - 文件 → 复制到缓存
+         * - 子目录 → 创建空占位目录（用户可对子目录再调 list() 展开）
+         * 返回指向缓存目录的 InputFile。
+         */
+        private fun tryCopyAssetDirToCache(context: Context, assetDirPath: String, children: Array<String>): InputFile? {
+            return try {
+                val cacheDirFile = File(cacheDir, "${UUID.randomUUID()}_asset_dir").apply {
+                    mkdirs()
+                    deleteOnExit()
+                }
+                for (child in children) {
+                    val childAssetPath = "$assetDirPath/$child"
+                    val target = File(cacheDirFile, child)
+                    // 子目录：创建空目录占位
+                    if (context.assets.list(childAssetPath) != null) {
+                        target.mkdirs()
+                    } else {
+                        // 文件：复制内容
+                        try {
+                            context.assets.open(childAssetPath).use { input ->
+                                FileOutputStream(target).use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                        } catch (_: Exception) {
+                            // 跳过无法复制的项
+                        }
+                    }
+                }
+                InputFile(cacheDirFile, isCache = true, sourceDoc = null)
+            } catch (e: Exception) {
+                null
+            }
         }
     }
 
@@ -63,7 +148,16 @@ open class JsFileAccess(
         val isCache: Boolean,
         /** 原始 DocumentFile（如果来源是 DocumentFile） */
         val sourceDoc: DocumentFile? = null
-    )
+    ): AutoCloseable {
+        init {
+            cacheFileList += this
+        }
+
+        override fun close() {
+            if (isCache) file.deleteRecursively()
+            cacheFileList -= this
+        }
+    }
 
     /**
      * 输出文件句柄：用于写入操作
@@ -109,16 +203,17 @@ open class JsFileAccess(
      * 3. 无法转换 → 返回缓存 File 句柄，写入完成后自动复制回 DocumentFile
      */
     fun resolveOutput(placeholderPath: String, context: Context): OutputHandle? {
+        val path = normalizePath(placeholderPath)
         // 绝对路径：直接使用 File
-        if (placeholderPath.startsWith("/")) {
-            val file = File(placeholderPath)
+        if (path.startsWith("/")) {
+            val file = File(path)
             // 确保父目录存在
             file.parentFile?.mkdirs()
             return OutputHandle(context, file, null, isCache = false)
         }
 
         // 1. 解析为 DocumentFile
-        val docFile = resolver.resolve(placeholderPath, context)
+        val docFile = resolver.resolve(path, context)
             ?: return null // 输出不支持 asset
 
         // 2. 尝试转换为普通 File
@@ -128,7 +223,7 @@ open class JsFileAccess(
         }
 
         // 3. 无法直接写入，使用缓存文件
-        val cacheFile = File(cacheDir, "${UUID.randomUUID()}_${docFile.name ?: "temp"}")
+        val cacheFile = File(cacheDir, "${UUID.randomUUID()}_${docFile.name ?: "temp"}").apply { deleteOnExit() }
         return OutputHandle(context, cacheFile, docFile, isCache = true)
     }
 
@@ -140,7 +235,10 @@ open class JsFileAccess(
      * 2. 占位符路径 → DocumentFile → 尝试转换
      * 3. 无法转换 → 返回缓存 File 句柄，写入完成后自动复制回 DocumentFile
      */
-    fun resolveOutputOrThrow(placeholderPath: String, context: Context): OutputHandle = resolveOutput(placeholderPath, context) ?: throw IllegalArgumentException("无法解析输出路径: $placeholderPath")
+    fun resolveOutputOrThrow(placeholderPath: String, context: Context): OutputHandle {
+        val path = normalizePath(placeholderPath)
+        return resolveOutput(path, context) ?: throw IllegalArgumentException("无法解析输出路径: $path")
+    }
 
     /**
      * 解析输入文件路径，返回可读取的 File。
@@ -151,9 +249,10 @@ open class JsFileAccess(
      * 3. 无法转换 → 复制到缓存目录 → 返回缓存 File
      */
     fun resolveInput(placeholderPath: String, context: Context): InputFile? {
+        val path = normalizePath(placeholderPath)
         // 绝对路径：直接使用 File
-        if (placeholderPath.startsWith("/")) {
-            val file = File(placeholderPath)
+        if (path.startsWith("/")) {
+            val file = File(path)
             if (file.exists() && file.canRead()) {
                 return InputFile(file, isCache = false)
             }
@@ -161,9 +260,9 @@ open class JsFileAccess(
         }
 
         // 1. 解析为 DocumentFile
-        val docFile = resolver.resolve(placeholderPath, context) ?: run {
+        val docFile = resolver.resolve(path, context) ?: run {
             // 如果工作目录未选择，尝试从 asset 读取
-            return resolveFromAsset(placeholderPath, context)
+            return resolveFromAsset(path, context)
         }
 
         // 2. 尝试转换为普通 File
@@ -172,7 +271,12 @@ open class JsFileAccess(
             return InputFile(file, isCache = false, sourceDoc = docFile)
         }
 
-        // 3. 无法直接访问，复制到缓存
+        // 3. 目录：复制直接子文件到缓存目录（供 listFiles() 使用）
+        if (docFile.isDirectory) {
+            return copyDirectoryToCache(docFile, context)
+        }
+
+        // 4. 普通文件：无法直接访问，复制到缓存
         return copyToCache(docFile, context)
     }
 
@@ -184,12 +288,135 @@ open class JsFileAccess(
      * 2. 占位符路径 → DocumentFile → 尝试转换
      * 3. 无法转换 → 复制到缓存目录 → 返回缓存 File
      */
-    fun resolveInputOrThrow(placeholderPath: String, context: Context): InputFile = resolveInput(placeholderPath,context) ?: throw IllegalArgumentException(
-        if (placeholderPath.startsWith("\$") && !placeholderPath.startsWith("/"))
-            "无法解析路径 \"$placeholderPath\"：请检查工作目录是否已选择，或目标文件是否存在"
-        else
-            "无法解析输入路径: $placeholderPath（文件不存在或无读取权限）"
-    )
+    fun resolveInputOrThrow(placeholderPath: String, context: Context): InputFile {
+        val path = normalizePath(placeholderPath)
+        return resolveInput(path, context) ?: throw IllegalArgumentException(
+            if (path.startsWith("\$") && !path.startsWith("/")) "无法解析路径 \"$path\"：请检查工作目录是否已选择，或目标文件是否存在"
+            else "无法解析输入路径: $path（文件不存在或无读取权限）"
+        )
+    }
+
+    /**
+     * 列出目录下的直接子项名称（不含路径前缀），不拷贝文件到缓存。
+     *
+     * 处理流程：
+     * 1. 绝对路径 → 直接使用 File.list()
+     * 2. 占位符路径 → 尝试解析为 DocumentFile，列出子项名
+     * 3. 若工作目录未选择，尝试从 asset 列出
+     *
+     * @return 子项名列表（文件名或子目录名），若路径不是目录或不存在则返回 null
+     */
+    fun listDirectory(placeholderPath: String, context: Context): List<String>? {
+        val path = normalizePath(placeholderPath)
+        // 绝对路径
+        if (path.startsWith("/")) {
+            val file = File(path)
+            if (file.isDirectory) {
+                return file.list()?.toList() ?: emptyList()
+            }
+            return null
+        }
+
+        // 尝试解析为 DocumentFile
+        val docFile = resolver.resolve(path, context)
+        if (docFile != null && docFile.isDirectory) {
+            return docFile.listFiles()?.mapNotNull { it.name } ?: emptyList()
+        }
+
+        // 工作目录未选择，尝试从 assets 列出
+        return listAssetDirectory(path, context)
+    }
+
+    /**
+     * 从 asset 列出目录子项名，遵循与 [resolveFromAsset] 相同的降级规则。
+     */
+    private fun listAssetDirectory(placeholderPath: String, context: Context): List<String>? {
+        val activeCtx = resolver.jsContext ?: return null
+        val version = activeCtx.version
+
+        val basePlaceholder = when {
+            placeholderPath.startsWith(JsFileResolver.JS_DIR) -> JsFileResolver.JS_DIR
+            placeholderPath.startsWith(JsFileResolver.ITEM) -> JsFileResolver.ITEM
+            placeholderPath.startsWith(JsFileResolver.SMF) -> JsFileResolver.SMF
+            placeholderPath.startsWith(JsFileResolver.WORK_DIR) -> JsFileResolver.WORK_DIR
+            else -> return null
+        }
+
+        val (primaryPath, fallbackPath, fallbackRootPath) = when {
+            placeholderPath.startsWith(JsFileResolver.JS_DIR) -> {
+                val section = activeCtx.section
+                val item = activeCtx.item
+                if (section != null && item != null) {
+                    Triple(
+                        item.resolveJsPath(section, version).substringBeforeLast('/'),
+                        section.resolveJsPath(version).substringBeforeLast('/'),
+                        version.resolveEnterGamePath().substringBeforeLast('/')
+                    )
+                } else if (section != null) {
+                    Triple(
+                        section.resolveJsPath(version).substringBeforeLast('/'),
+                        version.resolveEnterGamePath().substringBeforeLast('/'),
+                        null
+                    )
+                } else {
+                    Triple(version.resolveEnterGamePath().substringBeforeLast('/'), null, null)
+                }
+            }
+            placeholderPath.startsWith(JsFileResolver.ITEM) -> {
+                val section = activeCtx.section
+                val item = activeCtx.item
+                if (section != null && item != null) {
+                    Triple(
+                        item.resolvePath(section, version),
+                        version.resolveAssetPath(),
+                        version.baseAssetPath
+                    )
+                } else {
+                    Triple(version.resolveAssetPath(), version.baseAssetPath, null)
+                }
+            }
+            placeholderPath.startsWith(JsFileResolver.SMF) -> {
+                Triple(version.resolveAssetPath(), version.baseAssetPath, null)
+            }
+            placeholderPath.startsWith(JsFileResolver.WORK_DIR) -> {
+                Triple("", null, null)
+            }
+            else -> return null
+        }
+
+        val subPath = placeholderPath.removePrefix(basePlaceholder).trimStart('/').trimEnd('/')
+
+        fun assetAbsolutePath(relPath: String) =
+            if (relPath.isEmpty()) "pvz2tool" else "pvz2tool/$relPath"
+
+        // 尝试主路径
+        // assets.list() 对存在的目录返回数组（可能为空），对不存在的路径返回 null
+        val fullPrimaryPath = if (subPath.isEmpty()) primaryPath else if (primaryPath.isEmpty()) subPath else "$primaryPath/$subPath"
+        val children = context.assets.list(assetAbsolutePath(fullPrimaryPath))
+        if (children != null) return children.toList()
+
+        // 降级到 fallbackPath
+        fallbackPath?.let { fbPath ->
+            val fullFallbackPath = if (subPath.isEmpty()) fbPath else "$fbPath/$subPath"
+            val fbChildren = context.assets.list(assetAbsolutePath(fullFallbackPath))
+            if (fbChildren != null) return fbChildren.toList()
+        }
+
+        // 降级到 fallbackRootPath
+        fallbackRootPath?.let { fbPath ->
+            val fullFallbackPath = if (subPath.isEmpty()) fbPath else "$fbPath/$subPath"
+            val fbChildren = context.assets.list(assetAbsolutePath(fullFallbackPath))
+            if (fbChildren != null) return fbChildren.toList()
+        }
+
+        return null
+    }
+
+    /**
+     * 检测 asset 路径是否存在（文件或目录）。
+     * assets.list() 对不存在的路径返回 null，对存在的目录返回数组。
+     * assets.open() 对存在的文件成功，对目录抛异常。
+     */
 
     /**
      * 从 asset 解析文件（当工作目录未选择时使用）
@@ -210,6 +437,7 @@ open class JsFileAccess(
             placeholderPath.startsWith(JsFileResolver.JS_DIR) -> JsFileResolver.JS_DIR
             placeholderPath.startsWith(JsFileResolver.ITEM) -> JsFileResolver.ITEM
             placeholderPath.startsWith(JsFileResolver.SMF) -> JsFileResolver.SMF
+            placeholderPath.startsWith(JsFileResolver.WORK_DIR) -> JsFileResolver.WORK_DIR
             else -> return null
         }
 
@@ -243,20 +471,32 @@ open class JsFileAccess(
             placeholderPath.startsWith(JsFileResolver.SMF) -> {
                 Triple(version.resolveAssetPath(), version.baseAssetPath,null)
             }
+            placeholderPath.startsWith(JsFileResolver.WORK_DIR) -> {
+                Triple("",null,null)
+            }
             else -> return null // 其他占位符不支持 asset 回退
         }
 
-        val subPath = placeholderPath.removePrefix(basePlaceholder).trimStart('/')
-        // 优先从主路径读取
-        val fileName = subPath.ifEmpty { primaryPath.substringAfterLast('/') }
-        val fullPrimaryPath = if (subPath.isEmpty()) primaryPath else "$primaryPath/$subPath"
+        val subPath = placeholderPath.removePrefix(basePlaceholder).trimStart('/').trimEnd('/')
+
+        val fileName = subPath.ifEmpty { primaryPath }.substringAfterLast('/')
+        val fullPrimaryPath = if (subPath.isEmpty()) primaryPath else if (primaryPath.isEmpty()) subPath else "$primaryPath/$subPath"
+
+        // 构建 asset 绝对路径（用于 assets.list() / assets.open()）
+        fun assetAbsolutePath(relPath: String) =
+            if (relPath.isEmpty()) "pvz2tool" else "pvz2tool/$relPath"
+
+        // 尝试文件 → 失败则尝试目录 → 均失败则降级路径
         var cacheFile = tryCopyAssetToCache(context, fullPrimaryPath, fileName)
+            ?: tryCopyAssetDirIfExists(context, assetAbsolutePath(fullPrimaryPath))
+
         if (cacheFile != null) return cacheFile
 
         // 降级到 fallbackPath
         fallbackPath?.let { fbPath ->
             val fullFallbackPath = if (subPath.isEmpty()) fbPath else "$fbPath/$subPath"
             cacheFile = tryCopyAssetToCache(context, fullFallbackPath, fileName)
+                ?: tryCopyAssetDirIfExists(context, assetAbsolutePath(fullFallbackPath))
             if (cacheFile != null) return cacheFile
         }
 
@@ -264,10 +504,17 @@ open class JsFileAccess(
         fallbackRootPath?.let { fbPath ->
             val fullFallbackPath = if (subPath.isEmpty()) fbPath else "$fbPath/$subPath"
             cacheFile = tryCopyAssetToCache(context, fullFallbackPath, fileName)
+                ?: tryCopyAssetDirIfExists(context, assetAbsolutePath(fullFallbackPath))
             if (cacheFile != null) return cacheFile
         }
 
         return null
+    }
+
+    /** 若 [assetDirPath] 是一个 asset 目录则复制到缓存，否则返回 null */
+    private fun tryCopyAssetDirIfExists(context: Context, assetDirPath: String): InputFile? {
+        val children = context.assets.list(assetDirPath) ?: return null
+        return tryCopyAssetDirToCache(context, assetDirPath, children)
     }
 
     /**
@@ -275,7 +522,7 @@ open class JsFileAccess(
      */
     private fun tryCopyAssetToCache(context: Context, assetRelativePath: String, fileName: String): InputFile? {
         return try {
-            val cacheFile = File(cacheDir, "${UUID.randomUUID()}_$fileName")
+            val cacheFile = File(cacheDir, "${UUID.randomUUID()}_$fileName").apply { deleteOnExit() }
             context.assets.open("pvz2tool/$assetRelativePath").use { input ->
                 FileOutputStream(cacheFile).use { output ->
                     input.copyTo(output)

@@ -6,11 +6,15 @@ import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -23,13 +27,99 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 
+import io.github.dreammooncai.pvz2tool.DynamicSection
+import io.github.dreammooncai.pvz2tool.SectionItem
+import io.github.dreammooncai.pvz2tool.VersionDef
+import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
+import io.github.dreammooncai.pvz2tool.ui.main.DynamicSectionState
+import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
+
+// JS 执行上下文：携带当前渲染环境信息，使 {{js:...}} 可访问 this.当前
+data class JsExecutionContext(
+    val section: DynamicSection? = null,
+    val item: SectionItem? = null,
+    val version: VersionDef,
+    val sectionStates: Map<String, DynamicSectionState> = emptyMap(),
+    val updateSectionState: ((String, (DynamicSectionState) -> DynamicSectionState) -> Unit)? = null,
+)
+
+// 通过 CompositionLocal 向下传递 JS 执行上下文，避免每个 PvzRichText 调用点手动传参
+val LocalJsExecutionContext = compositionLocalOf<JsExecutionContext?> { null }
+
+// --------------- JS 执行辅助方法 ---------------
+
+/**
+ * 在给定上下文中执行 JS 表达式（支持内联表达式和 .js 文件）
+ * 使用 PvzToolJsEngine.executeScript 带上下文重载，使 JS 中可访问 this.当前
+ */
+private suspend fun executeJsExprWithContext(expr: String, context: JsExecutionContext): String {
+    return try {
+        val result = if (expr.endsWith(".js")) {
+            val jsFile = AssetExtractorHolder.openInputStream("js/$expr")
+            jsFile?.use { jsFile ->
+                val jsCode = jsFile.bufferedReader().readText()
+                PvzToolJsEngine.executeScript(
+                    script = jsCode,
+                    section = context.section,
+                    item = context.item,
+                    version = context.version,
+                    sectionStates = context.sectionStates,
+                    updateSectionState = context.updateSectionState
+                )
+            } ?: // .js 文件未找到，降级为内联表达式执行
+            PvzToolJsEngine.executeScript(
+                script = expr,
+                section = context.section,
+                item = context.item,
+                version = context.version,
+                sectionStates = context.sectionStates,
+                updateSectionState = context.updateSectionState
+            )
+        } else {
+            // 内联表达式
+            PvzToolJsEngine.executeScript(
+                script = expr,
+                section = context.section,
+                item = context.item,
+                version = context.version,
+                sectionStates = context.sectionStates,
+                updateSectionState = context.updateSectionState
+            )
+        }
+        result.ifBlank { "{{js:$expr}}" }
+    } catch (e: Exception) {
+        "{{js:$expr}}"
+    }
+}
+
+/**
+ * 无上下文执行 JS 表达式（降级方案，用于无法提供上下文的场景）
+ * 使用 PvzToolJsEngine.executeScript(script: String) 无参重载
+ */
+private suspend fun executeJsExprNoContext(expr: String): String {
+    return try {
+        val result = if (expr.endsWith(".js")) {
+            val jsFile = AssetExtractorHolder.openInputStream("js/$expr")
+            jsFile?.use { jsFile ->
+                val jsCode = jsFile.bufferedReader().readText()
+                PvzToolJsEngine.executeScript(jsCode)
+            } ?: PvzToolJsEngine.executeScript(expr)
+        } else {
+            PvzToolJsEngine.executeScript(expr)
+        }
+        result.ifBlank { "{{js:$expr}}" }
+    } catch (e: Exception) {
+        "{{js:$expr}}"
+    }
+}
+
 // 1. 简化文字样式配置：移除固定的 blur 和 offset，只保留核心颜色
 data class PvzTextStyle(
     val color: Color,
     val shadowColor: Color? = null
 )
 
-// 辅助函数：根据字体大小动态计算模糊半径 (16sp -> 5f 为基准)
+// 辅助函数：根据字体大小动态计算模糊半径 (16sp -> 4f 为基准)
 private fun calculateBlurRadius(fontSize: TextUnit): Float {
     return (fontSize.value / 16f) * 4f
 }
@@ -53,8 +143,8 @@ fun PvzText(
         style = if (style.shadowColor != null) LocalTextStyle.current.copy(
             shadow = Shadow(
                 color = style.shadowColor,
-                blurRadius = calculateBlurRadius(fontSize),      // 动态计算
-                offset = Offset(2f, 2f)       // 固定偏移
+                blurRadius = calculateBlurRadius(fontSize),
+                offset = Offset(2f, 2f)
             ),
             fontWeight = fontWeight
         ) else LocalTextStyle.current
@@ -98,6 +188,15 @@ val PvzTextOliveStyle = PvzTextStyle(
     shadowColor = Color(0xFF141200)
 )
 
+// 图标标签数据类
+private data class IconTag(
+    val id: String,
+    val path: String,
+    val width: TextUnit,
+    val height: TextUnit,
+    val fullMatch: String
+)
+
 // ---------------- 富文本区域 ----------------
 
 private val DefaultPvzTagStyles = mapOf(
@@ -118,6 +217,71 @@ private val DefaultPvzTagStyles = mapOf(
     "olive-shadow" to PvzTextOliveStyle,
 )
 
+/**
+ * 解析图标标签内容，提取路径、宽度、高度
+ */
+private fun parseIconTagContent(content: String, fontSize: TextUnit): Triple<String, TextUnit, TextUnit> {
+    val parts = content.split("|").map { it.trim() }
+    val path = parts[0]
+    var width: TextUnit? = null
+    var height: TextUnit? = null
+    for (part in parts.drop(1)) {
+        if (part.startsWith("width=")) {
+            width = part.substringAfter("=").toFloatOrNull()?.sp
+        } else if (part.startsWith("height=")) {
+            height = part.substringAfter("=").toFloatOrNull()?.sp
+        }
+    }
+    return Triple(path, width ?: (fontSize * 1.2f), height ?: (fontSize * 1.2f))
+}
+
+/**
+ * 从原始文本和 JS 缓存结果中解析所有图标标签
+ */
+private fun parseIconTags(text: String, jsCache: Map<String, String>, fontSize: TextUnit): List<IconTag> {
+    val iconRegex = "\\{\\{icon:([^}]+)\\}\\}".toRegex()
+    val tags = mutableListOf<IconTag>()
+    var globalIndex = 0
+
+    // 从原始 text 中解析图标标签
+    iconRegex.findAll(text).forEach { match ->
+        val (path, width, height) = parseIconTagContent(match.groupValues[1], fontSize)
+        tags.add(
+            IconTag(
+                id = "icon_${globalIndex}_$path",
+                path = path,
+                width = width,
+                height = height,
+                fullMatch = match.value
+            )
+        )
+        globalIndex++
+    }
+
+    // 从 JS 返回结果中解析图标标签
+    jsCache.values.forEach { result ->
+        iconRegex.findAll(result).forEach { iconMatch ->
+            val (iconPath, iconWidth, iconHeight) = parseIconTagContent(iconMatch.groupValues[1], fontSize)
+            val fullMatch = iconMatch.value
+            // 去重：如果 fullMatch 已存在则跳过
+            if (tags.none { it.fullMatch == fullMatch }) {
+                tags.add(
+                    IconTag(
+                        id = "icon_${globalIndex}_$iconPath",
+                        path = iconPath,
+                        width = iconWidth,
+                        height = iconHeight,
+                        fullMatch = fullMatch
+                    )
+                )
+                globalIndex++
+            }
+        }
+    }
+
+    return tags
+}
+
 @Composable
 fun PvzRichText(
     text: String,
@@ -128,108 +292,83 @@ fun PvzRichText(
     fontWeight: FontWeight = FontWeight.Bold,
     textAlign: TextAlign? = null,
     maxLines: Int = Int.MAX_VALUE,
+    jsContext: JsExecutionContext? = null,
 ) {
     val blurRadius = calculateBlurRadius(fontSize)
     val fixedOffset = Offset(2f, 2f)
 
-    // 1. 预解析：使用正则提取文本中所有的图标路径
-    // 使用 remember 避免每次重组都去跑正则匹配
-    val iconPaths = remember(text) {
-        val regex = "\\{\\{icon:([^}]+)\\}\\}".toRegex()
-        regex.findAll(text).map { it.groupValues[1] }.toSet()
+    // 合并显式参数和 CompositionLocal 中的上下文
+    val effectiveContext = jsContext ?: LocalJsExecutionContext.current
+
+    // 1. 从 text 中找出所有 {{js:...}} 表达式
+    val jsExpressions = remember(text) {
+        "\\{\\{js:([^}]+)\\}\\}".toRegex().findAll(text).map { it.groupValues[1] }.toList()
     }
 
-    // 2. 动态构建 inlineContent 映射表
-    val dynamicInlineContent = iconPaths.associateWith { path ->
-        InlineTextContent(
+    // 2. 异步执行 JS 并缓存结果（使用 produceState 支持 suspend）
+    val jsCache by produceState(emptyMap(), jsExpressions, effectiveContext) {
+        if (effectiveContext != null && jsExpressions.isNotEmpty()) {
+            // 有上下文：使用带上下文的 executeScript，使 JS 中可访问 this.当前
+            val results = mutableMapOf<String, String>()
+            for (expr in jsExpressions) {
+                try {
+                    val result = executeJsExprWithContext(expr, effectiveContext)
+                    results[expr] = result.ifBlank { "{{js:$expr}}" }
+                } catch (e: Exception) {
+                    results[expr] = "{{js:$expr}}"
+                }
+            }
+            value = results
+        } else if (jsExpressions.isNotEmpty()) {
+            // 无上下文：降级为无参执行（兼容无上下文场景）
+            val results = mutableMapOf<String, String>()
+            for (expr in jsExpressions) {
+                try {
+                    val result = executeJsExprNoContext(expr)
+                    results[expr] = result.ifBlank { "{{js:$expr}}" }
+                } catch (e: Exception) {
+                    results[expr] = "{{js:$expr}}"
+                }
+            }
+            value = results
+        } else {
+            value = emptyMap()
+        }
+    }
+
+    // 3. 解析所有图标标签（包括原始文本和 JS 返回结果中的）
+    val allIconTags = remember(text, jsCache, fontSize) {
+        parseIconTags(text, jsCache, fontSize)
+    }
+
+    // 4. 动态构建 inlineContent 映射表
+    val dynamicInlineContent = allIconTags.associate { tag ->
+        tag.id to InlineTextContent(
             Placeholder(
-                width = fontSize * 1.2f,  // 图标稍微比文字大一点，看起来更协调
-                height = fontSize * 1.2f, placeholderVerticalAlign = PlaceholderVerticalAlign.Center
+                width = tag.width,
+                height = tag.height,
+                placeholderVerticalAlign = PlaceholderVerticalAlign.Center
             )
-        ) { _ -> // 这里的参数是 alternateText，我们不需要使用它
+        ) { _ ->
             AsyncImageFromAssets(
-                "images/$path",
-                contentDescription = path,
+                "images/${tag.path}",
+                contentDescription = tag.path,
                 modifier = Modifier.fillMaxSize()
             )
         }
     }
 
-    // 3. 构建富文本 (这里的逻辑与上一版保持一致)
+    // 5. 构建富文本
     val annotatedString = buildAnnotatedString {
         val defaultSpanStyle = SpanStyle(
             color = defaultStyle.color,
             fontSize = fontSize,
             fontWeight = fontWeight,
-            shadow = if (defaultStyle.shadowColor != null) Shadow(defaultStyle.shadowColor, fixedOffset,blurRadius = blurRadius) else null
+            shadow = if (defaultStyle.shadowColor != null) Shadow(defaultStyle.shadowColor, fixedOffset, blurRadius) else null
         )
 
         pushStyle(defaultSpanStyle)
-
-        var currentIndex = 0
-        while (currentIndex < text.length) {
-            val start = text.indexOf("{{", currentIndex)
-            if (start == -1) {
-                append(text.substring(currentIndex))
-                break
-            }
-            append(text.substring(currentIndex, start))
-
-            val end = text.indexOf("}}", start + 2)
-            if (end == -1) {
-                append(text.substring(start))
-                break
-            }
-
-            // 【核心改进】先提取 {{ }} 内部的所有内容
-            val inner = text.substring(start + 2, end)
-
-            // 解析结构：{{ 标签名 | 参数 : 显示内容 }}
-            // 如果带 '|'，说明是 link 这种带参数的
-            if (inner.contains("|")) {
-                val tagName = inner.substringBefore("|").trim()
-                val remainder = inner.substringAfter("|")
-                // URL 和文本的分割点应该是最后一个冒号，避免被 https:// 干扰
-                val url = remainder.substringBeforeLast(":").trim()
-                val displayContent = remainder.substringAfterLast(":")
-
-                if (tagName.startsWith("link")) {
-                    val styleSuffix = tagName.removePrefix("link-")
-                    val targetStyle = DefaultPvzTagStyles[styleSuffix] ?: PvzTextStyle(Color(0xFF64B5F6), Color.Black)
-
-                    pushLink(LinkAnnotation.Url(url))
-                    withStyle(SpanStyle(
-                        color = targetStyle.color,
-                        textDecoration = TextDecoration.Underline,
-                        shadow = if (targetStyle.shadowColor != null) Shadow(targetStyle.shadowColor, fixedOffset, blurRadius) else null
-                    )) {
-                        append(displayContent)
-                    }
-                    pop()
-                }
-            } else if (inner.contains(":")) {
-                // 普通标签：{{ 标签名 : 内容 }}
-                val tagName = inner.substringBefore(":").trim()
-                val displayContent = inner.substringAfter(":")
-
-                if (tagName == "icon") {
-                    appendInlineContent(id = displayContent, alternateText = "[$displayContent]")
-                } else {
-                    val targetStyle = DefaultPvzTagStyles[tagName] ?: defaultStyle
-                    withStyle(SpanStyle(
-                        color = targetStyle.color,
-                        shadow = if (targetStyle.shadowColor != null) Shadow(targetStyle.shadowColor, fixedOffset, blurRadius) else null
-                    )) {
-                        append(displayContent)
-                    }
-                }
-            } else {
-                // 格式不合法的直接原样显示
-                append("{{$inner}}")
-            }
-
-            currentIndex = end + 2
-        }
+        parseRichText(this, text, jsCache, allIconTags, fixedOffset, blurRadius, defaultStyle)
         pop()
     }
 
@@ -240,8 +379,96 @@ fun PvzRichText(
         style = LocalTextStyle.current.copy(fontSize = fontSize),
         textAlign = textAlign,
         maxLines = maxLines,
-        inlineContent = dynamicInlineContent // 传入我们动态生成的图片映射
+        inlineContent = dynamicInlineContent
     )
+}
+
+/**
+ * 递归解析函数：解析文本中的 {{...}} 标签
+ * JS 执行结果通过 jsCache 获取，递归解析 JS 返回文本时不使用缓存（避免无限递归）
+ */
+private fun parseRichText(
+    builder: AnnotatedString.Builder,
+    src: String,
+    jsCache: Map<String, String>,
+    allIconTags: List<IconTag>,
+    fixedOffset: Offset,
+    blurRadius: Float,
+    defaultStyle: PvzTextStyle
+) {
+    var currentIndex = 0
+    while (currentIndex < src.length) {
+        val start = src.indexOf("{{", currentIndex)
+        if (start == -1) {
+            builder.append(src.substring(currentIndex))
+            break
+        }
+        builder.append(src.substring(currentIndex, start))
+
+        val end = src.indexOf("}}", start + 2)
+        if (end == -1) {
+            builder.append(src.substring(start))
+            break
+        }
+
+        val inner = src.substring(start + 2, end)
+
+        if (inner.contains("|")) {
+            val tagName = inner.substringBefore("|").trim()
+            val remainder = inner.substringAfter("|")
+            val url = remainder.substringBeforeLast(":").trim()
+            val displayContent = remainder.substringAfterLast(":")
+
+            if (tagName.startsWith("link")) {
+                val styleSuffix = tagName.removePrefix("link-")
+                val targetStyle = DefaultPvzTagStyles[styleSuffix] ?: PvzTextStyle(Color(0xFF64B5F6), Color.Black)
+
+                builder.pushLink(LinkAnnotation.Url(url))
+                builder.withStyle(SpanStyle(
+                    color = targetStyle.color,
+                    textDecoration = TextDecoration.Underline,
+                    shadow = if (targetStyle.shadowColor != null) Shadow(targetStyle.shadowColor, fixedOffset, blurRadius) else null
+                )) {
+                    builder.append(displayContent)
+                }
+                builder.pop()
+            }
+        } else if (inner.contains(":")) {
+            val tagName = inner.substringBefore(":").trim()
+            val displayContent = inner.substringAfter(":")
+
+            if (tagName == "js") {
+                // 使用缓存的 JS 执行结果
+                val result = jsCache[displayContent]
+                if (result != null) {
+                    // 递归解析，对 JS 返回结果不使用缓存（避免无限递归）
+                    parseRichText(builder, result, emptyMap(), allIconTags, fixedOffset, blurRadius, defaultStyle)
+                } else {
+                    builder.append("{{$inner}}")
+                }
+            } else if (tagName == "icon") {
+                // 在 allIconTags 中查找（包括 JS 返回结果中的图标）
+                val iconTag = allIconTags.find { it.fullMatch == "{{$tagName:$displayContent}}" }
+                if (iconTag != null) {
+                    builder.appendInlineContent(id = iconTag.id, alternateText = "[${iconTag.path}]")
+                } else {
+                    builder.append("{{$inner}}")
+                }
+            } else {
+                val targetStyle = DefaultPvzTagStyles[tagName] ?: defaultStyle
+                builder.withStyle(SpanStyle(
+                    color = targetStyle.color,
+                    shadow = if (targetStyle.shadowColor != null) Shadow(targetStyle.shadowColor, fixedOffset, blurRadius) else null
+                )) {
+                    builder.append(displayContent)
+                }
+            }
+        } else {
+            builder.append("{{$inner}}")
+        }
+
+        currentIndex = end + 2
+    }
 }
 
 /**

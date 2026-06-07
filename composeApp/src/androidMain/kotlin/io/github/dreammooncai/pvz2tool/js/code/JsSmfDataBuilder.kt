@@ -137,6 +137,22 @@ class JsSmfDataBuilder(
                     this
                 )
             }
+
+            // 读取字节数组
+            listOf("readBytes".js, "读字节".js).func {
+                if (!readSource.exists()) {
+                    throw IllegalStateException("文件不存在: ${readSource.absolutePath}")
+                }
+                readSource.readBytes().js
+            }
+
+            // 写入字节数组
+            listOf("writeBytes".js, "写字节".js).func("bytes") { args ->
+                modifiedFile.parentFile?.mkdirs()
+                val bytes = args.getOrNull(0)?.toKotlin(this@func) as? List<*> ?: throw IllegalArgumentException("需要传入字节数组")
+                modifiedFile.writeBytes(bytes.map { (it as? Number)?.toByte() ?: 0 }.toByteArray())
+                Undefined
+            }
         }
     }
 
