@@ -1672,7 +1672,7 @@ sections:
 # ------------------------------
 ui:
   title:
-    topAppBar: "植物大战僵尸2·迷宫拓展版"
+    topAppBar: "{{icon|width=200|height=40:egame_sdk_game_logo.png}}·迷宫拓展版"
     about: "关于版本"
     coreFunction: "核心功能"
     versionManage: "版本管理"
