@@ -21,6 +21,10 @@ import io.github.dreammooncai.pvz2tool.ui.main.Pvz2ScreenState
 import io.github.dreammooncai.util.ContextUtil
 import io.github.z4kn4fein.semver.Version
 import io.github.z4kn4fein.semver.toVersion
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -333,15 +337,24 @@ object InitializePvz2 {
         isLenient = true
     }
 
-    var mPvz2ScreenState: Pvz2ScreenState
-        get() {
-            return json.decodeFromString(settings["pvz2toolScreenState", ""].ifEmpty {
-                return Pvz2ScreenState()
-            })
+    private val _mPvz2ScreenStateFlow: MutableStateFlow<Pvz2ScreenState> by lazy {
+        // 核心修复：首次初始化时，从持久化getter加载真实状态
+        MutableStateFlow(json.decodeFromString<Pvz2ScreenState>(settings["pvz2toolScreenState", ""].ifEmpty {
+            return@lazy MutableStateFlow(Pvz2ScreenState())
+        }))
+    }
+
+    // 对外暴露只读的StateFlow
+    val mPvz2ScreenStateFlow: StateFlow<Pvz2ScreenState> by lazy { _mPvz2ScreenStateFlow.asStateFlow() }
+
+    fun updateScreenState(updater: (Pvz2ScreenState) -> Pvz2ScreenState) {
+        _mPvz2ScreenStateFlow.update { oldState ->
+            val newState = updater(oldState)
+            // 更新持久化存储
+            settings["pvz2toolScreenState"] = json.encodeToString(newState)
+            newState
         }
-        set(value) {
-            settings["pvz2toolScreenState"] = json.encodeToString(value)
-        }
+    }
 
     var mSfmVersion: Version
         get() = settings["pvz2toolSfmVersion", "0.0.0"].toVersion()

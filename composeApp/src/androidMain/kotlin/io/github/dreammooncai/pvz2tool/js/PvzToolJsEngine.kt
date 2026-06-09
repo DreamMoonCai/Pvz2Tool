@@ -92,7 +92,7 @@ object PvzToolJsEngine {
             JsConsole.warn("call: item $targetItemId 没有配置 JS 脚本")
             return null
         }
-        return callJsFunction(targetScript,targetSection,targetItem,version,sectionStates,onRunJsListener,onStateChange)
+        return callJsFunction(targetScript,targetSection,targetItem,version,sectionStates,false,onRunJsListener,onStateChange)
     }
 
     private suspend fun ScriptRuntime.callJsFunction(
@@ -101,6 +101,7 @@ object PvzToolJsEngine {
         targetItem: SectionItem?,
         version: VersionDef,
         sectionStates: Map<String, DynamicSectionState>,
+        isRichText: Boolean = false,
         onRunJsListener: (suspend ScriptRuntime.(section: DynamicSection?,item: SectionItem?) -> Unit)? = null,
         onStateChange: ((section: DynamicSection, item: SectionItem, newValue: Any) -> Unit)?,
     ): JsAny? = try {
@@ -152,6 +153,9 @@ object PvzToolJsEngine {
         } else {
             JsConsole.success("完成")
         }
+        if (!isRichText && targetSection != null && resultStr.isNotBlank() && (targetItem?.type == SectionType.INFO || targetItem?.type == SectionType.DESCRIPTION)) {
+            onStateChange?.invoke(targetSection, targetItem, resultStr)
+        }
         result
     } catch (e: Exception) {
         JsConsole.error("错误:",e)
@@ -174,13 +178,14 @@ object PvzToolJsEngine {
         item: SectionItem?,
         version: VersionDef,
         sectionStates: Map<String, DynamicSectionState> = emptyMap(),
+        isRichText: Boolean = false,
         onRunJsListener: (suspend ScriptRuntime.(section: DynamicSection?,item: SectionItem?) -> Unit)? = null,
         updateSectionState: ((String, (DynamicSectionState) -> DynamicSectionState) -> Unit)? = null,
     ): String {
         JsConsole.info("执行: ${item?.displayName ?: section?.title}")
         return try {
             runCatching {
-                getJSEngine().runtime.callJsFunction(script,section,item,version,sectionStates,onRunJsListener) { section, item, newValue ->
+                getJSEngine().runtime.callJsFunction(script,section,item,version,sectionStates,isRichText,onRunJsListener) { section, item, newValue ->
                     updateSectionState?.invoke(section.id) { s: DynamicSectionState ->
                         when (item.type) {
                             SectionType.INPUT -> s.copy(inputValues = s.inputValues + (item.id to newValue.toString()))

@@ -172,15 +172,15 @@ object Pvz2MainScreenUiState {
     /** 主内容区滚动偏移（px）。重建时用于 animateScrollTo 恢复位置。 */
     var scrollOffset: Int = 0
 
-    /** sectionId -> MutableState<Boolean>（展开状态），跨重建共享同一个 State 对象 */
+    /** id -> MutableState<Boolean>（展开状态），跨重建共享同一个 State 对象 */
     private val _sectionExpandedStates = mutableMapOf<String, MutableState<Boolean>>()
 
     /**
-     * 获取指定 sectionId 的展开状态 MutableState。
+     * 获取指定 id 的展开状态 MutableState。
      * 若不存在则以 [defaultExpanded] 为初始值新建并缓存。
      */
-    fun getExpandedState(sectionId: String, defaultExpanded: Boolean): MutableState<Boolean> {
-        return _sectionExpandedStates.getOrPut(sectionId) { mutableStateOf(defaultExpanded) }
+    fun getExpandedState(id: String, defaultExpanded: Boolean): MutableState<Boolean> {
+        return _sectionExpandedStates.getOrPut(id) { mutableStateOf(defaultExpanded) }
     }
 
     /**
@@ -1242,7 +1242,7 @@ private fun DynamicSectionComponent(
                             // 首次加载或重新加载时执行 JS
                             LaunchedEffect(item.id, version.id, jsScript) {
                                 if (jsScript != null) {
-                                    val result = PvzToolJsEngine.executeScript(
+                                    PvzToolJsEngine.executeScript(
                                         extractor = jsExtractor,
                                         script = jsScript,
                                         section = section,
@@ -1251,12 +1251,6 @@ private fun DynamicSectionComponent(
                                         sectionStates = sectionStates,
                                         updateSectionState = updateSectionState
                                     )
-
-                                    if (result.isNotBlank()) {
-                                        updateSectionState(section.id) { s ->
-                                            s.copy(descriptionValues = s.descriptionValues + (item.id to result))
-                                        }
-                                    }
                                 }
                             }
 
@@ -1577,7 +1571,7 @@ private fun DynamicSectionComponent(
                             // 首次加载或重新加载时执行 JS
                             LaunchedEffect(item.id, version.id, jsScript) {
                                 if (jsScript != null) {
-                                    val result = PvzToolJsEngine.executeScript(
+                                    PvzToolJsEngine.executeScript(
                                         extractor = jsExtractor,
                                         script = jsScript,
                                         section = section,
@@ -1586,12 +1580,6 @@ private fun DynamicSectionComponent(
                                         sectionStates = sectionStates,
                                         updateSectionState = updateSectionState
                                     )
-
-                                    if (result.isNotBlank()) {
-                                        updateSectionState(section.id) { s ->
-                                            s.copy(infoValues = s.inputValues + (item.id to result))
-                                        }
-                                    }
                                 }
                             }
 
@@ -2287,7 +2275,6 @@ private fun AboutSection() {
 // ======================== 9. 主界面（核心优化） ========================
 @Composable
 fun Pvz2MainScreen(
-    initialState: Pvz2ScreenState = Pvz2ScreenState(),
     onGotoGameClick: () -> Unit,
     onResetDataClick: () -> Unit,
     onCloseToolbox: () -> Unit,
@@ -2298,6 +2285,8 @@ fun Pvz2MainScreen(
     val config = InitializePvz2.config
 
     Pvz2ToolConfig.rootDirectory = rootDirectory
+
+    val currentState by InitializePvz2.mPvz2ScreenStateFlow.collectAsState()
 
     var showTutorial by remember { mutableStateOf(false) }
     if (showTutorial) PvzTutorialDialog(onDismiss = { showTutorial = false })
@@ -2325,22 +2314,25 @@ fun Pvz2MainScreen(
     val scrollState = rememberScrollState(initial = Pvz2MainScreenUiState.scrollOffset)
     val scope = rememberCoroutineScope()
 
-    // 滚动时实时同步到单例，供下次重建恢复
-    LaunchedEffect(scrollState.value) {
-        Pvz2MainScreenUiState.scrollOffset = scrollState.value
+    LaunchedEffect(scrollState) {
+        // 监听滚动值变化，不会触发重组
+        snapshotFlow { scrollState.value }
+            .collect { offset ->
+                Pvz2MainScreenUiState.scrollOffset = offset
+            }
     }
 
-    // 版本状态管理（使用 LaunchedEffect 避免 remember(initialState) 引用变化导致重置）
+    // 版本状态管理（使用 LaunchedEffect 避免 remember(localScreenState) 引用变化导致重置）
     val defaultVersion = config.versions.find { it.default } ?: config.versions.first()
-    val selectedVersion by remember(initialState) { mutableStateOf(initialState.selectedVersion ?: defaultVersion) }
+    val selectedVersion by remember(currentState) { mutableStateOf(currentState.selectedVersion ?: defaultVersion) }
 
     // 版本选择器临时状态
     var tempVersion by remember(selectedVersion) { mutableStateOf(selectedVersion) }
 
     // 动态栏目状态管理（版本隔离：每个版本的 section 状态独立存储）
-    val sectionStates = remember(initialState) {
+    val sectionStates = remember(currentState) {
         // 1. 从持久化状态中只提取属于当前版本的状态
-        val initMap = initialState.sectionStates.toMutableMap()
+        val initMap = currentState.sectionStates.toMutableMap()
 
         config.sections.forEach { section ->
             if (!initMap.containsKey(section.id)) {
@@ -2386,17 +2378,6 @@ fun Pvz2MainScreen(
         return section.visibleOnVersionIds.contains(selectedVersion.id)
     }
 
-    // 当前状态快照（用于持久化，需要版本化 key）
-    val currentState by remember(selectedVersion, sectionStates) {
-        derivedStateOf {
-            // 将内存中的 section.id key 转换为 ${versionId}_${sectionId}
-            Pvz2ScreenState(
-                selectedVersion = selectedVersion,
-                sectionStates = sectionStates
-            )
-        }
-    }
-
     val extractorHolder = rememberAssetExtractor(
         context = LocalContext.current
     )
@@ -2417,7 +2398,7 @@ fun Pvz2MainScreen(
             selectedVersion = selectedVersion,
             sectionStates = sectionStates
         )
-        InitializePvz2.mPvz2ScreenState = fullState
+        InitializePvz2.updateScreenState { fullState }
         onStateChanged(fullState)
         Log.d("FullSave", "进入游戏：全量保存所有状态")
     }
@@ -2691,11 +2672,15 @@ fun Pvz2MainScreen(
                                 verticalArrangement = Arrangement.Top
                             ) {
                                 WelcomeUserSection()
+
+                                val expandedState = Pvz2MainScreenUiState.getExpandedState("_versions", config.isExpandedVersions)
+
                                 // 版本管理
                                 PvzCollapsiblePanel(
                                     title = config.ui.title.versionManage,
                                     isExpandedInit = config.isExpandedVersions,
-                                    theme = config.versionsTheme
+                                    theme = config.versionsTheme,
+                                    expandedState = expandedState
                                 ) {
                                     config.versions.forEach { version ->
                                         RadioButtonItem(
@@ -2746,12 +2731,12 @@ fun Pvz2MainScreen(
                                             PvzSaveFileManager.notifyGameSaveChanged()
                                         }
 
-                                        // 版本切换：仅更新内存中的版本ID，不触发持久化
-                                        // （版本ID仅在进入游戏时随全量保存）
-                                        InitializePvz2.mPvz2ScreenState = InitializePvz2.mPvz2ScreenState.copy(
+                                        val fullState = Pvz2ScreenState(
                                             selectedVersion = tempVersion,
                                             sectionStates = emptyMap()
                                         )
+                                        InitializePvz2.updateScreenState { fullState }
+                                        onStateChanged(fullState)
                                         Log.d("VersionSwitch", "版本切换为[$tempVersion]")
                                     }
                                 }

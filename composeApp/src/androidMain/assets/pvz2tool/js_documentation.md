@@ -158,6 +158,23 @@
 | `assets.readBase64()` | `assets.读取Base64()` |
 | `assets.readArrayBuffer()` | `assets.读取ArrayBuffer()` |
 
+#### http 对象
+| 英文 | 中文别名 | 说明 |
+|------|----------|------|
+| `http.get(url, options?)` | `网络.获取()` | GET 请求 |
+| `http.post(url, body?, options?)` | `网络.提交()` | POST 请求 |
+| `http.put(url, body?, options?)` | `网络.上传()` | PUT 请求 |
+| `http.delete(url, options?)` | `网络.删除()` | DELETE 请求 |
+| `http.patch(url, body?, options?)` | `网络.修改()` | PATCH 请求 |
+| `http.head(url, options?)` | `网络.头部()` | HEAD 请求 |
+| `http.request(options)` | `网络.请求()` | 通用请求（支持指定 method） |
+| `response.status` | | HTTP 状态码（number） |
+| `response.ok` | | 状态码是否 200~299（boolean） |
+| `response.statusText` | | 状态文本（如 "OK"） |
+| `response.body` | | 响应体文本（string） |
+| `response.headers` | | 响应头对象 |
+| `response.json()` | `response.解析JSON()` | 将 body 解析为 JSON 字符串（可再用 JSON.parse） |
+
 #### this 对象
 | 英文 | 中文别名 | 说明 |
 |------|----------|------|
@@ -1719,6 +1736,126 @@ var dataUri = "data:image/png;base64," + base64;
 ```javascript
 var buffer = assets.readArrayBuffer("pvz2tool/data.bin");
 // 处理二进制数据
+```
+
+---
+
+## 9.5. http - 网络请求
+
+`http` / `网络` 对象提供 HTTP 网络请求能力，基于 Ktor 客户端实现，支持 GET、POST、PUT、DELETE、PATCH、HEAD 等常用方法，以及完整的请求头、请求体、超时配置。
+
+### 9.5.1 请求方法概览
+
+| 方法 | 中文别名 | 签名 | 说明 |
+|------|----------|------|------|
+| `http.get` | `网络.获取` | `get(url, options?)` | GET 请求，适合查询数据 |
+| `http.post` | `网络.提交` | `post(url, body?, options?)` | POST 请求，适合提交数据 |
+| `http.put` | `网络.上传` | `put(url, body?, options?)` | PUT 请求，适合替换资源 |
+| `http.delete` | `网络.删除` | `delete(url, options?)` | DELETE 请求，适合删除资源 |
+| `http.patch` | `网络.修改` | `patch(url, body?, options?)` | PATCH 请求，适合局部更新 |
+| `http.head` | `网络.头部` | `head(url, options?)` | HEAD 请求，只获取响应头 |
+| `http.request` | `网络.请求` | `request(options)` | 通用请求，通过 options.method 指定方法 |
+
+### 9.5.2 options 参数
+
+所有方法均支持可选的 `options` 对象：
+
+| 字段 | 中文别名字段 | 类型 | 默认值 | 说明 |
+|------|-------------|------|--------|------|
+| `headers` | `请求头` | `object` | `{}` | 请求头键值对 |
+| `contentType` | `内容类型` | `string` | `"application/json"` | 请求体的 Content-Type |
+| `timeout` | `超时` | `number` | `30000` | 超时毫秒数 |
+
+`http.request` 的 `options` 额外支持：
+
+| 字段 | 中文别名字段 | 类型 | 说明 |
+|------|-------------|------|------|
+| `url` | `地址` | `string` | 请求地址（必填） |
+| `method` | `方法` | `string` | HTTP 方法，默认 `"GET"` |
+| `body` | `数据` | `string` | 请求体 |
+
+### 9.5.3 Response 响应对象
+
+每个请求方法均返回一个 Response 对象：
+
+| 属性/方法 | 中文别名 | 类型 | 说明                          |
+|-----------|----------|------|-----------------------------|
+| `response.status` | — | `number` | HTTP 状态码（如 200、404）         |
+| `response.ok` | — | `boolean` | 状态码是否在 200~299 范围内          |
+| `response.statusText` | — | `string` | 状态文本（如 `"OK"`、`"Not Found"`） |
+| `response.body` | — | `string` | 响应体文本                       |
+| `response.headers` | — | `object` | 响应头键值对对象                    |
+| `response.json()` | `response.解析JSON()` | `string` | 将 body 规范化为 JSON 对象使用       |
+
+### 9.5.4 使用示例
+
+#### 简单 GET 请求
+
+```javascript
+var res = http.get("https://httpbin.org/get");
+if (res.ok) {
+    var data = res.json();
+    console.log("状态码：" + res.status);
+    console.log("响应体：", data);
+} else {
+    console.error("请求失败：" + res.status + " " + res.statusText);
+}
+```
+
+#### 带请求头的 GET 请求
+
+```javascript
+var res = http.get("https://api.example.com/data", {
+    headers: {
+        "Authorization": "Bearer token123",
+        "Accept": "application/json"
+    },
+    timeout: 15000
+});
+var data = JSON.parse(res.body);
+console.log(data);
+```
+
+#### POST JSON 数据
+
+```javascript
+var payload = JSON.stringify({ name: "test", value: 42 });
+var res = http.post("https://httpbin.org/post", payload, {
+    headers: { "X-Custom-Header": "hello" },
+    contentType: "application/json"
+});
+if (res.ok) {
+    console.log("提交成功：" + res.status);
+}
+```
+
+#### 中文别名调用
+
+```javascript
+var res = 网络.获取("https://httpbin.org/get");
+console.log("状态：" + res.ok);
+```
+
+#### 通用 request 方法
+
+```javascript
+var res = http.request({
+    url: "https://httpbin.org/put",
+    method: "PUT",
+    body: JSON.stringify({ key: "value" }),
+    contentType: "application/json",
+    headers: { "Authorization": "Bearer abc" },
+    timeout: 20000
+});
+console.log(res.status, res.body);
+```
+
+#### 读取响应头
+
+```javascript
+var res = http.get("https://httpbin.org/headers");
+var contentType = res.headers["Content-Type"];
+console.log("Content-Type:", contentType);
 ```
 
 ---

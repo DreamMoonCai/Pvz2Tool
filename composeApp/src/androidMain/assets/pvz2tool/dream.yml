@@ -353,6 +353,205 @@ sections:
           "年份：" + year + "\nPI 值：" + pi;
 
   # ==========================================
+  # 栏目: HTTP 网络请求测试
+  # 测试新增的 http(网络) 对象 API
+  # ==========================================
+  - id: "http_demo"
+    title: "HTTP 网络请求测试"
+    theme: "ORANGE"
+
+    items:
+      # ----- 测试1：简单 GET 请求 -----
+      - id: "http_get_simple"
+        name: "简单 GET 请求"
+        desc: "测试 http.get() 请求 httpbin.org/get"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: |-
+          var res = http.get("https://httpbin.org/get");
+          var result;
+          if (res.ok) {
+              result = "状态码：" + res.status + "\n响应体：" + res.body;
+          } else {
+              result = "请求失败：" + res.status + " " + res.statusText;
+          }
+          result;
+
+      # ----- 测试2：POST 请求发送 JSON -----
+      - id: "http_post_json"
+        name: "POST 发送 JSON"
+        desc: "测试 http.post() 提交 JSON 数据"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: |-
+          var payload = JSON.stringify({ name: "pvz2tool", value: 42 });
+          var res = http.post("https://httpbin.org/post", payload, {
+              contentType: "application/json"
+          });
+          var result;
+          if (res.ok) {
+              result = "状态：" + res.status + "\n" + res.body;
+          } else {
+              result = "POST 失败：" + res.status;
+          }
+          result;
+
+      # ----- 测试3：PUT 请求 -----
+      - id: "http_put_test"
+        name: "PUT 请求测试"
+        desc: "测试 http.put() 替换资源"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: |-
+          var body = JSON.stringify({ updated: true });
+          var res = http.put("https://httpbin.org/put", body);
+          var result;
+          if (res.ok) {
+              result = "PUT 成功：" + res.status;
+          } else {
+              result = "PUT 失败：" + res.status;
+          }
+          result;
+
+      # ----- 测试4：DELETE 请求 -----
+      - id: "http_delete_test"
+        name: "DELETE 请求测试"
+        desc: "测试 http.delete() 删除资源"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: |-
+          var res = http["delete"]("https://httpbin.org/delete");
+          var result;
+          if (res.ok) {
+              result = "DELETE 成功：" + res.status;
+          } else {
+              result = "DELETE 失败：" + res.status;
+          }
+          result;
+
+      # ----- 测试5：自定义请求头 -----
+      - id: "http_headers"
+        name: "自定义请求头"
+        desc: "测试带自定义 headers 的 GET 请求"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: |-
+          var res = http.get("https://httpbin.org/headers", {
+              headers: {
+                  "X-Custom-Header": "HelloPvz2",
+                  "User-Agent": "Pvz2Tool/1.0"
+              }
+          });
+          var result;
+          if (res.ok) {
+              result = "状态：" + res.status + "\n" + res.body;
+          } else {
+              result = "请求失败：" + res.status;
+          }
+          result;
+
+      # ----- 测试6：读取响应头 -----
+      - id: "http_response_headers"
+        name: "读取响应头"
+        desc: "测试从响应中读取 headers"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: |-
+          var res = http.get("https://httpbin.org/response-headers?X-Demo=Hello");
+          var result;
+          if (res.ok) {
+              var ct = res.headers["Content-Type"] || "unknown";
+              result = "Content-Type：" + ct + "\n状态码：" + res.status;
+          } else {
+              result = "请求失败";
+          }
+          result;
+
+      # ----- 测试7：通用 request 方法 -----
+      - id: "http_generic_request"
+        name: "通用 request 方法"
+        desc: "测试 http.request() 指定 method"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: |-
+          var res = http.request({
+              url: "https://httpbin.org/anything",
+              method: "PATCH",
+              body: JSON.stringify({ patch: true }),
+              contentType: "application/json",
+              timeout: 15000
+          });
+          var result;
+          if (res.ok) {
+              result = "request 成功：" + res.status;
+          } else {
+              result = "request 失败：" + res.status;
+          }
+          result;
+
+      # ----- 测试8：中文别名调用 -----
+      - id: "http_cn_alias"
+        name: "中文别名测试"
+        desc: "测试网络.获取() 等中文别名"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: |-
+          var res = 网络.获取("https://httpbin.org/get");
+          var result;
+          if (res.ok) {
+              result = "中文别名调用成功，状态码：" + res.status;
+          } else {
+              result = "调用失败：" + res.status;
+          }
+          result;
+
+      # ----- 分隔线 -----
+      - id: "http_sep_1"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- 测试9：超时设置 -----
+      - id: "http_timeout"
+        name: "超时测试"
+        desc: "测试设置 timeout 参数（使用快速响应的 URL）"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: |-
+          var res = http.get("https://httpbin.org/delay/1", {
+              timeout: 5000
+          });
+          var result;
+          if (res.ok) {
+              result = "请求成功（未超时）：" + res.status;
+          } else {
+              result = "请求失败或超时：" + res.status;
+          }
+          result;
+
+      # ----- 分隔线 -----
+      - id: "http_sep_2"
+        name: ""
+        desc: "────────────────────────────"
+        type: "DESCRIPTION"
+
+      # ----- 测试10：INFO 显示 HTTP 状态 -----
+      - id: "http_info_demo"
+        name: "HTTP 状态检查"
+        desc: "使用 INFO 显示远程 API 状态"
+        type: "INFO"
+        infoValue: "点击上方按钮测试 HTTP 功能"
+        jsScript: |-
+          var res = http.get("https://httpbin.org/get");
+          var result;
+          if (res.ok) {
+              result = "HTTP 连接正常\n状态码：" + res.status + "\n响应 OK：" + res.ok;
+          } else {
+              result = "HTTP 连接异常\n状态码：" + res.status;
+          }
+          result;
+
+  # ==========================================
   # 栏目 4: JS 工具
   # 类型: 按钮 (BUTTON)
   # 说明: 每个 item 点击后执行对应的 JS 脚本

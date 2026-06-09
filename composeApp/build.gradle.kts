@@ -34,6 +34,11 @@ kotlin {
             implementation(libs.coil.gif)
             implementation(libs.androidx.media3.exoplayer)
             implementation(libs.androidx.media3.ui)
+            // Ktor 网络客户端
+            implementation(libs.ktor.client.android)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.kotlinx.json)
+            implementation(libs.ktor.client.logging)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)

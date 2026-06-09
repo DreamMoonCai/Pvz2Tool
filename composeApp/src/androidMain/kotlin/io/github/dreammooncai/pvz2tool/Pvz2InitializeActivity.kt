@@ -153,7 +153,6 @@ class Pvz2InitializeActivity : ComponentActivity() {
                 )
                 key(InitializePvz2.mPvz2MainScreenReloadKey) {
                     Pvz2MainScreen(
-                        InitializePvz2.mPvz2ScreenState,
                         onGotoGameClick = ::onGotoGame,
                         onResetDataClick = ::onResetDataClick,
                         onCloseToolbox = {
@@ -246,7 +245,7 @@ class Pvz2InitializeActivity : ComponentActivity() {
         }
         JsSmfDataManager.clearCache()
         JsPvz.clearCache()
-        InitializePvz2.mPvz2ScreenState = Pvz2ScreenState()
+        InitializePvz2.updateScreenState { Pvz2ScreenState() }
         InitializePvz2.mSfmVersion = Version.min
         Pvz2MainScreenUiState.resetAll()
         InitializePvz2.mPvz2MainScreenReloadKey++

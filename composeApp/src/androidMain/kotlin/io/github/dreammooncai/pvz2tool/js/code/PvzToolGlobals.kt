@@ -315,6 +315,9 @@ object PvzToolGlobals {
         listOf("audio".js, "音频".js).forEach { key ->
             runtime.set(key, audio, VariableType.Global)
         }
+        listOf("http".js, "网络".js).forEach { key ->
+            runtime.set(key, JsHttp.js, VariableType.Global)
+        }
         runtime.get("Number".js)?.get("prototype".js, runtime)?.let { it as? JsObject }?.let { prototype ->
             listOf("encrypt".js, "加密".js).forEach { key ->
                 prototype.set(key, JsProperty {

@@ -83,7 +83,7 @@ class JsToolContext(
 
         // 刷新界面
         listOf("refresh".js, "刷新".js).func {
-            PvzLocalSaveManager.triggerRefresh()
+            InitializePvz2.mPvz2MainScreenReloadKey++
             Undefined
         }
     }

@@ -64,6 +64,7 @@ private suspend fun executeJsExprWithContext(expr: String, context: JsExecutionC
                     item = context.item,
                     version = context.version,
                     sectionStates = context.sectionStates,
+                    isRichText = true,
                     updateSectionState = context.updateSectionState
                 )
             } ?: // .js 文件未找到，降级为内联表达式执行
@@ -73,6 +74,7 @@ private suspend fun executeJsExprWithContext(expr: String, context: JsExecutionC
                 item = context.item,
                 version = context.version,
                 sectionStates = context.sectionStates,
+                isRichText = true,
                 updateSectionState = context.updateSectionState
             )
         } else {
@@ -83,6 +85,7 @@ private suspend fun executeJsExprWithContext(expr: String, context: JsExecutionC
                 item = context.item,
                 version = context.version,
                 sectionStates = context.sectionStates,
+                isRichText = true,
                 updateSectionState = context.updateSectionState
             )
         }
