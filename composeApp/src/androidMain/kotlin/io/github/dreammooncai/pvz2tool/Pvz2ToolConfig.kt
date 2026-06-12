@@ -463,6 +463,40 @@ data class Pvz2ToolConfigUISettings(
     val resetPacketDeepClearing: String = "重置数据包时删除smf目录",
     val showNotUpdate: String = "进入游戏时未检测到更新也进行弹窗",
     val importSmfFile: String = "导入SMF文件",
+    /** 是否启用自定义游戏画面设置的文字标签 */
+    val customGameDisplay: String = "自定义游戏画面",
+    /** 自定义游戏画面子页面标题 */
+    val customGameDisplayTitle: String = "游戏画面设置",
+    /** 游戏画面配置默认值 */
+    val gameDisplay: Pvz2ToolConfigGameDisplay = Pvz2ToolConfigGameDisplay(),
+)
+
+/**
+ * 游戏画面自定义配置
+ * 在"自定义游戏画面"子页面中生效
+ */
+@Serializable
+data class Pvz2ToolConfigGameDisplay(
+    /** 是否默认启用自定义游戏画面（总开关）*/
+    val isUseCustomGameDisplay: Boolean = false,
+    /** 允许随意翻转界面（支持竖屏）的文字标签 */
+    val allowRotation: String = "允许随意翻转界面（支持竖屏）",
+    /** 是否默认允许随意翻转 */
+    val isAllowRotation: Boolean = false,
+    /** 自定义窗口尺寸的文字标签 */
+    val customWindowSize: String = "自定义窗口宽高",
+    /** 自定义窗口比例的文字标签 */
+    val customWindowRatio: String = "自定义窗口比例",
+    /** 全屏模式的文字标签 */
+    val fullscreen: String = "全屏",
+    /** 显示模式：fullscreen / ratio / size，默认 fullscreen */
+    val displayMode: String = "ratio",
+    /** displayMode=size 时的窗口宽度（dp）*/
+    val windowWidth: Int = 1280,
+    /** displayMode=size 时的窗口高度（dp）*/
+    val windowHeight: Int = 720,
+    /** displayMode=ratio 时的宽高比（宽/高），例如 1.5 表示 3:2 */
+    val windowRatio: Float = 1.5f,
 )
 
 // 4. 【JS 日志面板】配置

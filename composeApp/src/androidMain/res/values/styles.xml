@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.DreamPvzApp" parent="@android:style/Theme.NoTitleBar.Fullscreen">
+        <!-- 核心：信箱黑边填充背景，替换默认纯黑色 -->
+        <item name="android:windowBackground">@drawable/game_fill_bg</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <!-- 移除系统自带阴影遮罩 -->
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+
+        <!-- 核心2：窗口沉浸式，让背景穿透到系统栏，布局内容保留安全区 -->
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+    <style name="Theme.DreamPvzApp.NoBackground" parent="Theme.DreamPvzApp">
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+    <style name="Theme.DreamPvzApp.DrawsSystemBar" parent="Theme.DreamPvzApp">
+        <item name="android:windowDrawsSystemBarBackgrounds">false</item>
+    </style>
+</resources>

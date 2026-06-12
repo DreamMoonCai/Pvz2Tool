@@ -19,6 +19,7 @@ kotlin = "2.3.20"
 material3 = "1.10.0-alpha05"
 materialIconsCore = "1.7.8"
 media3Exoplayer = "1.10.0"
+yukireflection = "1.0.3"
 yukireflection-kotlin = "1.0.5"
 io-semver-version = "3.0.0"
 multiplatformSettings = "1.3.0"
@@ -66,6 +67,7 @@ compose-ui-graphics = { module = "org.jetbrains.compose.ui:ui-graphics", version
 compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeMultiplatform" }
 compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
 io-semver-version = { group = "io.github.z4kn4fein", name = "semver", version.ref = "io-semver-version" }
+yukireflection-api = { group = "com.highcapable.yukireflection", name = "api", version.ref = "yukireflection" }
 yukireflection-api-kotlin = { group = "io.github.dreammooncai.yukireflection", name = "api-kotlin", version.ref = "yukireflection-kotlin" }
 multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatformSettings" }
 kotlinx-coroutines = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }

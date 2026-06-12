@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Typeface
 import android.net.Uri
+import android.opengl.GLSurfaceView
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -13,6 +14,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import com.charleskorn.kaml.*
+import com.highcapable.yukireflection.factory.field
+import com.highcapable.yukireflection.factory.method
 import com.russhwolf.settings.Settings
 import com.russhwolf.settings.SharedPreferencesSettings
 import com.russhwolf.settings.get
@@ -31,6 +34,26 @@ import java.io.File
 @SuppressLint("StaticFieldLeak")
 object InitializePvz2 {
     lateinit var context: Context
+
+    var mGLView: GLSurfaceView? = null
+
+    fun updateGlViewSize(width: Int,height: Int) {
+        if (width <= 0 || height <= 0) return
+
+        val mGLView = mGLView ?: return
+
+        mGLView::class.java.method { name = "SetScreenSizeInPixels" }.get(mGLView).call(width, height)
+
+        val renderer = mGLView::class.java.field { name = "mAndroidRenderer" }
+            .get(mGLView)
+            .cast<GLSurfaceView.Renderer>() ?: return
+
+        runCatching { if (renderer::class.java.field { name = "mFirstDraw" }.get(renderer).boolean()) return }
+
+        mGLView.queueEvent {
+            mGLView::class.java.method { name = "Native_onSurfaceChanged" }.get(mGLView).call(width, height)
+        }
+    }
 
     var mPvz2MainScreenReloadKey by mutableIntStateOf(0)
 

@@ -511,6 +511,42 @@ ui:
 | `resetPacketDeepClearing` | String | `重置数据包时删除smf目录` | 重置数据包时删除smf目录 |
 | `showNotUpdate` | String | `进入游戏时未检测到更新也进行弹窗` | 进入游戏时未检测到更新也弹窗 |
 | `importSmfFile` | String | `导入SMF文件` | 导入SMF文件按钮 |
+| `customGameDisplay` | String | `自定义游戏画面` | 自定义游戏画面总开关标签 |
+| `customGameDisplayTitle` | String | `游戏画面设置` | 游戏画面子页面标题 |
+| `gameDisplay` | Object | 见下表 | 游戏画面配置默认值（见下方 gameDisplay 详解） |
+
+**settings.gameDisplay 配置详解（游戏画面设置子页面）：**
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `isUseCustomGameDisplay` | Boolean | `false` | 是否默认启用自定义游戏画面（总开关）|
+| `allowRotation` | String | `允许随意翻转界面（支持竖屏）` | 允许翻转开关的标签文字 |
+| `isAllowRotation` | Boolean | `false` | 是否默认允许随意翻转（支持竖屏）|
+| `customWindowSize` | String | `自定义窗口宽高` | 自定义宽高模式的标签文字 |
+| `customWindowRatio` | String | `自定义窗口比例` | 自定义比例模式的标签文字 |
+| `fullscreen` | String | `全屏` | 全屏模式的标签文字 |
+| `displayMode` | String | `fullscreen` | 默认显示模式，可选值：`fullscreen`（全屏）/ `ratio`（自定义比例）/ `size`（自定义宽高）|
+| `windowWidth` | Int | `1280` | 自定义宽高模式下的默认宽度（dp，仅 `displayMode=size` 时生效）|
+| `windowHeight` | Int | `720` | 自定义宽高模式下的默认高度（dp，仅 `displayMode=size` 时生效）|
+| `windowRatio` | Float | `1.5` | 自定义比例模式下的默认宽高比（如 `1.5` = 3:2，仅 `displayMode=ratio` 时生效）|
+
+**gameDisplay 使用示例：**
+```yaml
+settings:
+  customGameDisplay: "自定义游戏画面"
+  customGameDisplayTitle: "游戏画面设置"
+  gameDisplay:
+    isUseCustomGameDisplay: false     # 总开关，false = 不启用（默认横屏全屏）
+    allowRotation: "允许随意翻转界面（支持竖屏）"
+    isAllowRotation: false
+    fullscreen: "全屏"
+    customWindowRatio: "自定义窗口比例"
+    customWindowSize: "自定义窗口宽高"
+    displayMode: "fullscreen"         # fullscreen / ratio / size
+    windowRatio: 1.5                  # 比例模式：3:2
+    windowWidth: 1280                 # 尺寸模式：宽度 dp
+    windowHeight: 720                 # 尺寸模式：高度 dp
+```
 
 所有文本类配置均支持**复合颜色样式**，语法：
 

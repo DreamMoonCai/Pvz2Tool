@@ -25,6 +25,7 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.yukireflection.api)
             implementation(libs.yukireflection.api.kotlin)
             implementation(libs.kaml)
             implementation(libs.androidx.documentfile)
@@ -39,6 +40,7 @@ kotlin {
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.ktor.client.logging)
+
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
