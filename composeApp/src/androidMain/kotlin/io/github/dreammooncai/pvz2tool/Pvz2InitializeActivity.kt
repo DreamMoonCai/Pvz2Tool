@@ -505,7 +505,11 @@ class Pvz2InitializeActivity : ComponentActivity() {
         }
         JsSmfDataManager.clearCache()
         JsPvz.clearCache()
-        InitializePvz2.updateScreenState { Pvz2ScreenState() }
+        // 保留当前版本，避免重置后版本跳变导致存档迁移到错误目录
+        val currentVersion = InitializePvz2.mPvz2ScreenStateFlow.value.selectedVersion
+        InitializePvz2.updateScreenState {
+            Pvz2ScreenState(selectedVersion = currentVersion)
+        }
         InitializePvz2.mSfmVersion = Version.min
         Pvz2MainScreenUiState.resetAll()
         InitializePvz2.mPvz2MainScreenReloadKey++
