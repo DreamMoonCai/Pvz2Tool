@@ -14,9 +14,13 @@ object SettingsDialogState {
         private set
     var isUseResetPacketDeepClearing by mutableStateOf(InitializePvz2.settings["isUseResetPacketDeepClearing", true])
         private set
-    var isUseDisconnectTheNetworkAndStart by mutableStateOf(InitializePvz2.settings["isUseDisconnectTheNetworkAndStart", false])
+    /** 是否开启悬浮窗 */
+    var isShowFloatingWindow by mutableStateOf(InitializePvz2.settings["isShowFloatingWindow", InitializePvz2.config.ui.settings.isShowFloatingWindow])
         private set
     var isUseShowNotUpdate by mutableStateOf(InitializePvz2.settings["isUseShowNotUpdate", false])
+        private set
+    /** 退出游戏二次确认 */
+    var isUseExitConfirm by mutableStateOf(InitializePvz2.settings["isUseExitConfirm", InitializePvz2.config.ui.settings.isUseExitConfirm])
         private set
     var isUseCustomGameDisplay by mutableStateOf(
         InitializePvz2.settings["isUseCustomGameDisplay", InitializePvz2.config.ui.settings.gameDisplay.isUseCustomGameDisplay]
@@ -54,8 +58,9 @@ object SettingsDialogState {
     init {
         isUseSolidColorBackground = InitializePvz2.settings["isUseSolidColorBackground", InitializePvz2.config.ui.assets.isUseSolidColorBackground]
         isUseResetPacketDeepClearing = InitializePvz2.settings["isUseResetPacketDeepClearing", true]
-        isUseDisconnectTheNetworkAndStart = InitializePvz2.settings["isUseDisconnectTheNetworkAndStart", false]
+        isShowFloatingWindow = InitializePvz2.settings["isShowFloatingWindow", InitializePvz2.config.ui.settings.isShowFloatingWindow]
         isUseShowNotUpdate = InitializePvz2.settings["isUseShowNotUpdate", false]
+        isUseExitConfirm = InitializePvz2.settings["isUseExitConfirm", InitializePvz2.config.ui.settings.isUseExitConfirm]
         isUseCustomGameDisplay = InitializePvz2.settings["isUseCustomGameDisplay", InitializePvz2.config.ui.settings.gameDisplay.isUseCustomGameDisplay]
         isAllowRotation = InitializePvz2.settings["isAllowRotation", InitializePvz2.config.ui.settings.gameDisplay.isAllowRotation]
         displayMode = InitializePvz2.settings["displayMode", InitializePvz2.config.ui.settings.gameDisplay.displayMode]
@@ -80,14 +85,19 @@ object SettingsDialogState {
         InitializePvz2.settings["isUseResetPacketDeepClearing"] = isUseResetPacketDeepClearing
     }
 
-    fun toggleDisconnectTheNetworkAndStart() {
-        isUseDisconnectTheNetworkAndStart = !isUseDisconnectTheNetworkAndStart
-        InitializePvz2.settings["isUseDisconnectTheNetworkAndStart"] = isUseDisconnectTheNetworkAndStart
+    fun toggleShowFloatingWindow() {
+        isShowFloatingWindow = !isShowFloatingWindow
+        InitializePvz2.settings["isShowFloatingWindow"] = isShowFloatingWindow
     }
 
     fun toggleShowNotUpdate() {
         isUseShowNotUpdate = !isUseShowNotUpdate
         InitializePvz2.settings["isUseShowNotUpdate"] = isUseShowNotUpdate
+    }
+
+    fun toggleExitConfirm() {
+        isUseExitConfirm = !isUseExitConfirm
+        InitializePvz2.settings["isUseExitConfirm"] = isUseExitConfirm
     }
 
     fun toggleCustomGameDisplay() {
@@ -119,4 +129,75 @@ object SettingsDialogState {
         windowRatio = ratio
         InitializePvz2.settings["windowRatio"] = windowRatio
     }
+
+    var lastScreenSize = arrayOf(0,0,0,0,0,0)
+
+    fun calcRatioAndPadding(
+        screenWidth: Int,
+        screenHeight: Int
+    ) = (if (!isUseCustomGameDisplay) {
+        // 未启用自定义：全屏模式，游戏内容充满 contentParent
+        arrayOf(screenWidth, screenHeight, 0, 0, 0, 0)
+    } else when (displayMode) {
+        "fullscreen" -> {
+            arrayOf(screenWidth, screenHeight, 0, 0, 0, 0)
+        }
+        "ratio" -> {
+            val ratio = windowRatio.coerceAtLeast(0.1f)
+            calcRatioAndPadding(screenWidth, screenHeight, ratio)
+        }
+        "size" -> {
+            val density = InitializePvz2.context.resources.displayMetrics.density
+            // 0 = 未配置，使用屏幕实际尺寸
+            val tw = if (windowWidth > 0) (windowWidth * density).toInt().coerceAtLeast(1) else screenWidth
+            val th = if (windowHeight > 0) (windowHeight * density).toInt().coerceAtLeast(1) else screenHeight
+            val pl = ((screenWidth - tw) / 2).coerceAtLeast(0)
+            val pt = ((screenHeight - th) / 2).coerceAtLeast(0)
+            arrayOf(tw, th, pl, pt, pl, pt)
+        }
+        else -> calcRatioAndPadding(screenWidth, screenHeight, 3.0f / 2.0f)
+    }).also { result -> lastScreenSize = result }
+}
+
+/**
+ * 按指定比例计算目标尺寸 + 居中 Padding
+ * @return 依次返回: targetWidth, targetHeight, left, top, right, bottom
+ */
+private fun calcRatioAndPadding(
+    screenWidth: Int,
+    screenHeight: Int,
+    targetRatio: Float
+): Array<Int> {
+    val screenRatio = screenWidth.toFloat() / screenHeight.toFloat()
+    val targetWidth: Int
+    val targetHeight: Int
+
+    if (screenRatio > targetRatio) {
+        targetHeight = screenHeight
+        targetWidth = (targetHeight * targetRatio).toInt()
+    } else {
+        targetWidth = screenWidth
+        targetHeight = (targetWidth / targetRatio).toInt()
+    }
+
+    val paddingLeft: Int
+    val paddingTop: Int
+    val paddingRight: Int
+    val paddingBottom: Int
+
+    if (screenRatio > targetRatio) {
+        val horizontalPadding = (screenWidth - targetWidth) / 2
+        paddingLeft = horizontalPadding
+        paddingRight = horizontalPadding
+        paddingTop = 0
+        paddingBottom = 0
+    } else {
+        val verticalPadding = (screenHeight - targetHeight) / 2
+        paddingTop = verticalPadding
+        paddingBottom = verticalPadding
+        paddingLeft = 0
+        paddingRight = 0
+    }
+
+    return arrayOf(targetWidth, targetHeight, paddingLeft, paddingTop, paddingRight, paddingBottom)
 }

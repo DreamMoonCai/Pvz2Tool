@@ -16,14 +16,14 @@ import android.os.Environment
 import android.os.Process
 import android.provider.Settings
 import android.view.View
-import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import android.view.KeyEvent
+import android.view.Window
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,31 +35,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.net.toUri
 import io.github.dreammooncai.manager.FilePickerManager
-import io.github.dreammooncai.pvz2tool.controller.RestoreNetworkFloatingController
+import io.github.dreammooncai.pvz2tool.controller.GameDisplayFloatingController
+import io.github.dreammooncai.pvz2tool.controller.FloatingBallController
 import io.github.dreammooncai.pvz2tool.js.JsSmfDataManager
 import io.github.dreammooncai.pvz2tool.js.code.JsPvz
 import io.github.dreammooncai.pvz2tool.js.code.PvzToolGlobals
-import io.github.dreammooncai.pvz2tool.service.LocalVpnService
 import io.github.dreammooncai.pvz2tool.ui.main.*
 import io.github.dreammooncai.pvz2tool.ui.music.rememberBackgroundMusicState
 import io.github.dreammooncai.pvz2tool.view.CgVideoPlayer
-import io.github.dreammooncai.util.ContextUtil
 import io.github.dreammooncai.yukireflection.factory.toKClass
 import io.github.z4kn4fein.semver.Version
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.system.exitProcess
-import kotlin.time.Duration.Companion.seconds
-import androidx.core.view.isEmpty
-import androidx.core.view.isNotEmpty
 import com.highcapable.yukireflection.factory.field
-import com.highcapable.yukireflection.factory.method
-import io.github.dreammooncai.yukireflection.factory.function
-import io.github.dreammooncai.yukireflection.factory.property
-import kotlin.time.Duration.Companion.milliseconds
+import io.github.dreammooncai.pvz2tool.controller.GeneralFloatingDialogController
 
 class Pvz2InitializeActivity : ComponentActivity() {
 
@@ -248,6 +238,7 @@ class Pvz2InitializeActivity : ComponentActivity() {
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
 
         val application = applicationContext as Application
+        var setupDone = false
 
         // 全局游戏Activity生命周期监听器（零侵入核心）
         val lifecycleCallback = object : Application.ActivityLifecycleCallbacks {
@@ -263,27 +254,18 @@ class Pvz2InitializeActivity : ComponentActivity() {
                                 name = "mGLView"
                                 superClass()
                             }.get(activity).cast<GLSurfaceView>() ?: return@post
-
-                        // 应用自定义游戏画面设置
-                        applyGameDisplaySettings(activity)
-
-                        // 应用沉浸式模式
+                        GameDisplayFloatingController.applyGameDisplaySettings(activity)
                         applyImmersiveMode(activity)
-
-                        watchGameViewLayoutChange(activity)
-
-                        if (SettingsDialogState.isUseDisconnectTheNetworkAndStart) {
-                            runCatching {
-                                LocalVpnService.startVpn(activity)
-                                RestoreNetworkFloatingController.showFloatingControl(activity)
-                            }.onFailure {
-                                LocalVpnService.stopVpn(activity)
-                            }
+                        if (!FloatingBallController.isShow.value && SettingsDialogState.isShowFloatingWindow) {
+                            FloatingBallController.showFloatingControl(activity)
+                        }
+                        registerBackPressHandler(activity)
+                        if (!setupDone) {
+                            watchGameViewLayoutChange(activity)
+                            setupDone = true
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
-                    } finally {
-                        application.unregisterActivityLifecycleCallbacks(this)
                     }
                 }
             }
@@ -324,19 +306,31 @@ class Pvz2InitializeActivity : ComponentActivity() {
                 }
             }
 
-            /**
-             * 将 [SettingsDialogState] 中的自定义画面设置应用到游戏 Activity。
-             * 此处只处理屏幕方向；窗口大小/比例/内容填充由 modifyGameLayoutWithPadding 负责。
-             * 仅在 isUseCustomGameDisplay 开启时生效；
-             * 关闭时不干预，由游戏自身的 manifest 设置决定。
-             */
-            private fun applyGameDisplaySettings(activity: Activity) {
-                if (!SettingsDialogState.isUseCustomGameDisplay) return
 
-                activity.requestedOrientation = if (SettingsDialogState.isAllowRotation) {
-                    ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
-                } else {
-                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            /**
+             * 通过 [Window.Callback] 包装拦截返回键，适配所有 Activity 类型（包括原生 android.app.Activity）。
+             * 当 [SettingsDialogState.isUseExitConfirm] 开启时弹出退出确认弹窗。
+             */
+            @Suppress("JavaDefaultMethodsNotOverriddenByDelegation")
+            private fun registerBackPressHandler(activity: Activity) {
+                val window = activity.window ?: return
+                val originalCallback = window.callback ?: return
+                if (originalCallback is IPvzToolBackPress) return
+                window.callback = object : Window.Callback by originalCallback,IPvzToolBackPress {
+                    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                        if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                            if (!SettingsDialogState.isUseExitConfirm) {
+                                return originalCallback.dispatchKeyEvent(event)
+                            }
+                            GeneralFloatingDialogController.showExitConfirm(activity) {
+                                activity.finish()
+                                Process.killProcess(Process.myPid())
+                                exitProcess(0)
+                            }
+                            return true
+                        }
+                        return originalCallback.dispatchKeyEvent(event)
+                    }
                 }
             }
         }
@@ -355,7 +349,7 @@ class Pvz2InitializeActivity : ComponentActivity() {
         try {
             val contentParent = activity.findViewById<FrameLayout>(android.R.id.content)
             val layoutRunnable = Runnable {
-                modifyGameLayoutWithPadding(activity)
+                GameDisplayFloatingController.modifyGameLayoutWithPadding(activity)
             }
 
             // ======================== 新增：配置变化监听 ========================
@@ -383,123 +377,16 @@ class Pvz2InitializeActivity : ComponentActivity() {
 
             // 初始修正
             contentParent.post {
-                modifyGameLayoutWithPadding(activity)
+                GameDisplayFloatingController.modifyGameLayoutWithPadding(activity)
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
-    }
-    /**
-     * 布局修正 + GL渲染刷新（小窗/分屏自动适配）
-     * - 未启用自定义画面：全屏（充满 contentParent）
-     * - 启用后按 displayMode 选择策略：fullscreen/ratio/size
-     */
-    private fun modifyGameLayoutWithPadding(activity: Activity) {
-        try {
-            val contentParent = activity.findViewById<FrameLayout>(android.R.id.content)
-            if (contentParent.isEmpty()) return
-
-            val originalGameRoot = contentParent.getChildAt(0) as ViewGroup
-            contentParent.setBackgroundResource(R.drawable.game_side_bg)
-
-            val windowWidth = contentParent.width
-            val windowHeight = contentParent.height
-
-            // 安全校验：尺寸为0时不执行，避免触发Surface销毁
-            if (windowWidth <= 0 || windowHeight <= 0) return
-
-            // ── 根据自定义画面设置选择布局策略 ──
-            val result: Array<Int> = if (!SettingsDialogState.isUseCustomGameDisplay) {
-                // 未启用自定义：全屏模式，游戏内容充满 contentParent
-                arrayOf(windowWidth, windowHeight, 0, 0, 0, 0)
-            } else when (SettingsDialogState.displayMode) {
-                "fullscreen" -> {
-                    arrayOf(windowWidth, windowHeight, 0, 0, 0, 0)
-                }
-                "ratio" -> {
-                    val ratio = SettingsDialogState.windowRatio.coerceAtLeast(0.1f)
-                    calcRatioAndPadding(windowWidth, windowHeight, ratio)
-                }
-                "size" -> {
-                    val density = activity.resources.displayMetrics.density
-                    val tw = (SettingsDialogState.windowWidth * density).toInt().coerceAtLeast(1)
-                    val th = (SettingsDialogState.windowHeight * density).toInt().coerceAtLeast(1)
-                    val pl = ((windowWidth - tw) / 2).coerceAtLeast(0)
-                    val pt = ((windowHeight - th) / 2).coerceAtLeast(0)
-                    arrayOf(tw, th, pl, pt, pl, pt)
-                }
-                else -> calcRatioAndPadding(windowWidth, windowHeight, 3.0f / 2.0f)
-            }
-            val targetWidth = result[0]
-            val targetHeight = result[1]
-            val pl = result[2]
-            val pt = result[3]
-            val pr = result[4]
-            val pb = result[5]
-
-            // 二次校验：目标GL尺寸不能为0
-            if (targetWidth <= 0 || targetHeight <= 0) return
-
-            // 只有Padding真正变化时才设置，避免无意义requestLayout
-            if (originalGameRoot.paddingLeft != pl
-                || originalGameRoot.paddingTop != pt
-                || originalGameRoot.paddingRight != pr
-                || originalGameRoot.paddingBottom != pb
-            ) {
-                originalGameRoot.setPadding(pl, pt, pr, pb)
-                originalGameRoot.requestLayout()
-            }
-
-            InitializePvz2.updateGlViewSize(targetWidth, targetHeight)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    /**
-     * 按指定比例计算目标尺寸 + 居中 Padding
-     * @return 依次返回: targetWidth, targetHeight, left, top, right, bottom
-     */
-    private fun calcRatioAndPadding(
-        screenWidth: Int,
-        screenHeight: Int,
-        targetRatio: Float
-    ): Array<Int> {
-        val screenRatio = screenWidth.toFloat() / screenHeight.toFloat()
-        val targetWidth: Int
-        val targetHeight: Int
-
-        if (screenRatio > targetRatio) {
-            targetHeight = screenHeight
-            targetWidth = (targetHeight * targetRatio).toInt()
-        } else {
-            targetWidth = screenWidth
-            targetHeight = (targetWidth / targetRatio).toInt()
-        }
-
-        val paddingLeft: Int
-        val paddingTop: Int
-        val paddingRight: Int
-        val paddingBottom: Int
-
-        if (screenRatio > targetRatio) {
-            val horizontalPadding = (screenWidth - targetWidth) / 2
-            paddingLeft = horizontalPadding
-            paddingRight = horizontalPadding
-            paddingTop = 0
-            paddingBottom = 0
-        } else {
-            val verticalPadding = (screenHeight - targetHeight) / 2
-            paddingTop = verticalPadding
-            paddingBottom = verticalPadding
-            paddingLeft = 0
-            paddingRight = 0
-        }
-
-        return arrayOf(targetWidth, targetHeight, paddingLeft, paddingTop, paddingRight, paddingBottom)
     }
 
     fun onResetDataClick() {
+//        FloatingBallController.showFloatingControl(this)
+//        return
         if (SettingsDialogState.isUseResetPacketDeepClearing) {
             InitializePvz2.config.getSmfDirectoryFile().deleteRecursively()
         }
@@ -567,3 +454,5 @@ class Pvz2InitializeActivity : ComponentActivity() {
         InitializePvz2.initBgMusicOn()
     }
 }
+
+interface IPvzToolBackPress

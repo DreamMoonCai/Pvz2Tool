@@ -1,12 +1,25 @@
 import android.Manifest
 import android.annotation.SuppressLint
-import android.content.pm.PackageManager
+import android.content.Context
 import android.os.Build
 import android.telephony.TelephonyManager
+import android.view.Display
+import android.view.WindowManager
 import androidx.annotation.RequiresPermission
-import androidx.core.app.ActivityCompat
+import androidx.compose.ui.util.fastMaxBy
+import com.highcapable.yukireflection.factory.allFields
+import com.highcapable.yukireflection.factory.constructor
+import com.highcapable.yukireflection.factory.field
+import com.highcapable.yukireflection.factory.method
+import com.highcapable.yukireflection.factory.toClass
+import com.highcapable.yukireflection.type.java.IntType
+import io.github.dreammooncai.pvz2tool.ui.main.SettingsDialogState
 import io.github.dreammooncai.util.ContextUtil
+import io.github.dreammooncai.yukireflection.factory.returnType
+import org.lsposed.hiddenapibypass.HiddenApiBypass
+import org.lsposed.hiddenapibypass.LSPass
 import java.io.File
+import kotlin.random.Random
 
 @Suppress("DEPRECATION")
 @SuppressLint("HardwareIds")
@@ -18,6 +31,30 @@ object DreamRootPath {
 
     @JvmStatic
     val rootPath: String by lazy { rootFile.absolutePath }
+
+    private var windowDisplay: CustomDisplay? = null
+
+    @JvmStatic
+    fun getDefaultDisplay(windowManager: WindowManager): Display {
+        val df = windowManager.defaultDisplay
+        val windowDisplay = windowDisplay
+        var customWidth = SettingsDialogState.lastScreenSize[0]
+        var customHeight = SettingsDialogState.lastScreenSize[1]
+        if (customWidth == 0 || customHeight == 0) {
+            val result = SettingsDialogState.calcRatioAndPadding(df.width,df.height)
+            customWidth = result[0]
+            customHeight = result[1]
+        }
+        return if (windowDisplay != null) {
+            windowDisplay.updateDisplay(customWidth,customHeight)
+            windowDisplay.display
+        } else runCatching {
+            val windowDisplay = CustomDisplay(df)
+            this.windowDisplay = windowDisplay
+            windowDisplay.updateDisplay(customWidth,customHeight)
+            windowDisplay.display
+        }.getOrDefault(df)
+    }
 
     @JvmStatic
     @RequiresPermission("android.permission.READ_PRIVILEGED_PHONE_STATE")
@@ -276,4 +313,122 @@ object DreamRootPath {
             null
         }
     }
+
+    @JvmStatic
+    @JvmOverloads
+    fun getIMSIBySlot(thiz: Any,context: Context = DreamRootPath.context,slotID: Int = 0): String? {
+        return try {
+            "com.popcap.SexyAppFramework.AndroidGameApp".toClass().method { name = "getIMSIBySlot" }.get(thiz).string(context,slotID)
+        } catch (_: Exception) {
+            null
+        }
+    }
+}
+
+private class CustomDisplay(
+    private val originalDisplay: Display
+) {
+    init {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try {
+                LSPass.setHiddenApiExemptions("Landroid/view/")
+            } catch (_: Exception) {
+                HiddenApiBypass.setHiddenApiExemptions("Landroid/view/")
+            }
+        }
+    }
+
+    private val displayClass = Display::class.java
+    private val originalDisplayInfo = displayClass.field { name = "mDisplayInfo" }.get(originalDisplay).any()
+    private val displayInfoClass = originalDisplayInfo?.javaClass ?: error("not impl")
+
+    // 创建DisplayInfo的副本(因为原始对象可能被系统共享)
+    private val newDisplayInfo = displayInfoClass.constructor().get().call()?.also { newDisplayInfo ->
+        // 复制所有字段到新对象
+        displayInfoClass.allFields { _, field ->
+            field.set(newDisplayInfo, field.get(originalDisplayInfo))
+        }
+    }
+
+    val display by lazy {
+        val constructor = displayClass.constructor().giveAll().fastMaxBy { it.parameterTypes.size } ?: return@lazy originalDisplay
+        constructor.isAccessible = true
+        val param = constructor.parameterTypes.map {
+            if (it == IntType) return@map Random.nextInt()
+            if (it == displayInfoClass) return@map newDisplayInfo
+            displayClass.field { type = it }.get(originalDisplay).any()
+        }
+
+        // 实例化新的Display对象
+        val customDisplay = constructor.newInstance(
+            *param.toTypedArray()
+        ) as Display
+
+        runCatching { displayClass.field { name = "mResources" }.get(customDisplay).set(null) }
+        runCatching {
+            displayClass.field { name = "mDisplayAdjustments" }.let { adj ->
+                adj.get(customDisplay).set(adj.give()?.returnType?.constructor { emptyParam() }?.get()?.call())
+            }
+        }
+        customDisplay
+    }
+
+    fun updateDisplay(
+        customWidth: Int,
+        customHeight: Int,
+        calculateNominalSizes: Boolean = true
+    ) {
+        // 设置自定义宽高
+        // logicalWidth/logicalHeight: 逻辑屏幕尺寸(用于getRealSize/getRealMetrics)
+        setDisplayInfoField("logicalWidth",customWidth)
+        setDisplayInfoField("logicalHeight",customHeight)
+
+        // appWidth/appHeight: 应用可用尺寸(用于getSize/getMetrics/getWidth/getHeight)
+        setDisplayInfoField("appWidth",customWidth)
+        setDisplayInfoField("appHeight",customHeight)
+
+        // ========== 新增：动态计算标称尺寸范围 ==========
+        if (calculateNominalSizes) {
+            // 获取原始尺寸比例
+            val originalLogicalWidth = getDisplayInfoField<Int>("logicalWidth") ?: 0
+            val originalLogicalHeight = getDisplayInfoField<Int>("logicalHeight") ?: 0
+
+            if (originalLogicalWidth > 0 && originalLogicalHeight > 0) {
+                // 计算缩放比例
+                val widthScale = customWidth.toFloat() / originalLogicalWidth.toFloat()
+                val heightScale = customHeight.toFloat() / originalLogicalHeight.toFloat()
+
+                // 获取原始标称尺寸并按比例缩放
+                val originalSmallestWidth = getDisplayInfoField<Int>("smallestNominalAppWidth") ?: 0
+                setDisplayInfoField("smallestNominalAppWidth",(originalSmallestWidth * widthScale).toInt())
+
+                val originalSmallestHeight = getDisplayInfoField<Int>("smallestNominalAppHeight") ?: 0
+                setDisplayInfoField("smallestNominalAppHeight",(originalSmallestHeight * heightScale).toInt())
+
+                val originalLargestWidth = getDisplayInfoField<Int>("largestNominalAppWidth") ?: 0
+                setDisplayInfoField("largestNominalAppWidth",(originalLargestWidth * widthScale).toInt())
+
+                val originalLargestHeight = getDisplayInfoField<Int>("largestNominalAppHeight") ?: 0
+                setDisplayInfoField("largestNominalAppHeight",(originalLargestHeight * heightScale).toInt())
+
+            } else {
+                // 无法获取原始尺寸时，直接使用自定义尺寸
+                setDisplayInfoField("smallestNominalAppWidth",customWidth)
+                setDisplayInfoField("smallestNominalAppHeight",customHeight)
+                setDisplayInfoField("largestNominalAppWidth",customWidth)
+                setDisplayInfoField("largestNominalAppHeight",customHeight)
+            }
+        } else {
+            // 强制所有标称尺寸与自定义尺寸一致
+            setDisplayInfoField("smallestNominalAppWidth",customWidth)
+            setDisplayInfoField("smallestNominalAppHeight",customHeight)
+            setDisplayInfoField("largestNominalAppWidth",customWidth)
+            setDisplayInfoField("largestNominalAppHeight",customHeight)
+        }
+    }
+
+    private fun setDisplayInfoField(name: String,value: Any?) = runCatching { displayInfoClass.field { this.name = name }.get(newDisplayInfo).set(value) }
+
+    private fun <T> getDisplayInfoField(name: String) = runCatching { displayInfoClass.field { this.name = name }.get(originalDisplayInfo).cast<T>() }.getOrNull()
+
 }

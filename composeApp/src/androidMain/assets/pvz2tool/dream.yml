@@ -1883,7 +1883,7 @@ ui:
     isTutorialDefaultIcon: true # 是否使用默认图标
     resetData: "重置数据包"
     isResetDataDefaultIcon: true # 是否使用默认图标
-    disconnectTheNetworkAndStart: "断网启动"
+    showFloatingWindow: "工具悬窗"
     confirmVersion: "选定版本"
 
   extractor:
@@ -1977,18 +1977,33 @@ ui:
     # 自定义游戏画面功能
     customGameDisplay: "自定义游戏画面"
     customGameDisplayTitle: "游戏画面设置"
+    # 游戏画面悬浮窗"应用"按钮文字
+    applyButtonText: "应 用"
+    # 是否开启悬浮窗
+    showFloatingWindow: "是否开启悬浮窗"
+    isShowFloatingWindow: true
+    # 退出游戏二次确认
+    exitConfirm: "退出游戏二次确认"
+    exitConfirmTitle: "退出游戏"
+    exitConfirmMessage: "确定要退出游戏吗？"
+    isUseExitConfirm: true
+    exitConfirmButtonText: "确认退出"
     # 游戏画面子项默认值
     gameDisplay:
-      isUseCustomGameDisplay: false       # 总开关默认关闭
+      isUseCustomGameDisplay: true       # 总开关默认关闭
       allowRotation: "允许随意翻转界面（支持竖屏）"
       isAllowRotation: false              # 默认不允许竖屏
       customWindowSize: "自定义窗口宽高"
       customWindowRatio: "自定义窗口比例"
       fullscreen: "全屏"
       displayMode: "ratio"           # 默认等比例（fullscreen / ratio / size）
-      windowWidth: 1280                   # displayMode=size 时的默认宽度（dp）
-      windowHeight: 720                   # displayMode=size 时的默认高度（dp）
+      windowWidth: 0                      # displayMode=size 时的默认宽度（px，0 = 屏幕实际宽度）
+      windowHeight: 0                     # displayMode=size 时的默认高度（px，0 = 屏幕实际高度）
       windowRatio: 1.5                    # displayMode=ratio 时的默认宽高比（1.5 = 3:2）
+      # 比例/尺寸输入框提示文字
+      ratioHint: "宽高比（支持 1.5 或 3:2）"
+      widthHint: "宽度（dp）"
+      heightHint: "高度（dp）"
 
   # JS 日志面板配置
   log:
@@ -2038,6 +2053,10 @@ ui:
     cgVideoLoadTimeout: 5000
     # CG 开场视频超时或报错是显示的海报图片
     cgVideoPoster: "bg_main.jpg"
+    # ── 侧边背景图（相对于 assets/pvz2tool/images/）──
+    sideBgImage: "game_side_bg.jpg"
+    # ── 悬浮球图标（相对于 assets/pvz2tool/images/）──
+    floatingBallIcon: "ic_floating_dave.png"
 
   # ── 音效文件名映射（相对于 assets/pvz2tool/sound/）──
   # 注意：支持 URL（http:// 或 https://），检测到 URL 则直接使用

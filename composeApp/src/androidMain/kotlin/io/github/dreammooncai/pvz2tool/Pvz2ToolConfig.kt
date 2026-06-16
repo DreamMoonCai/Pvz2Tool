@@ -364,7 +364,7 @@ data class Pvz2ToolConfigUIButton(
     val isTutorialDefaultIcon: Boolean = true,
     val resetData: String,
     val isResetDataDefaultIcon: Boolean = true,
-    val disconnectTheNetworkAndStart: String = "断网启动",
+    val showFloatingWindow: String = "工具悬窗",
     val confirmVersion: String
 )
 
@@ -463,12 +463,28 @@ data class Pvz2ToolConfigUISettings(
     val resetPacketDeepClearing: String = "重置数据包时删除smf目录",
     val showNotUpdate: String = "进入游戏时未检测到更新也进行弹窗",
     val importSmfFile: String = "导入SMF文件",
+    /** 退出游戏二次确认文字标签 */
+    val exitConfirm: String = "退出游戏二次确认",
+    /** 退出确认弹窗标题 */
+    val exitConfirmTitle: String = "退出游戏",
+    /** 退出确认弹窗内容 */
+    val exitConfirmMessage: String = "确定要退出游戏吗？",
     /** 是否启用自定义游戏画面设置的文字标签 */
     val customGameDisplay: String = "自定义游戏画面",
     /** 自定义游戏画面子页面标题 */
     val customGameDisplayTitle: String = "游戏画面设置",
     /** 游戏画面配置默认值 */
     val gameDisplay: Pvz2ToolConfigGameDisplay = Pvz2ToolConfigGameDisplay(),
+    /** 游戏画面悬浮窗"应用"按钮文字 */
+    val applyButtonText: String = "应 用",
+    /** 是否开启悬浮窗开关标签 */
+    val showFloatingWindow: String = "是否开启悬浮窗",
+    /** 是否默认开启悬浮窗 */
+    val isShowFloatingWindow: Boolean = true,
+    /** 退出游戏二次确认默认值 */
+    val isUseExitConfirm: Boolean = true,
+    /** 退出确认按钮文字 */
+    val exitConfirmButtonText: String = "确认退出",
 )
 
 /**
@@ -478,7 +494,7 @@ data class Pvz2ToolConfigUISettings(
 @Serializable
 data class Pvz2ToolConfigGameDisplay(
     /** 是否默认启用自定义游戏画面（总开关）*/
-    val isUseCustomGameDisplay: Boolean = false,
+    val isUseCustomGameDisplay: Boolean = true,
     /** 允许随意翻转界面（支持竖屏）的文字标签 */
     val allowRotation: String = "允许随意翻转界面（支持竖屏）",
     /** 是否默认允许随意翻转 */
@@ -491,12 +507,18 @@ data class Pvz2ToolConfigGameDisplay(
     val fullscreen: String = "全屏",
     /** 显示模式：fullscreen / ratio / size，默认 fullscreen */
     val displayMode: String = "ratio",
-    /** displayMode=size 时的窗口宽度（dp）*/
-    val windowWidth: Int = 1280,
-    /** displayMode=size 时的窗口高度（dp）*/
-    val windowHeight: Int = 720,
+    /** displayMode=size 时的窗口宽度（px，0 = 使用屏幕实际宽度）*/
+    val windowWidth: Int = 0,
+    /** displayMode=size 时的窗口高度（px，0 = 使用屏幕实际高度）*/
+    val windowHeight: Int = 0,
     /** displayMode=ratio 时的宽高比（宽/高），例如 1.5 表示 3:2 */
     val windowRatio: Float = 1.5f,
+    /** 比例输入框提示文字 */
+    val ratioHint: String = "宽高比（支持 1.5 或 3:2）",
+    /** 宽度输入框标签 */
+    val widthHint: String = "宽度（dp）",
+    /** 高度输入框标签 */
+    val heightHint: String = "高度（dp）",
 )
 
 // 4. 【JS 日志面板】配置
@@ -573,6 +595,10 @@ data class Pvz2ToolConfigUIAssets(
     val cgVideoLoadTimeout: Long = 5000L,
     /** CG 视频失败后的海报图片（相对于 assets/pvz2tool/video/），为空则不显示海报直接跳过 */
     val cgVideoPoster: String? = null,
+    /** 侧边背景图文件名（相对于 assets/pvz2tool/images/） */
+    val sideBgImage: String = "game_side_bg.jpg",
+    /** 悬浮球图标文件名（相对于 assets/pvz2tool/images/） */
+    val floatingBallIcon: String = "ic_floating_dave.png",
 ) {
 
     /**

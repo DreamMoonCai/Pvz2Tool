@@ -4,11 +4,7 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,7 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -34,7 +29,6 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.documentfile.provider.DocumentFile
 import io.github.dreammooncai.manager.FilePickerManager
 import io.github.dreammooncai.pvz2tool.InitializePvz2
-import io.github.dreammooncai.pvz2tool.Pvz2ToolConfig
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzExtractorDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.rememberAssetExtractor
@@ -48,7 +42,6 @@ import io.github.dreammooncai.pvz2tool.ui.popup.PvzPopupText
 import io.github.dreammooncai.pvz2tool.ui.popup.SubPopup
 import io.github.dreammooncai.pvz2tool.view.PvzRichText
 import io.github.dreammooncai.pvz2tool.view.PvzTextStyle
-import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -153,6 +146,12 @@ fun PvzSettingsDialog(filePickerManager: FilePickerManager? = null) {
                             selected = SettingsDialogState.isUseShowNotUpdate,
                             onCheckedChange = { SettingsDialogState.toggleShowNotUpdate() }
                         )
+                        // ── 退出游戏二次确认 ──
+                        PvzPopupItemSwitch(
+                            title = settingsConfig.exitConfirm,
+                            selected = SettingsDialogState.isUseExitConfirm,
+                            onCheckedChange = { SettingsDialogState.toggleExitConfirm() }
+                        )
                         // ── 自定义游戏画面：总开关 ──
                         PvzPopupItemSwitch(
                             title = settingsConfig.customGameDisplay,
@@ -170,11 +169,13 @@ fun PvzSettingsDialog(filePickerManager: FilePickerManager? = null) {
 
                 is SubPopup -> {
                     if (currentRoute.title == settingsConfig.customGameDisplayTitle)
-                        GameDisplaySettingsPage(
+                        PvzPopupContent(
                             title = currentRoute.title,
-                            gameDisplayConfig = gameDisplayConfig,
+                            showBackButton = true,
                             onBack = { navigator.pop() }
-                        )
+                        ) {
+                            GameDisplaySettingsContent()
+                        }
                 }
             }
         }
@@ -186,116 +187,130 @@ fun PvzSettingsDialog(filePickerManager: FilePickerManager? = null) {
  * 包含：允许随意翻转、显示模式（全屏 / 自定义宽高 / 自定义比例）
  */
 @Composable
-private fun GameDisplaySettingsPage(
-    title: String,
-    gameDisplayConfig: io.github.dreammooncai.pvz2tool.Pvz2ToolConfigGameDisplay,
-    onBack: () -> Unit
-) {
-    PvzPopupContent(
-        title = title,
-        showBackButton = true,
-        onBack = onBack
-    ) {
-        // ── 1. 允许随意翻转界面（支持竖屏）──
-        PvzPopupItemSwitch(
-            title = gameDisplayConfig.allowRotation,
-            selected = SettingsDialogState.isAllowRotation,
-            onCheckedChange = { SettingsDialogState.toggleAllowRotation() }
-        )
+fun GameDisplaySettingsContent() {
+    val context = LocalContext.current
+    val gameDisplayConfig = InitializePvz2.config.ui.settings.gameDisplay
+    // ── 1. 允许随意翻转界面（支持竖屏）──
+    PvzPopupItemSwitch(
+        title = gameDisplayConfig.allowRotation,
+        selected = SettingsDialogState.isAllowRotation,
+        onCheckedChange = { SettingsDialogState.toggleAllowRotation() }
+    )
 
-        // ── 2. 显示模式：三选一 ──
-        // 全屏
-        PvzPopupItemSwitch(
-            title = gameDisplayConfig.fullscreen,
-            selected = SettingsDialogState.displayMode == "fullscreen",
-            onCheckedChange = { SettingsDialogState.updateDisplayMode("fullscreen") }
-        )
+    // ── 2. 显示模式：三选一 ──
+    // 全屏
+    PvzPopupItemSwitch(
+        title = gameDisplayConfig.fullscreen,
+        selected = SettingsDialogState.displayMode == "fullscreen",
+        onCheckedChange = { SettingsDialogState.updateDisplayMode("fullscreen") }
+    )
 
-        // 自定义比例
-        PvzPopupItemSwitch(
-            title = gameDisplayConfig.customWindowRatio,
-            selected = SettingsDialogState.displayMode == "ratio",
-            onCheckedChange = { SettingsDialogState.updateDisplayMode("ratio") }
-        )
+    // 自定义比例
+    PvzPopupItemSwitch(
+        title = gameDisplayConfig.customWindowRatio,
+        selected = SettingsDialogState.displayMode == "ratio",
+        onCheckedChange = { SettingsDialogState.updateDisplayMode("ratio") }
+    )
 
-        // 比例值输入（仅 ratio 模式显示）
-        if (SettingsDialogState.displayMode == "ratio") {
-            PvzPopupRow {
-                PvzRichText(
-                    "宽高比（支持 1.5 或 3:2）",
-                    defaultStyle = PvzTextStyle(Color(0xFF423F00), null),
-                    fontSize = 18.sp,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(Modifier.width(8.dp))
-                var ratioText by remember(SettingsDialogState.windowRatio) {
-                    mutableStateOf(formatRatio(SettingsDialogState.windowRatio))
-                }
-                GameDisplayTextField(
-                    value = ratioText,
-                    onValueChange = { text ->
-                        ratioText = text
-                        parseRatioText(text)?.let { v ->
-                            if (v > 0f) SettingsDialogState.updateWindowRatio(v)
-                        }
-                    },
-                    keyboardType = KeyboardType.Text,
-                    modifier = Modifier.width(90.dp)
-                )
+    // 比例值输入（仅 ratio 模式显示）
+    if (SettingsDialogState.displayMode == "ratio") {
+        PvzPopupRow {
+            PvzRichText(
+                gameDisplayConfig.ratioHint,
+                defaultStyle = PvzTextStyle(Color(0xFF423F00), null),
+                fontSize = 18.sp,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(8.dp))
+            var ratioText by remember(SettingsDialogState.windowRatio) {
+                mutableStateOf(formatRatio(SettingsDialogState.windowRatio))
             }
+            GameDisplayTextField(
+                value = ratioText,
+                onValueChange = { text ->
+                    ratioText = text
+                    parseRatioText(text)?.let { v ->
+                        if (v > 0f) SettingsDialogState.updateWindowRatio(v)
+                    }
+                },
+                keyboardType = KeyboardType.Text,
+                modifier = Modifier.width(90.dp)
+            )
         }
+    }
 
-        // 自定义宽高
-        PvzPopupItemSwitch(
-            title = gameDisplayConfig.customWindowSize,
-            selected = SettingsDialogState.displayMode == "size",
-            onCheckedChange = { SettingsDialogState.updateDisplayMode("size") }
-        )
+    // 自定义宽高
+    PvzPopupItemSwitch(
+        title = gameDisplayConfig.customWindowSize,
+        selected = SettingsDialogState.displayMode == "size",
+        onCheckedChange = { SettingsDialogState.updateDisplayMode("size") }
+    )
 
-        // 宽高值输入（仅 size 模式显示）
-        if (SettingsDialogState.displayMode == "size") {
-            PvzPopupRow {
-                PvzRichText(
-                    "宽度（dp）",
-                    defaultStyle = PvzTextStyle(Color(0xFF423F00), null),
-                    fontSize = 18.sp,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(Modifier.width(8.dp))
-                var widthText by remember { mutableStateOf(SettingsDialogState.windowWidth.toString()) }
-                GameDisplayTextField(
-                    value = widthText,
-                    onValueChange = { text ->
-                        widthText = text
-                        text.toIntOrNull()?.let { v ->
-                            if (v > 0) SettingsDialogState.updateWindowWidth(v)
-                        }
-                    },
-                    keyboardType = KeyboardType.Number,
-                    modifier = Modifier.width(90.dp)
+    // 宽高值输入（仅 size 模式显示）
+    if (SettingsDialogState.displayMode == "size") {
+        val density = context.resources.displayMetrics.density
+        val maxWidthPx = context.resources.displayMetrics.widthPixels
+        val maxHeightPx = context.resources.displayMetrics.heightPixels
+
+        PvzPopupRow {
+            PvzRichText(
+                gameDisplayConfig.widthHint,
+                defaultStyle = PvzTextStyle(Color(0xFF423F00), null),
+                fontSize = 18.sp,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(8.dp))
+            var widthText by remember {
+                mutableStateOf(
+                    SettingsDialogState.windowWidth.let { if (it > 0) it.toString() else maxWidthPx.toString() }
                 )
             }
-            PvzPopupRow {
-                PvzRichText(
-                    "高度（dp）",
-                    defaultStyle = PvzTextStyle(Color(0xFF423F00), null),
-                    fontSize = 18.sp,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(Modifier.width(8.dp))
-                var heightText by remember { mutableStateOf(SettingsDialogState.windowHeight.toString()) }
-                GameDisplayTextField(
-                    value = heightText,
-                    onValueChange = { text ->
-                        heightText = text
-                        text.toIntOrNull()?.let { v ->
-                            if (v > 0) SettingsDialogState.updateWindowHeight(v)
+            GameDisplayTextField(
+                value = widthText,
+                onValueChange = { text ->
+                    widthText = text
+                    text.toIntOrNull()?.let { v ->
+                        if (v > maxWidthPx) {
+                            widthText = maxWidthPx.toString()
+                            SettingsDialogState.updateWindowWidth(maxWidthPx)
+                        } else if (v > 0) {
+                            SettingsDialogState.updateWindowWidth(v)
                         }
-                    },
-                    keyboardType = KeyboardType.Number,
-                    modifier = Modifier.width(90.dp)
+                    }
+                },
+                keyboardType = KeyboardType.Number,
+                modifier = Modifier.width(90.dp)
+            )
+        }
+        PvzPopupRow {
+            PvzRichText(
+                gameDisplayConfig.heightHint,
+                defaultStyle = PvzTextStyle(Color(0xFF423F00), null),
+                fontSize = 18.sp,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(8.dp))
+            var heightText by remember {
+                mutableStateOf(
+                    SettingsDialogState.windowHeight.let { if (it > 0) it.toString() else maxHeightPx.toString() }
                 )
             }
+            GameDisplayTextField(
+                value = heightText,
+                onValueChange = { text ->
+                    heightText = text
+                    text.toIntOrNull()?.let { v ->
+                        if (v > maxHeightPx) {
+                            heightText = maxHeightPx.toString()
+                            SettingsDialogState.updateWindowHeight(maxHeightPx)
+                        } else if (v > 0) {
+                            SettingsDialogState.updateWindowHeight(v)
+                        }
+                    }
+                },
+                keyboardType = KeyboardType.Number,
+                modifier = Modifier.width(90.dp)
+            )
         }
     }
 }
