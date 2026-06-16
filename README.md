@@ -610,6 +610,7 @@ val jsContent = section.readJs(version)
 ```
 
 > **包名替换**：上述 XML 中所有 `游戏包名` 字符串需统一替换为目标游戏的实际包名（如 `com.ea.game.pvzfree_row`）。
+> **更新处理**：更新时重复上述步骤，或只执行部分已修改的步骤。
 
 #### 4.3 检查 targetSdkVersion
 
