@@ -494,11 +494,11 @@ val jsContent = section.readJs(version)
 </provider>
 
 <activity
-    android:theme="@style/Theme.SexyApp"
+    android:theme="@app66:style/Theme.DreamPvzApp"
     android:label="@string/app_label"
     android:name="io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity"
     android:screenOrientation="sensorLandscape"
-    android:configChanges="keyboardHidden|orientation"
+    android:configChanges="density|keyboardHidden|layoutDirection|navigation|orientation|screenLayout|screenSize|smallestScreenSize"
     android:windowSoftInputMode="stateAlwaysHidden">
     <intent-filter>
         <action android:name="android.intent.action.VIEW" />
