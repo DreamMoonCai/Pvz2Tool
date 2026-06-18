@@ -593,7 +593,7 @@ settings:
   - **自动化处理**：组件会自动扫描文本中的 `icon` 标签，并尝试从 `${Pvz2ToolConfig.PATH_NAME}/images/文件名` 加载图片。
   - **视觉对齐**：图标大小会随字体大小（fontSize）自动缩放（约 1.2 倍），并保持垂直居中。
   - **示例**：
-     - `消耗 {{icon|height=18:sun.png}} 50 点阳光`（默认宽度，高度 18dp）。
+     - `消耗 {{icon:sun.png}} 50 点阳光`（默认宽度，高度 18dp）。
      - `{{icon|width=32|height=32:coin.png}}`（32dp 正方形图标）。
 
 - **JS 表达式 (JS)**：
