@@ -1,14 +1,12 @@
 package io.github.dreammooncai.pvz2tool.controller
 
 import android.app.Activity
-import android.net.VpnService
 import io.github.dreammooncai.pvz2tool.view.AsyncImageFromAssets
 import android.graphics.Rect
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -465,28 +463,22 @@ object FloatingBallController {
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isVpn) {
-                        PvzGreenButton("恢复网络", modifier = Modifier.size(150.dp, 44.dp)) {
-                            LocalVpnService.stopVpn(InitializePvz2.context)
-                        }
-                    } else {
-                        val activity = LocalActivity.current ?: return@Box
-                        PvzGreenButton("断开网络", modifier = Modifier.size(150.dp, 44.dp)) {
-                            val intent = VpnService.prepare(activity)
-                            if (intent != null) {
-                                activity.startActivity(intent)
-                                Toast.makeText(activity, "请在弹窗中允许VPN权限以开启断网功能.", Toast.LENGTH_SHORT).show()
-                            } else {
+                if (LocalVpnService.prepareVpn(context) == null) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(), contentAlignment = Alignment.Center
+                    ) {
+                        if (isVpn) {
+                            PvzGreenButton("恢复网络", modifier = Modifier.size(150.dp, 44.dp)) {
+                                LocalVpnService.stopVpn(InitializePvz2.context)
+                            }
+                        } else {
+                            PvzGreenButton("断开网络", modifier = Modifier.size(150.dp, 44.dp)) {
                                 runCatching {
-                                    LocalVpnService.startVpn(activity)
+                                    LocalVpnService.startVpn(InitializePvz2.context)
                                 }.onFailure {
-                                    LocalVpnService.stopVpn(activity)
+                                    LocalVpnService.stopVpn(InitializePvz2.context)
                                 }
                             }
                         }

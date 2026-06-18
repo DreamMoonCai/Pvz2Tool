@@ -585,8 +585,7 @@ settings:
   - 示例：`{{link-gold-shadow|https://pvz2.com:前往官网}}`。
 
 - **行内图标 (Icon)**：
-  - **格式 1（推荐）**：`{{icon|width=宽度|height=高度:文件名}}`（参数放在冒号前面，`width`/`height` 可选，单位 dp）。
-  - **格式 2（兼容）**：`{{icon:文件名|width=宽度|height=高度}}`（旧格式，参数放在冒号后面）。
+  - **格式**：`{{icon|width=宽度|height=高度:文件名}}`（`width`/`height` 可选，单位 dp）。
   - **参数**：
      - `文件名`：`pvz2tool/images/` 下的图片文件名。
      - `width=宽度`（可选）：图片宽度，单位 dp，默认 `fontSize * 1.2`。
@@ -594,22 +593,21 @@ settings:
   - **自动化处理**：组件会自动扫描文本中的 `icon` 标签，并尝试从 `${Pvz2ToolConfig.PATH_NAME}/images/文件名` 加载图片。
   - **视觉对齐**：图标大小会随字体大小（fontSize）自动缩放（约 1.2 倍），并保持垂直居中。
   - **示例**：
-     - `消耗 {{icon:sun.png}} 50 点阳光`（默认尺寸，兼容格式）。
-     - `{{icon|width=32|height=32:coin.png}}`（32dp 正方形图标，推荐格式）。
-     - `{{icon:coin.png|width=32|height=32}}`（32dp 正方形图标，兼容格式）。
+     - `消耗 {{icon|height=18:sun.png}} 50 点阳光`（默认宽度，高度 18dp）。
+     - `{{icon|width=32|height=32:coin.png}}`（32dp 正方形图标）。
 
 - **JS 表达式 (JS)**：
   - **作用**：执行一段 JavaScript 表达式，并将结果插入到文本中。
   - **格式**：`{{js:表达式}}`/`{{js:JS路径}}`。
   - **参数**：
-    - `JS路径`：`pvz2tool/js/` 下的图片文件名。
+    - `JS路径`：`pvz2tool/js/` 下的脚本文件名。
   - **递归解析**：JS 表达式的返回值如果包含 `{{...}}` 复合文本标签，会自动递归解析（支持颜色标签、链接标签、图标标签、嵌套 `{{js:...}}` 标签等）。
   - **示例**：
     - `{{js:test.js}}` → 执行`pvz2tool/js/test.js`并显示返回结果。
     - `{{js:1 + 2}}` → 显示为 `3`。
     - `{{js:new Date().getFullYear()}}` → 显示为当前年份。
     - `{{js: '状态：' + (hp > 0 ? '{{green:存活}}' : '{{red:阵亡}}') }}` → JS 返回的字符串中含有 `{{green:...}}` / `{{red:...}}` 标签，会被继续解析为对应颜色的文本。
-    - `{{js: '道具：' + itemIcon }}`（其中 `itemIcon = '{{icon:sword.png}}'`）→ JS 返回的字符串中含有 `{{icon:...}}` 标签，会被继续解析并渲染为图标。
+    - `{{js: '道具：' + itemIcon }}`（其中 `itemIcon = '{{icon|height=18:sword.png}}'`）→ JS 返回的字符串中含有 `{{icon|...}}` 标签，会被继续解析并渲染为图标。
 
 ---
 

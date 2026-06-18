@@ -222,57 +222,31 @@ private val DefaultPvzTagStyles = mapOf(
 
 /**
  * 解析图标标签内容，提取路径、宽度、高度
- * 支持两种格式：
- * 1. 新格式（参数在冒号前）：width=80|height=80:auto_collect.png
- * 2. 旧格式（参数在路径后）：auto_collect.png|width=80|height=80
- * 3. 无参数：auto_collect.png
+ * 格式：{{icon|width=80|height=80:auto_collect.png}}
  */
 private fun parseIconTagContent(content: String, fontSize: TextUnit): Triple<String, TextUnit, TextUnit> {
-    // 判断是否为新格式：包含 "|" 且包含 ":" 且 ":" 在最后一个 "|" 之后
-    // 新格式特征：params:path，即 ":" 前面是参数（含 "="）
+    // 格式：width=80|height=80:auto_collect.png
     val lastColonIndex = content.lastIndexOf(":")
-    val hasParamsBeforeColon = lastColonIndex > 0 &&
-            content.substring(0, lastColonIndex).contains("=")
-
-    if (hasParamsBeforeColon) {
-        // 新格式：width=80|height=80:auto_collect.png
-        val paramsPart = content.substring(0, lastColonIndex)
-        val path = content.substring(lastColonIndex + 1)
-        var width: TextUnit? = null
-        var height: TextUnit? = null
-        paramsPart.split("|").forEach { part ->
-            val trimmed = part.trim()
-            if (trimmed.startsWith("width=")) {
-                width = trimmed.substringAfter("=").toFloatOrNull()?.sp
-            } else if (trimmed.startsWith("height=")) {
-                height = trimmed.substringAfter("=").toFloatOrNull()?.sp
-            }
+    val paramsPart = content.substring(0, lastColonIndex)
+    val path = content.substring(lastColonIndex + 1)
+    var width: TextUnit? = null
+    var height: TextUnit? = null
+    paramsPart.split("|").forEach { part ->
+        val trimmed = part.trim()
+        if (trimmed.startsWith("width=")) {
+            width = trimmed.substringAfter("=").toFloatOrNull()?.sp
+        } else if (trimmed.startsWith("height=")) {
+            height = trimmed.substringAfter("=").toFloatOrNull()?.sp
         }
-        return Triple(path, width ?: (fontSize * 1.2f), height ?: (fontSize * 1.2f))
-    } else {
-        // 旧格式或无参数：auto_collect.png|width=80|height=80 或 auto_collect.png
-        val parts = content.split("|").map { it.trim() }
-        val path = parts[0]
-        var width: TextUnit? = null
-        var height: TextUnit? = null
-        for (part in parts.drop(1)) {
-            if (part.startsWith("width=")) {
-                width = part.substringAfter("=").toFloatOrNull()?.sp
-            } else if (part.startsWith("height=")) {
-                height = part.substringAfter("=").toFloatOrNull()?.sp
-            }
-        }
-        return Triple(path, width ?: (fontSize * 1.2f), height ?: (fontSize * 1.2f))
     }
+    return Triple(path, width ?: (fontSize * 1.2f), height ?: (fontSize * 1.2f))
 }
 
 /**
  * 从原始文本和 JS 缓存结果中解析所有图标标签
- * 支持两种格式：
- * 1. 新格式（参数在冒号前）：{{icon|width=80|height=80:auto_collect.png}}
- * 2. 旧格式（参数在路径后）：{{icon:auto_collect.png|width=80|height=80}} 或 {{icon:auto_collect.png}}
+ * 格式：{{icon|width=80|height=80:auto_collect.png}}
  */
-private val iconRegex = "\\{\\{icon(:|\\|)([^}]+)\\}\\}".toRegex()
+private val iconRegex = "\\{\\{icon\\|([^}]+)\\}\\}".toRegex()
 
 private fun parseIconTags(text: String, jsCache: Map<String, String>, fontSize: TextUnit): List<IconTag> {
     val tags = mutableListOf<IconTag>()
@@ -280,7 +254,7 @@ private fun parseIconTags(text: String, jsCache: Map<String, String>, fontSize: 
 
     // 从原始 text 中解析图标标签
     iconRegex.findAll(text).forEach { match ->
-        val content = match.groupValues[2]
+        val content = match.groupValues[1]
         val (path, width, height) = parseIconTagContent(content, fontSize)
         tags.add(
             IconTag(
@@ -297,7 +271,7 @@ private fun parseIconTags(text: String, jsCache: Map<String, String>, fontSize: 
     // 从 JS 返回结果中解析图标标签
     jsCache.values.forEach { result ->
         iconRegex.findAll(result).forEach { iconMatch ->
-            val content = iconMatch.groupValues[2]
+            val content = iconMatch.groupValues[1]
             val (iconPath, iconWidth, iconHeight) = parseIconTagContent(content, fontSize)
             val fullMatch = iconMatch.value
             // 去重：如果 fullMatch 已存在则跳过
@@ -492,14 +466,6 @@ private fun parseRichText(
                 } else {
                     builder.append("{{$inner}}")
                 }
-            } else if (tagName == "icon") {
-                // 在 allIconTags 中查找（包括 JS 返回结果中的图标）
-                val iconTag = allIconTags.find { it.fullMatch == "{{$tagName:$displayContent}}" }
-                if (iconTag != null) {
-                    builder.appendInlineContent(id = iconTag.id, alternateText = "[${iconTag.path}]")
-                } else {
-                    builder.append("{{$inner}}")
-                }
             } else {
                 val targetStyle = DefaultPvzTagStyles[tagName] ?: defaultStyle
                 builder.withStyle(SpanStyle(
@@ -550,13 +516,10 @@ fun String.stripPvzRichTags(): String {
                     sb.append(displayContent)
                 }
             }
-            // 处理普通颜色标签，排除 icon
+            // 处理普通颜色标签
             inner.contains(":") -> {
-                val tagName = inner.substringBefore(":").trim()
                 val displayContent = inner.substringAfter(":")
-                if (tagName != "icon") {
-                    sb.append(displayContent)
-                }
+                sb.append(displayContent)
             }
         }
         currentIndex = end + 2

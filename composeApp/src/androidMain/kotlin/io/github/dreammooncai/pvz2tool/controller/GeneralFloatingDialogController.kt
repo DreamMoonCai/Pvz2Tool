@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,6 +37,9 @@ import com.petterp.floatingx.listener.control.IFxScopeControl
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.Pvz2ToolTheme
 import io.github.dreammooncai.pvz2tool.view.PvzGreenButton
+import io.github.dreammooncai.pvz2tool.view.PvzRichText
+import io.github.dreammooncai.pvz2tool.view.PvzTextGreenStyle
+import io.github.dreammooncai.pvz2tool.view.PvzTextWhiteStyle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -233,19 +235,18 @@ fun CommonConfirmDialog(
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 // 标题
-                Text(
+                PvzRichText(
                     text = title,
+                    defaultStyle = PvzTextGreenStyle,
                     fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF4CAF50),
                     textAlign = TextAlign.Center
                 )
 
                 // 描述文案
-                Text(
+                PvzRichText(
                     text = message,
+                    defaultStyle = PvzTextWhiteStyle,
                     fontSize = 15.sp,
-                    color = Color.White.copy(alpha = 0.9f),
                     textAlign = TextAlign.Center,
                     lineHeight = 22.sp
                 )
@@ -309,9 +310,9 @@ private fun PvzCancelButton(text: String, onClick: () -> Unit, modifier: Modifie
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Text(
+        PvzRichText(
             text = text,
-            color = Color.White.copy(alpha = 0.9f),
+            defaultStyle = PvzTextWhiteStyle,
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium
         )

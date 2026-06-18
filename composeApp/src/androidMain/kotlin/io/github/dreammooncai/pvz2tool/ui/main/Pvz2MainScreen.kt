@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -96,6 +97,7 @@ import java.util.Date
 import io.github.dreammooncai.manager.FilePickerManager
 import io.github.dreammooncai.pvz2tool.VersionDef
 import io.github.dreammooncai.pvz2tool.controller.SoundController
+import io.github.dreammooncai.pvz2tool.service.LocalVpnService
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.z4kn4fein.semver.Version
 import io.github.dreammooncai.pvz2tool.js.JsConsole
@@ -2300,6 +2302,12 @@ fun Pvz2MainScreen(
 
     // 2. 显示设置弹窗（仅传状态）
     PvzSettingsDialog(filePickerManager = filePickerManager)
+
+    if (SettingsDialogState.isShowFloatingWindow) {
+        LocalVpnService.RequestPermissionsVpn({
+            Toast.makeText(InitializePvz2.context, "未同意VPN权限，无法显示断网功能.", Toast.LENGTH_SHORT).show()
+        })
+    }
 
     // 直接用单例里保存的偏移量作为初始值，首帧就渲染在正确位置，不会闪跳到顶部
     val scrollState = rememberScrollState(initial = Pvz2MainScreenUiState.scrollOffset)
