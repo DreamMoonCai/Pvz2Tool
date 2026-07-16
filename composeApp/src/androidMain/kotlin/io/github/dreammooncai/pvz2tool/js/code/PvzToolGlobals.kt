@@ -335,6 +335,9 @@ object PvzToolGlobals {
         listOf("picker".js, "选择器".js).forEach { key ->
             runtime.set(key, JsPicker.js, VariableType.Global)
         }
+        listOf("clipboard".js, "剪切板".js).forEach { key ->
+            runtime.set(key, JsClipboard.js, VariableType.Global)
+        }
         runtime.get("Number".js)?.get("prototype".js, runtime)?.let { it as? JsObject }?.let { prototype ->
             listOf("encrypt".js, "加密".js).forEach { key ->
                 prototype.set(key, JsProperty {

@@ -254,6 +254,7 @@
 | `path` | 路径 | 路径解析和构建 | 局部 |
 | `file` | 文件 | 通用文件读写操作 | 局部 |
 | `picker` | 选择器 | 系统文件/目录选择器（SAF），返回文件对象 | 全局 |
+| `clipboard` | 剪切板 | 系统剪切板读写（复制文本 / 读取文本 / 清空） | 全局 |
 | `rton` | RTON | RTON 文件编解码 | 局部 |
 | `rsb` | RSB | RSB 资源包解包/打包 | 局部 |
 | `zlib` | ZLIB | ZLib 压缩/解压 | 局部 |
@@ -2535,10 +2536,66 @@ console.log("已导入", imgs.length, "张图片");
 
 ---
 
+## 12. clipboard - 剪切板
+
+基于 Android 系统 `ClipboardManager`，对系统剪切板进行文本读写与清空。
+
+> **平台限制**：Android 10（API 29）及以上，应用仅能在自身处于前台（有焦点）时读取剪切板。本工具的 JS 运行于前台界面，读取可正常工作；后台/无焦点状态下 `read()` 可能返回 `undefined`。
+
+### 12.1 clipboard.copy / clipboard.复制 / clipboard.写入
+
+将指定字符串写入系统剪切板。
+
+**参数**：`text` (string) — 要复制的内容（为 `undefined`/未传时复制空字符串）
+
+**返回**：`undefined`
+
+```javascript
+// 复制指定字符串
+clipboard.copy("这是要复制的内容");
+clipboard.复制("中文别名同样可用");
+
+// 配合其它 API：把读取到的文件内容复制到剪切板
+let f = picker.file({ mimeType: "text/plain" });
+if (f) clipboard.copy(f.readText());
+```
+
+### 12.2 clipboard.read / clipboard.读取 / clipboard.粘贴
+
+读取剪切板当前的主文本内容。
+
+**返回**：`string` — 剪切板文本；无内容 / 服务不可用 / 无焦点时返回 `undefined`
+
+```javascript
+let text = clipboard.read();
+if (text !== undefined) {
+  console.log("剪切板内容:", text);
+} else {
+  console.log("剪切板为空或当前无法读取");
+}
+
+// 别名
+let pasted = clipboard.粘贴();
+```
+
+### 12.3 clipboard.clear / clipboard.清空
+
+清空系统剪切板（写入一个空内容）。
+
+**返回**：`undefined`
+
+```javascript
+clipboard.clear();
+```
+
+---
+
 *文档版本: 2.0*
 *最后更新: 2026-07-17*
 *新增：audio 音频控制对象（getBgmVolume/setBgmVolume/getSfxVolume/setSfxVolume 及中文别名），并补入内置对象总览表（同时补 http）*
 *修正：http.json()/response.解析JSON() 返回已解析的 JS 对象（解析失败返回 null），非 JSON 字符串*
+*新增：picker 文件选择器（directory/file/files，返回文件对象，支持多选与 copy 到 SAF 树内新建文件）*
+*新增：clipboard 剪切板对象（copy/复制、read/读取/粘贴、clear/清空，基于系统 ClipboardManager）*
 *修正：pvz.<type>.all 返回 Array（数据对象数组），单个条目仍可由父对象按 code/name 访问*
 *修正：file.copy/file.复制 当 toPath 带扩展名时按目标文件处理并重命名，否则视为目标目录*
 *修正：file.list 路径无效时返回空数组 []（非 null）*
