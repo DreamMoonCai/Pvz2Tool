@@ -106,6 +106,7 @@ import io.github.dreammooncai.pvz2tool.js.JsLogLevel
 import io.github.dreammooncai.pvz2tool.js.JsLogger
 import io.github.dreammooncai.pvz2tool.pop.rton.RTON
 import io.github.dreammooncai.pvz2tool.rememberSoundInteractionSource
+import io.github.dreammooncai.pvz2tool.service.RequestPermissionsVpn
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsAlertDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsConfirmDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsExtractorDialog
@@ -1998,6 +1999,7 @@ private fun WelcomeUserSection(
                     )
                 )
                 .padding(12.dp)
+                .padding(end = 5.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -2007,29 +2009,24 @@ private fun WelcomeUserSection(
                 // 欢迎语文本
                 PvzRichText(
                     text = String.format(InitializePvz2.config.ui.welcome.greetingTemplate, userName),
-                    fontSize = 16.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     defaultStyle = PvzTextStyle(theme.primaryTextColor)
                 )
 
                 // 编辑按钮
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = InitializePvz2.config.ui.welcome.editUserNameTitle,
-                    tint = theme.secondaryTextColor,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clickable(
-                            interactionSource = rememberSoundInteractionSource(
-                                InitializePvz2.config.ui.sounds.buttonSettingsPress,
-                                InitializePvz2.config.ui.sounds.buttonSettingsRelease
-                            ),
-                            indication = null
-                        ) {
-                            SoundController.playSoundFromAssets(InitializePvz2.config.ui.sounds.buttonSettingsPress)
-                            showEditDialog = true
-                        }
-                )
+                ImageSvgButton(
+                    imageVector = Pvz2Icon.EditBtnNormal,
+                    imageVectorPress = Pvz2Icon.EditBtnPressed,
+                    contentDescription = "编辑存档名",
+                    modifier = Modifier.size(32.dp),
+                    // 【新增】传入按下的音效
+                    pressSound = InitializePvz2.config.ui.sounds.buttonSettingsPress,
+                    // 【新增】传入释放的音效
+                    releaseSound = InitializePvz2.config.ui.sounds.buttonSettingsRelease
+                ) {
+                    showEditDialog = true
+                }
             }
         }
     }
@@ -2307,7 +2304,7 @@ fun Pvz2MainScreen(
     PvzSettingsDialog(filePickerManager = filePickerManager)
 
     if (SettingsDialogState.isShowFloatingWindow) {
-        LocalVpnService.RequestPermissionsVpn({
+        RequestPermissionsVpn({
             Toast.makeText(InitializePvz2.context, "未同意VPN权限，无法显示断网功能.", Toast.LENGTH_SHORT).show()
         })
     }

@@ -12,6 +12,36 @@
 | `announcement` | Array | 否 | 公告列表，每项包含 `title` 和 `content` |
 | `ui` | Object | 否 | UI 文案配置（详见"UI 配置"章节） |
 | `localConfigFile` | String | 否 | 本地配置文件路径（逐步淘汰，不推荐使用） |
+| `simplifiedLaunch` | Boolean | 否 | 精简模式开关，默认 `false`；开启后跳过完整主界面，CG 开场视频正常播放，之后只解压 base 资源并直接进入游戏 |
+
+#### 精简配置模式
+
+当 `simplifiedLaunch: true` 时，系统使用精简配置类进行解析，**只需以下字段**，其余字段（`versions`、`sections`、`ui.title/button/save/settings`、`announcement` 等）均不需要：
+
+| 属性 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `gameActivity` | String | 是 | — | 游戏主 Activity 完整类名 |
+| `simplifiedLaunch` | Boolean | 是 | — | 必须为 `true` |
+| `smfDirectory` | String | 否 | `files/` | 游戏 SMF 存放目录 |
+| `baseAssetPath` | String | 否 | `version/base/smf` | base 资源路径 |
+| `cgVideoPath` | String | 否 | `opening.mp4` | CG 开场视频路径 |
+| `cgVideoPoster` | String | 否 | `null` | CG 视频超时海报图 |
+| `cgVideoLoadTimeout` | Long | 否 | `5000` | CG 视频超时毫秒 |
+| `gameActivityInvalid` | String | 否 | `设置的游戏Activity有误或不存在` | Activity 错误提示 |
+
+**精简配置示例**：
+```yaml
+gameActivity: com.popcap.pvz2cmhd.SexyAppActivity
+simplifiedLaunch: true
+# baseAssetPath: version/base/smf  # 可选，自定义 base 资源路径
+# smfDirectory: files/              # 可选，自定义 SMF 目录
+# cgVideoPath: opening.mp4          # 可选，CG 视频路径
+# cgVideoPoster: poster.jpg         # 可选，CG 超时海报图
+# cgVideoLoadTimeout: 5000          # 可选，CG 超时毫秒
+# gameActivityInvalid: "..."        # 可选，Activity 错误提示
+```
+
+> **注意**：精简模式下 CG 开场视频仍会正常播放（如有版本变化），之后直接跳过主界面进入游戏。
 
 **主题颜色可选值（BROWN | BLUE | BLUE_BACKGROUND | GREEN | GREEN_BACKGROUND | RED | PURPLE | PURPLE_BACKGROUND | ORANGE | TEAL | TEAL_BACKGROUND | GOLD | GRAY | GRAY_BACKGROUND）**：
 - 带 `_BACKGROUND` 后缀 = 深色背景 + 亮色文字（适合深色风格）

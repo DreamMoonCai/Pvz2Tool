@@ -27,13 +27,18 @@ import android.view.Window
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.net.toUri
+import kotlinx.coroutines.delay
 import io.github.dreammooncai.manager.FilePickerManager
 import io.github.dreammooncai.pvz2tool.controller.GameDisplayFloatingController
 import io.github.dreammooncai.pvz2tool.controller.FloatingBallController
@@ -44,6 +49,10 @@ import io.github.dreammooncai.pvz2tool.js.code.PvzToolGlobals
 import io.github.dreammooncai.pvz2tool.ui.main.*
 import io.github.dreammooncai.pvz2tool.ui.music.rememberBackgroundMusicState
 import io.github.dreammooncai.pvz2tool.view.CgVideoPlayer
+import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
+import io.github.dreammooncai.pvz2tool.ui.dialog.PvzExtractorDialog
+import io.github.dreammooncai.pvz2tool.ui.dialog.ResourcePair
+import io.github.dreammooncai.pvz2tool.ui.dialog.rememberAssetExtractor
 import io.github.dreammooncai.yukireflection.factory.toKClass
 import io.github.z4kn4fein.semver.Version
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -51,6 +60,7 @@ import kotlin.coroutines.resume
 import kotlin.system.exitProcess
 import com.highcapable.yukireflection.factory.field
 import io.github.dreammooncai.pvz2tool.controller.GeneralFloatingDialogController
+import kotlin.time.Duration.Companion.milliseconds
 
 class Pvz2InitializeActivity : ComponentActivity() {
 
@@ -130,6 +140,14 @@ class Pvz2InitializeActivity : ComponentActivity() {
                         onVideoEnd = onCgSkip,
                         posterImagePath = InitializePvz2.config.ui.assets.cgVideoPoster?.takeIf { it.isNotEmpty() }?.let { JsFileResolver.resolvePlaceholders(it) },
                         loadTimeoutMillis = InitializePvz2.config.ui.assets.cgVideoLoadTimeout
+                    )
+                    return@Pvz2ToolTheme
+                }
+
+                // ======================== 精简模式：CG 播放完毕后跳过主界面直接启动 ========================
+                if (InitializePvz2.config.simplifiedLaunch) {
+                    SimplifiedLaunchScreen(
+                        onGotoGame = ::onGotoGame
                     )
                     return@Pvz2ToolTheme
                 }
@@ -457,3 +475,76 @@ class Pvz2InitializeActivity : ComponentActivity() {
 }
 
 interface IPvzToolBackPress
+
+// ======================== 精简模式：无本地配置时直接启动游戏 ========================
+
+/**
+ * 精简启动界面
+ * 当检测到没有本地 yml 配置文件时，跳过完整 UI，直接解压 base 资源并进入游戏。
+ *
+ * 流程：
+ * 1. 显示简洁的加载提示
+ * 2. 解压 version/base/smf（通用基础资源）
+ * 3. 完成后自动调用 onGotoGame 进入游戏
+ */
+@Composable
+private fun SimplifiedLaunchScreen(
+    onGotoGame: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    val extractorHolder = rememberAssetExtractor(context)
+
+    // 提取进度状态
+    val uiState by extractorHolder.extractor.uiState
+
+    // 是否已触发提取
+    var extractionStarted by remember { mutableStateOf(false) }
+
+    // 提取完成后的回调
+    LaunchedEffect(uiState.isComplete) {
+        if (uiState.isComplete) {
+            // 短暂延迟让用户看到完成提示
+            delay(500.milliseconds)
+            onGotoGame()
+        }
+    }
+
+    // 首次进入时自动触发提取
+    LaunchedEffect(Unit) {
+        if (!extractionStarted) {
+            extractionStarted = true
+
+            val resourcesToExtract = mutableListOf<ResourcePair>()
+            val targetDir = InitializePvz2.config.getSmfDirectoryFile()
+
+            // 只解压 base 资源（默认 version/base/smf，可通过 baseAssetPath 自定义）
+            val baseAssetPath = InitializePvz2.simpleConfig?.baseAssetPath ?: "version/base/smf"
+            resourcesToExtract.add(
+                AssetExtractorHolder.resource(
+                    internalPath = baseAssetPath,
+                    targetDir = targetDir,
+                    sectionName = "基础资源"
+                )
+            )
+
+            if (resourcesToExtract.isNotEmpty()) {
+                extractorHolder.setOnDismissListener {
+                    if (it.isComplete) onGotoGame()
+                }
+                extractorHolder.extract(*resourcesToExtract.toTypedArray())
+            } else {
+                // 无需提取，直接进入游戏
+                onGotoGame()
+            }
+        }
+    }
+
+    // 显示提取进度弹窗（复用现有的 PvzExtractorDialog）
+    PvzExtractorDialog(
+        uiState = uiState,
+        isShowNotUpdate = false,
+        onDismissRequest = {
+            if (uiState.isComplete) onGotoGame()
+        }
+    )
+}

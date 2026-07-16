@@ -945,7 +945,7 @@ class AssetExtractorHolder(
             // 0. 检测是否为 URL（支持 http:// 和 https://）
             if (path.startsWith("http://") || path.startsWith("https://")) {
                 Log.d("SmartResource", "使用远程 URL: $path")
-                return Uri.parse(path)
+                return path.toUri()
             }
 
             // 0.5 绝对路径：直接使用本地文件系统

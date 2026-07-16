@@ -26,7 +26,9 @@ data class Pvz2ToolConfig(
     val versionsTheme: PvzCollapsiblePanelTheme = PvzCollapsiblePanelTheme.BROWN,
     val announcement: List<Pvz2ToolConfigAnnouncement>,
     val ui: Pvz2ToolConfigUI,
-    val localConfigFile: String? = null // 兼容旧的文件路径（逐步淘汰）
+    val localConfigFile: String? = null,
+    /** 精简模式：开启后跳过完整主界面，只解压 base 资源后直接进入游戏 */
+    val simplifiedLaunch: Boolean = false
 ) {
     companion object {
         const val PATH_NAME = "pvz2tool"
@@ -65,6 +67,113 @@ data class Pvz2ToolConfig(
             e.printStackTrace()
             null
         }
+    }
+}
+
+/**
+ * 精简配置类 —— 仅包含精简模式启动所需的最少字段
+ *
+ * 当 simplifiedLaunch = true 时，系统使用此配置类进行反序列化，
+ * 避免 Pvz2ToolConfig 中大量必填字段（sections、announcement、ui.title/button/save/settings 等）的约束。
+ *
+ * 包含精简路径下实际用到的所有配置：
+ * - gameActivity / smfDirectory / baseAssetPath — 启动与解压
+ * - cgVideoPath / cgVideoPoster / cgVideoLoadTimeout — CG 开场视频
+ * - gameActivityInvalid — 错误提示
+ *
+ * 示例：
+ * ```yaml
+ * gameActivity: com.popcap.pvz2cmhd.SexyAppActivity
+ * simplifiedLaunch: true
+ * # cgVideoPath: opening.mp4
+ * # cgVideoPoster: poster.jpg
+ * # cgVideoLoadTimeout: 5000
+ * ```
+ */
+@Serializable
+data class Pvz2ToolSimpleConfig(
+    val gameActivity: String,
+    val smfDirectory: String = "files/",
+    val baseAssetPath: String = "version/base/smf",
+    val simplifiedLaunch: Boolean = true,
+    // CG 视频相关
+    val cgVideoPath: String = "opening.mp4",
+    val cgVideoPoster: String? = null,
+    val cgVideoLoadTimeout: Long = 5000L,
+    // 错误提示
+    val gameActivityInvalid: String = "设置的游戏Activity有误或不存在"
+) {
+    /**
+     * 将精简配置转换为 Pvz2ToolConfig，填充必要的默认值。
+     * 仅用于简化启动流程中的类型兼容，不会显示完整 UI。
+     */
+    fun toFullConfig(): Pvz2ToolConfig {
+        val empty = ""
+        return Pvz2ToolConfig(
+            gameActivity = gameActivity,
+            smfDirectory = smfDirectory,
+            sections = emptyList(),
+            versions = listOf(
+                VersionDef(
+                    id = "simplified",
+                    name = "精简模式",
+                    desc = "精简启动",
+                    baseAssetPath = baseAssetPath
+                )
+            ),
+            announcement = emptyList(),
+            ui = Pvz2ToolConfigUI(
+                title = Pvz2ToolConfigUITitle(empty, empty, empty, empty),
+                button = Pvz2ToolConfigUIButton(empty, false, empty, false, empty, false, empty, empty),
+                extractor = Pvz2ToolConfigUIExtractor(),
+                noValidDirTip = empty,
+                versionLabel = empty,
+                uiVersion = empty,
+                authorInfo = empty,
+                tutorial = empty,
+                save = Pvz2ToolConfigUISave(
+                    presetConfirmTitle = empty,
+                    presetConfirmMessage = empty,
+                    deleteConfirmTitle = empty,
+                    deleteConfirmMessage = empty,
+                    coverConfirmTitle = empty,
+                    coverConfirmMessage = empty,
+                    saveInfoTitle = empty,
+                    saveNameLabel = empty,
+                    saveDescLabel = empty,
+                    cancelButton = empty,
+                    confirmButton = empty,
+                    exportButton = empty,
+                    importButton = empty,
+                    backupButton = empty,
+                    coverLocalButton = empty,
+                    coverPresetButton = empty,
+                    saveNameEmptyTip = empty,
+                    noLocalSaveTip = empty,
+                    selectLocalSaveTip = empty,
+                    backupSuccessTip = empty,
+                    backupFailTipPrefix = empty,
+                    exportSuccessTip = empty,
+                    exportFailTipPrefix = empty,
+                    importSuccessTip = empty,
+                    importFailTipPrefix = empty,
+                    deleteSuccessTip = empty,
+                    deleteFailTipPrefix = empty,
+                    coverSuccessTip = empty,
+                    coverFailTipPrefix = empty,
+                    defaultImportNamePrefix = empty,
+                    defaultBackupDesc = empty,
+                    defaultImportDesc = empty,
+                    retryButtonText = empty,
+                    operation = Pvz2ToolConfigOperation(empty, empty, empty, empty, empty, empty, empty)
+                ),
+                settings = Pvz2ToolConfigUISettings(empty, empty, empty, empty),
+                // CG 视频和错误提示使用精简配置中的值
+                assets = Pvz2ToolConfigUIAssets(cgVideoPath = cgVideoPath, cgVideoPoster = cgVideoPoster, cgVideoLoadTimeout = cgVideoLoadTimeout),
+                error = Pvz2ToolConfigUIError(gameActivityInvalid = gameActivityInvalid)
+            ),
+            simplifiedLaunch = true
+        )
     }
 }
 

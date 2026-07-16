@@ -29,6 +29,24 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
 
+@Composable
+fun RequestPermissionsVpn(onRejected: () -> Unit = {}, onSuccess: () -> Unit = {}) {
+    val context = LocalContext.current
+    val vpnAuthLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            onSuccess()
+        } else onRejected()
+    }
+    LaunchedEffect(vpnAuthLauncher) {
+        val authIntent = runCatching { LocalVpnService.prepareVpn(context) }.getOrNull()
+        if (authIntent != null) {
+            vpnAuthLauncher.launch(authIntent)
+        } else onSuccess()
+    }
+}
+
 @SuppressLint("VpnServicePolicy")
 class LocalVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
@@ -41,25 +59,7 @@ class LocalVpnService : VpnService() {
         private val _isVpnActive = MutableStateFlow(false)
         val isVpnActive: StateFlow<Boolean> = _isVpnActive.asStateFlow()
 
-        fun prepareVpn(context: Context): Intent? = prepare(context)
-
-        @Composable
-        fun RequestPermissionsVpn(onRejected: () -> Unit = {}, onSuccess: () -> Unit = {}) {
-            val context = LocalContext.current
-            val vpnAuthLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.StartActivityForResult()
-            ) { result ->
-                if (result.resultCode == Activity.RESULT_OK) {
-                    onSuccess()
-                } else onRejected()
-            }
-            LaunchedEffect(vpnAuthLauncher) {
-                val authIntent = prepareVpn(context)
-                if (authIntent != null) {
-                    vpnAuthLauncher.launch(authIntent)
-                } else onSuccess()
-            }
-        }
+        fun prepareVpn(context: Context): Intent? = runCatching { prepare(context) }.getOrNull()
 
         fun startVpn(context: Context) {
             if (prepare(context) == null) {

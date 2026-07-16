@@ -63,7 +63,7 @@ class JsToolContext(
         }
         listOf("version".js, "版本".js) eq buildVersion()
         listOf("all".js, "全部".js) eq buildAll()
-        listOf("gameActivity".js, "游戏界面".js) eq (config.gameActivity ?: "").js
+        listOf("gameActivity".js, "游戏界面".js) eq config.gameActivity.js
 
         buildItemProperty(item,section,sectionStates[section?.id])
         

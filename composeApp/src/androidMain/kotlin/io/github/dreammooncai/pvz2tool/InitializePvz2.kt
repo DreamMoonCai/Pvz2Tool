@@ -77,6 +77,10 @@ object InitializePvz2 {
     // 最终合并后的配置
     lateinit var config: Pvz2ToolConfig
 
+    // 精简配置（仅在 simplifiedLaunch=true 时有值）
+    var simpleConfig: Pvz2ToolSimpleConfig? = null
+        private set
+
     // 初始化配置（基础配置 + 本地配置合并）
     fun initConfig() {
         val appContext = context.applicationContext
@@ -92,8 +96,20 @@ object InitializePvz2 {
         // 2. 合并本地配置（若存在）
         val mergedYamlNode = tryMergeLocalConfig(yaml, baseConfig, baseYamlNode)
 
-        // 3. 反序列化为最终配置
-        config = yaml.decodeFromYamlNode(Pvz2ToolConfig.serializer(), mergedYamlNode)
+        // 3. 先尝试精简配置解码，判断是否为精简模式
+        val simpleConfig = runCatching {
+            yaml.decodeFromYamlNode(Pvz2ToolSimpleConfig.serializer(), mergedYamlNode)
+        }.getOrNull()
+
+        config = if (simpleConfig != null && simpleConfig.simplifiedLaunch) {
+            // 精简模式：使用简易配置转换，避免完整配置的必填项约束
+            this.simpleConfig = simpleConfig
+            simpleConfig.toFullConfig()
+        } else {
+            // 正常模式：使用完整配置解码
+            this.simpleConfig = null
+            yaml.decodeFromYamlNode(Pvz2ToolConfig.serializer(), mergedYamlNode)
+        }
     }
 
     /**

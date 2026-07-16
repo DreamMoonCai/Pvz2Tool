@@ -21,6 +21,24 @@ gameActivity: com.popcap.pvz2cmhd.SexyAppActivity
 smfDirectory: files/
 
 # ------------------------------
+# 精简模式
+# 开启后跳过完整主界面，只解压 base 资源后直接进入游戏
+# CG 开场视频仍会正常播放
+#
+# 精简模式下只需最少配置，示例：
+#   gameActivity: com.popcap.pvz2cmhd.SexyAppActivity
+#   simplifiedLaunch: true
+#   # baseAssetPath: version/base/smf  （可选，默认值如左）
+#   # smfDirectory: files/              （可选，默认值如左）
+#   # cgVideoPath: opening.mp4          （可选，CG 视频路径）
+#   # cgVideoPoster: poster.jpg         （可选，CG 超时海报图）
+#   # cgVideoLoadTimeout: 5000          （可选，CG 超时毫秒）
+#   # gameActivityInvalid: "..."        （可选，Activity 错误提示）
+# 其余字段（versions、sections、ui 大部分等）均不需要
+# ------------------------------
+simplifiedLaunch: false
+
+# ------------------------------
 # 关于复合颜色文本说明
 #
 # 以下所有文本除了明确写了不支持以外，都支持复合颜色文本
