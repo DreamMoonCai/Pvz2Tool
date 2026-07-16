@@ -29,7 +29,7 @@ import java.util.TimeZone
  *
  * 基于 Android 系统 API（[Build]、[WindowManager]、[ActivityManager]、
  * [BatteryManager]、[ConnectivityManager]、[StatFs] 等），
- * 提供当前安卓设备的系统、屏幕、内存、存储、电池、网络、应用及 Root 状态等信息。
+ * 提供当前安卓设备的系统、屏幕、内存、存储、电池、网络、应用、CPU 及 Root 状态等信息。
  *
  * 用法：
  * ```js
@@ -50,6 +50,9 @@ import java.util.TimeZone
  * console.log(device.memory.total());          // 总内存（字节）
  * console.log(device.network.type());          // wifi / cellular / ethernet / none
  * console.log(device.app.packageName());       // 当前应用包名
+ * console.log(device.cpu.cores());             // CPU 核心数
+ * console.log(device.cpu.arch());              // CPU 架构（如 arm64-v8a）
+ * console.log(device.cpu.maxFreqMhz());        // CPU 最高频率（MHz）
  * console.log(device.isRooted());              // 是否已 Root
  * ```
  */
@@ -277,6 +280,37 @@ object JsDevice {
         listOf("targetSdk".js, "目标SDK".js) eq ctx.applicationInfo.targetSdkVersion.js
     }
 
+    // ===================== CPU 信息 =====================
+
+    private fun readSysfsLong(path: String): Long = runCatching {
+        File(path).readText().trim().toLongOrNull()
+    }.getOrNull() ?: -1L
+
+    private fun readSysfsText(path: String): String = runCatching {
+        File(path).readText().trim()
+    }.getOrNull() ?: ""
+
+    private fun cpuInfo(): JsObject = Object("cpuInfo") {
+        val cores = runCatching { Runtime.getRuntime().availableProcessors() }.getOrDefault(-1)
+        val supportedAbis = Build.SUPPORTED_ABIS.toList()
+        val arch = supportedAbis.firstOrNull() ?: ""
+        val cpu0 = "/sys/devices/system/cpu/cpu0/cpufreq"
+        val maxFreq = readSysfsLong("$cpu0/cpuinfo_max_freq")   // kHz
+        val minFreq = readSysfsLong("$cpu0/cpuinfo_min_freq")   // kHz
+        val curFreq = readSysfsLong("$cpu0/scaling_cur_freq")   // kHz
+        val governor = readSysfsText("$cpu0/scaling_governor")
+        listOf("cores".js, "核心数".js) eq cores.js
+        listOf("arch".js, "架构".js) eq arch.js
+        listOf("supportedAbis".js, "支持的ABI".js) eq supportedAbis.map { it.js }.js
+        listOf("maxFreq".js, "最高频率".js) eq maxFreq.js            // kHz
+        listOf("maxFreqMhz".js, "最高频率MHz".js) eq (if (maxFreq > 0) maxFreq / 1000 else -1L).js
+        listOf("minFreq".js, "最低频率".js) eq minFreq.js            // kHz
+        listOf("minFreqMhz".js, "最低频率MHz".js) eq (if (minFreq > 0) minFreq / 1000 else -1L).js
+        listOf("currentFreq".js, "当前频率".js) eq curFreq.js        // kHz
+        listOf("currentFreqMhz".js, "当前频率MHz".js) eq (if (curFreq > 0) curFreq / 1000 else -1L).js
+        listOf("governor".js, "调度器".js) eq governor.js
+    }
+
     // ===================== Root 状态 =====================
 
     private fun isRooted(): Boolean {
@@ -484,6 +518,29 @@ object JsDevice {
             listOf("targetSdk".js, "目标SDK".js).func { context.applicationInfo.targetSdkVersion.js }
         }
 
+        val cpu = Object("cpu") {
+            listOf("info".js, "信息".js).func { cpuInfo() }
+            listOf("cores".js, "核心数".js).func { runCatching { Runtime.getRuntime().availableProcessors() }.getOrDefault(-1).js }
+            listOf("arch".js, "架构".js).func { (Build.SUPPORTED_ABIS.firstOrNull() ?: "").js }
+            listOf("supportedAbis".js, "支持的ABI".js).func { Build.SUPPORTED_ABIS.map { it.js }.js }
+            listOf("maxFreq".js, "最高频率".js).func { readSysfsLong("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq").js }
+            listOf("maxFreqMhz".js, "最高频率MHz".js).func {
+                val f = readSysfsLong("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq")
+                (if (f > 0) f / 1000 else -1L).js
+            }
+            listOf("minFreq".js, "最低频率".js).func { readSysfsLong("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq").js }
+            listOf("minFreqMhz".js, "最低频率MHz".js).func {
+                val f = readSysfsLong("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq")
+                (if (f > 0) f / 1000 else -1L).js
+            }
+            listOf("currentFreq".js, "当前频率".js).func { readSysfsLong("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq").js }
+            listOf("currentFreqMhz".js, "当前频率MHz".js).func {
+                val f = readSysfsLong("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq")
+                (if (f > 0) f / 1000 else -1L).js
+            }
+            listOf("governor".js, "调度器".js).func { readSysfsText("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor").js }
+        }
+
         // 分组对象挂载到 device 下
         listOf("system".js, "系统".js) eq system
         listOf("screen".js, "屏幕".js) eq screen
@@ -492,6 +549,7 @@ object JsDevice {
         listOf("battery".js, "电池".js) eq battery
         listOf("network".js, "网络".js) eq network
         listOf("app".js, "应用".js) eq app
+        listOf("cpu".js, "CPU".js) eq cpu
 
         // 是否已 Root
         listOf("isRooted".js, "是否已Root".js).func { isRooted().js }
@@ -506,6 +564,7 @@ object JsDevice {
                 listOf("battery".js, "电池".js) eq batteryInfo()
                 listOf("network".js, "网络".js) eq networkInfo()
                 listOf("app".js, "应用".js) eq appInfo()
+                listOf("cpu".js, "CPU".js) eq cpuInfo()
                 listOf("isRooted".js, "是否已Root".js) eq isRooted().js
             }
         }

@@ -255,7 +255,7 @@
 | `file` | 文件 | 通用文件读写操作 | 局部 |
 | `picker` | 选择器 | 系统文件/目录选择器（SAF），返回文件对象 | 全局 |
 | `clipboard` | 剪切板 | 系统剪切板读写（复制文本 / 读取文本 / 清空） | 全局 |
-| `device` | 设备 | 当前安卓设备信息（系统 / 屏幕 / 内存 / 存储 / 电池 / 网络 / 应用 / Root） | 全局 |
+| `device` | 设备 | 当前安卓设备信息（系统 / 屏幕 / 内存 / 存储 / 电池 / 网络 / 应用 / CPU / Root） | 全局 |
 | `rton` | RTON | RTON 文件编解码 | 局部 |
 | `rsb` | RSB | RSB 资源包解包/打包 | 局部 |
 | `zlib` | ZLIB | ZLib 压缩/解压 | 局部 |
@@ -2593,7 +2593,7 @@ clipboard.clear();
 
 ## 13. device - 设备信息
 
-基于 Android 系统 API（`Build` / `WindowManager` / `ActivityManager` / `BatteryManager` / `ConnectivityManager` / `StatFs` 等），提供当前安卓设备的各种信息。支持按分组（`system` / `screen` / `memory` / `storage` / `battery` / `network` / `app`）获取，也支持 `device.info()` 一次性聚合全部信息。
+基于 Android 系统 API（`Build` / `WindowManager` / `ActivityManager` / `BatteryManager` / `ConnectivityManager` / `StatFs` 等），提供当前安卓设备的各种信息。支持按分组（`system` / `screen` / `memory` / `storage` / `battery` / `network` / `app` / `cpu`）获取，也支持 `device.info()` 一次性聚合全部信息。
 
 > **说明**：所有信息均为实时读取（每次调用刷新），例如电池电量、网络状态会反映当前真实值，而非注册时的快照。
 
@@ -2601,7 +2601,7 @@ clipboard.clear();
 
 一次性返回全部设备信息（聚合对象，各分组作为子对象存在）。
 
-**返回**：`object` — 结构为 `{ system, screen, memory, storage, battery, network, app, isRooted }`
+**返回**：`object` — 结构为 `{ system, screen, memory, storage, battery, network, app, cpu, isRooted }`
 
 ```js
 let d = device.info();
@@ -2717,7 +2717,35 @@ console.log("Root:", d.isRooted);
 | `app.isDebuggable()` | `应用.是否调试版()` | 是否 debug 构建（`boolean`） |
 | `app.targetSdk()` | `应用.目标SDK()` | 目标 SDK 版本（`number`） |
 
-### 13.9 device.isRooted / device.是否已Root
+### 13.9 device.cpu / device.CPU
+
+CPU 信息。核心数来自 `Runtime.getRuntime().availableProcessors()`；架构 / 支持的 ABI 来自 `Build.SUPPORTED_ABIS`；频率与调度器读取 `cpu0` 的 cpufreq sysfs 节点（`/sys/devices/system/cpu/cpu0/cpufreq/...`）。频率单位为 **kHz**（另提供 `*Mhz` 便捷字段，单位 MHz）。部分设备可能限制 sysfs 读取，频率/调度器读取失败时返回 `-1`（数值）或 `""`（字符串）。
+
+| 方法 | 中文别名 | 说明 |
+|------|---------|------|
+| `cpu.info()` | `CPU.信息()` | CPU 信息聚合对象 |
+| `cpu.cores()` | `CPU.核心数()` | CPU 核心数（`number`，如 `8`） |
+| `cpu.arch()` | `CPU.架构()` | 主 ABI（如 `arm64-v8a`） |
+| `cpu.supportedAbis()` | `CPU.支持的ABI()` | 全部支持的 ABI（`Array<string>`，如 `["arm64-v8a","armeabi-v7a"]`） |
+| `cpu.maxFreq()` | `CPU.最高频率()` | 最高频率（kHz，`number`） |
+| `cpu.maxFreqMhz()` | `CPU.最高频率MHz()` | 最高频率（MHz，`number`） |
+| `cpu.minFreq()` | `CPU.最低频率()` | 最低频率（kHz，`number`） |
+| `cpu.minFreqMhz()` | `CPU.最低频率MHz()` | 最低频率（MHz，`number`） |
+| `cpu.currentFreq()` | `CPU.当前频率()` | 当前频率（kHz，`number`，实时） |
+| `cpu.currentFreqMhz()` | `CPU.当前频率MHz()` | 当前频率（MHz，`number`，实时） |
+| `cpu.governor()` | `CPU.调度器()` | 当前调度器（如 `schedutil` / `performance`） |
+
+**示例**
+```js
+console.log("核心数:", device.cpu.cores());
+console.log("架构:", device.cpu.arch());
+console.log("支持ABI:", device.cpu.supportedAbis());    // ["arm64-v8a","armeabi-v7a"]
+console.log("最高频率(MHz):", device.cpu.maxFreqMhz());
+console.log("当前频率(MHz):", device.cpu.currentFreqMhz());
+console.log("调度器:", device.cpu.governor());
+```
+
+### 13.10 device.isRooted / device.是否已Root
 
 判断设备是否已 Root（检查常见 `su` 路径并回退到 `which su`）。
 
@@ -2733,7 +2761,7 @@ if (device.isRooted()) {
 
 *文档版本: 2.0*
 *最后更新: 2026-07-17*
-*新增：device 设备信息对象（system/screen/memory/storage/battery/network/app 分组 + info() 聚合，及中文别名），并补入内置对象总览表*
+*新增：device 设备信息对象（system/screen/memory/storage/battery/network/app/cpu 分组 + info() 聚合，及中文别名），并补入内置对象总览表；cpu 分组含核心数/架构/ABI/频率(kHz与MHz)/调度器*
 *新增：audio 音频控制对象（getBgmVolume/setBgmVolume/getSfxVolume/setSfxVolume 及中文别名），并补入内置对象总览表（同时补 http）*
 *修正：http.json()/response.解析JSON() 返回已解析的 JS 对象（解析失败返回 null），非 JSON 字符串*
 *新增：picker 文件选择器（directory/file/files，返回文件对象，支持多选与 copy 到 SAF 树内新建文件）*
