@@ -518,7 +518,7 @@ data class Pvz2ToolConfigUISave(
     // 按钮文字
     val cancelButton: String,
     val confirmButton: String,
-    val shareButton: String = "分享所有本地存档",
+    val shareButton: String = "导出所有本地存档",
     val exportButton: String,
     val importButton: String,
     val backupButton: String,
@@ -548,6 +548,25 @@ data class Pvz2ToolConfigUISave(
     val defaultBackupDesc: String,       // 自动备份
     val defaultImportDesc: String,       // 手动导入
 
+    // 游戏存档信息显示
+    /** 游戏存档区域标题 */
+    val gameSaveLabel: String = "游玩存档",
+    /** 游戏存档信息模板，支持 %s（用户名）、%t（最后修改时间）；如 "存档用户：%s | 最后游玩：%t" */
+    val gameSaveInfoTemplate: String = "存档用户：%s · 最后游玩：%t",
+    /** 游戏存档用户名获取失败时的占位文本 */
+    val gameSaveUnknownUser: String = "未知用户",
+    /** 游戏存档不存在时的提示文本 */
+    val gameSaveNotExistTip: String = "暂无游玩存档",
+    /** 导出/分享选项弹窗标题 */
+    val exportOptionTitle: String = "选择导出方式",
+    /** 导出到文件夹选项 */
+    val exportToFolderOption: String = "导出到指定文件夹",
+    /** 分享存档包选项 */
+    val shareAsPackageOption: String = "分享为存档包",
+    /** 备份游玩存档按钮文字 */
+    val backupGameSaveButton: String = "备份游玩存档",
+    /** 导出游玩存档按钮文字 */
+    val exportGameSaveButton: String = "导出游玩存档",
     // 新增：重试按钮文字
     val retryButtonText: String,
     val operation: Pvz2ToolConfigOperation, // 新增操作类型

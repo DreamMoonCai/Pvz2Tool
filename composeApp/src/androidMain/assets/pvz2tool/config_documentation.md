@@ -4,13 +4,13 @@
 | 属性 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `gameActivity` | String | 是 | 游戏主 Activity 完整类名，如 `com.popcap.pvz2cmhd.SexyAppActivity` |
-| `smfDirectory` | String | 否 | 游戏默认 SMF 存放目录，默认 `files/`；当 section 不填写 `targetPath` 时使用此目录 |
+| `smfDirectory` | String | 是 | 游戏默认 SMF 存放目录，如 `files/`；当 section 不填写 `targetPath` 时使用此目录 |
 | `versions` | Array | 是 | 版本配置数组，至少配置 1 个版本 |
-| `sections` | Array | 否 | 功能栏目配置数组，不配置则无功能项展示 |
+| `sections` | Array | 是 | 功能栏目配置数组（精简模式下可为空列表 `[]`） |
 | `isExpandedVersions` | Boolean | 否 | 版本管理面板是否默认展开，默认 `false` |
 | `versionsTheme` | String | 否 | 版本管理面板主题颜色，默认 `BROWN`；可选值见下方主题颜色列表 |
-| `announcement` | Array | 否 | 公告列表，每项包含 `title` 和 `content` |
-| `ui` | Object | 否 | UI 文案配置（详见"UI 配置"章节） |
+| `announcement` | Array | 是 | 公告列表（精简模式下可为空列表 `[]`），每项包含 `title` 和 `content` |
+| `ui` | Object | 是 | UI 文案配置（精简模式下可省略，详见"UI 配置"章节） |
 | `localConfigFile` | String | 否 | 本地配置文件路径（逐步淘汰，不推荐使用） |
 | `simplifiedLaunch` | Boolean | 否 | 精简模式开关，默认 `false`；开启后跳过完整主界面，CG 开场视频正常播放，之后只解压 base 资源并直接进入游戏 |
 
@@ -84,6 +84,7 @@ simplifiedLaunch: true
 | `sections[n].addItems` | Boolean | 否 | **本地配置专属**：是否追加模式；`true` 追加到 APK 内置配置同 ID 栏目；`false`（默认）替换 |
 | `sections[n].isExpanded` | Boolean | 否 | 是否默认展开该功能栏，默认 `false` |
 | `sections[n].confirmButtonText` | String | 否 | 保存按钮文字，默认 `null`（不显示按钮） |
+| `sections[n].descriptionContent` | String | 否 | DESCRIPTION 类型栏目的默认显示文本，默认空；JS 脚本返回值会覆盖此内容 |
 | `sections[n].theme` | String | 否 | 栏目主题颜色，默认 `BROWN`；可选值见主题颜色列表 |
 | `sections[n].jsScript` | String | 否 | 栏目级 JS 脚本；`confirmButtonText` 存在时点击按钮后执行，否则进入游戏时执行 |
 | `sections[n].jsPath` | String | 否 | 栏目级 JS 脚本文件路径；`jsScript` 为空时从该路径加载；默认路径 `version/版本ID/栏目ID/main.js`；文件不存在且 `jsScript` 也为空则不执行；支持占位符变量 |
@@ -455,48 +456,57 @@ sections:
 | `toastErrorPrefix` | String | `戴夫的小提示：更新失败啦 → ` | Toast 错误前缀 |
 
 **save 配置详解（存档操作）**：
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| `presetConfirmTitle` | String | 预设存档确认弹窗标题 |
-| `presetConfirmMessage` | String | 预设存档确认弹窗内容 |
-| `deleteConfirmTitle` | String | 删除存档确认弹窗标题 |
-| `deleteConfirmMessage` | String | 删除存档确认弹窗内容 |
-| `coverConfirmTitle` | String | 覆盖存档确认弹窗标题 |
-| `coverConfirmMessage` | String | 覆盖存档确认弹窗内容 |
-| `deleteGameSaveConfirmTitle` | String | 删除游玩存档确认弹窗标题 |
-| `deleteGameSaveConfirmMessage` | String | 删除游玩存档确认弹窗内容 |
-| `saveInfoTitle` | String | 存档信息标题 |
-| `saveNameLabel` | String | 存档名称标签 |
-| `saveDescLabel` | String | 存档描述标签 |
-| `cancelButton` | String | 取消按钮 |
-| `confirmButton` | String | 确认按钮 |
-| `shareButton` | String | 分享按钮 |
-| `exportButton` | String | 导出按钮 |
-| `importButton` | String | 导入按钮 |
-| `backupButton` | String | 备份按钮 |
-| `coverLocalButton` | String | 覆盖本地按钮 |
-| `deleteGameSaveButton` | String | 删除游玩存档按钮 |
-| `coverPresetButton` | String | 覆盖预设按钮 |
-| `retryButtonText` | String | 重试按钮文字 |
-| `saveNameEmptyTip` | String | 存档名称为空提示 |
-| `noLocalSaveTip` | String | 无本地存档提示 |
-| `selectLocalSaveTip` | String | 选择本地存档提示 |
-| `backupSuccessTip` | String | 备份成功提示 |
-| `backupFailTipPrefix` | String | 备份失败提示前缀 |
-| `exportSuccessTip` | String | 导出成功提示 |
-| `exportFailTipPrefix` | String | 导出失败提示前缀 |
-| `importSuccessTip` | String | 导入成功提示 |
-| `importFailTipPrefix` | String | 导入失败提示前缀 |
-| `deleteSuccessTip` | String | 删除成功提示 |
-| `deleteFailTipPrefix` | String | 删除失败提示前缀 |
-| `coverSuccessTip` | String | 覆盖成功提示 |
-| `coverFailTipPrefix` | String | 覆盖失败提示前缀 |
-| `deleteGameSaveSuccessTip` | String | 删除游玩存档成功提示 |
-| `deleteGameSaveFailTipPrefix` | String | 删除游玩存档失败提示前缀 |
-| `defaultImportNamePrefix` | String | 导入默认名称前缀 |
-| `defaultBackupDesc` | String | 自动备份描述 |
-| `defaultImportDesc` | String | 手动导入描述 |
-| `operation` | Object | 操作类型配置 |
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `presetConfirmTitle` | String | - | 使用预设存档时的二次确认弹窗标题 |
+| `presetConfirmMessage` | String | - | 使用预设存档时的二次确认弹窗内容 |
+| `deleteConfirmTitle` | String | - | 删除本地存档时的二次确认弹窗标题 |
+| `deleteConfirmMessage` | String | - | 删除本地存档时的二次确认弹窗内容（支持 `%s` 替换为存档名） |
+| `coverConfirmTitle` | String | - | 用本地存档覆盖游玩存档时的二次确认弹窗标题 |
+| `coverConfirmMessage` | String | - | 用本地存档覆盖游玩存档时的二次确认弹窗内容 |
+| `deleteGameSaveConfirmTitle` | String | `删除游玩存档` | 删除游玩存档时的二次确认弹窗标题 |
+| `deleteGameSaveConfirmMessage` | String | `此操作将永久清空...` | 删除游玩存档时的二次确认弹窗内容 |
+| `saveInfoTitle` | String | - | 备份/导入存档时的命名弹窗标题 |
+| `saveNameLabel` | String | - | 命名弹窗中存档名称输入框的标签文字 |
+| `saveDescLabel` | String | - | 命名弹窗中存档描述输入框的标签文字 |
+| `cancelButton` | String | - | 命名弹窗中的取消按钮文字 |
+| `confirmButton` | String | - | 命名弹窗中的确认按钮文字 |
+| `shareButton` | String | `导出所有本地存档` | 本地存档区域的导出按钮文字（点击弹出导出选项弹窗或直接导出文件夹） |
+| `exportButton` | String | - | 游玩存档区域的导出按钮文字（已迁移到 `exportGameSaveButton`，保留兼容） |
+| `importButton` | String | - | 导入存档按钮文字 |
+| `backupButton` | String | - | 备份游玩存档按钮文字（已迁移到 `backupGameSaveButton`，保留兼容） |
+| `coverLocalButton` | String | - | 用选中的本地存档覆盖当前游玩存档的按钮文字 |
+| `deleteGameSaveButton` | String | `删除游玩存档` | 删除当前游玩存档的按钮文字 |
+| `coverPresetButton` | String | - | 使用预设存档覆盖当前游玩存档的按钮文字 |
+| `gameSaveLabel` | String | `游玩存档` | 游玩存档信息区域的标题文字 |
+| `gameSaveInfoTemplate` | String | `存档用户：%s · 最后游玩：%t` | 游玩存档信息展示模板；`%s` 替换为存档内用户名（读取 pp.dat），`%t` 替换为 pp.dat 最后修改时间 |
+| `gameSaveUnknownUser` | String | `未知用户` | 无法从 pp.dat 读取用户名时的占位文本 |
+| `gameSaveNotExistTip` | String | `暂无游玩存档` | 游戏存档目录为空或不存在时的提示文字 |
+| `exportOptionTitle` | String | `选择导出方式` | 导出选项弹窗的标题（FileProvider 可用时显示） |
+| `exportToFolderOption` | String | `导出到指定文件夹` | 导出选项弹窗中「导出到文件夹」按钮文字 |
+| `shareAsPackageOption` | String | `分享为存档包` | 导出选项弹窗中「分享为 .pvz2saves 存档包」按钮文字 |
+| `backupGameSaveButton` | String | `备份游玩存档` | 游玩存档区域的备份按钮文字 |
+| `exportGameSaveButton` | String | `导出游玩存档` | 游玩存档区域的导出按钮文字 |
+| `retryButtonText` | String | - | 操作失败结果弹窗中的重试按钮文字 |
+| `saveNameEmptyTip` | String | - | 存档名称输入为空时的提示文字 |
+| `noLocalSaveTip` | String | - | 本地存档列表为空时的占位提示文字 |
+| `selectLocalSaveTip` | String | - | 未选中本地存档就点击覆盖按钮时的提示文字 |
+| `backupSuccessTip` | String | - | 备份本地存档成功的结果提示 |
+| `backupFailTipPrefix` | String | - | 备份本地存档失败的结果提示前缀（后接异常信息） |
+| `exportSuccessTip` | String | - | 导出游玩存档到文件夹成功的结果提示 |
+| `exportFailTipPrefix` | String | - | 导出游玩存档失败的结果提示前缀（后接异常信息） |
+| `importSuccessTip` | String | - | 导入存档成功的结果提示 |
+| `importFailTipPrefix` | String | - | 导入存档失败的结果提示前缀（后接异常信息） |
+| `deleteSuccessTip` | String | - | 删除本地存档成功的结果提示 |
+| `deleteFailTipPrefix` | String | - | 删除本地存档失败的结果提示前缀（后接异常信息） |
+| `coverSuccessTip` | String | - | 用本地存档覆盖游玩存档成功的结果提示 |
+| `coverFailTipPrefix` | String | - | 覆盖游玩存档失败的结果提示前缀（后接异常信息） |
+| `deleteGameSaveSuccessTip` | String | `当前游玩存档已成功删除` | 删除游玩存档成功的结果提示 |
+| `deleteGameSaveFailTipPrefix` | String | `删除游玩存档失败：%s` | 删除游玩存档失败的结果提示前缀（`%s` 替换为异常信息） |
+| `defaultImportNamePrefix` | String | - | 批量导入存档时自动生成的名称前缀（如 `导入_`，后接序号） |
+| `defaultBackupDesc` | String | - | 备份存档时默认填入的描述文字（如 `自动备份`） |
+| `defaultImportDesc` | String | - | 导入存档时默认填入的描述文字（如 `手动导入`） |
+| `operation` | Object | - | 操作类型中文描述配置（结果弹窗标题用，详见下方） |
 
 **operation 配置详解**：
 | 属性 | 类型 | 默认值 | 说明 |
@@ -605,7 +615,7 @@ sections:
 | `customWindowSize` | String | `自定义窗口宽高`        | 自定义宽高模式的标签文字 |
 | `customWindowRatio` | String | `自定义窗口比例`        | 自定义比例模式的标签文字 |
 | `fullscreen` | String | `全屏`             | 全屏模式的标签文字 |
-| `displayMode` | String | `fullscreen`     | 默认显示模式，可选值：`fullscreen`（全屏）/ `ratio`（自定义比例）/ `size`（自定义宽高）|
+| `displayMode` | String | `ratio`      | 默认显示模式，可选值：`fullscreen`（全屏）/ `ratio`（自定义比例）/ `size`（自定义宽高）|
 | `windowWidth` | Int | `0`              | 自定义宽高模式下的默认宽度（px，仅 `displayMode=size` 时生效。`0` = 自动使用屏幕实际宽度）|
 | `windowHeight` | Int | `0`              | 自定义宽高模式下的默认高度（px，仅 `displayMode=size` 时生效。`0` = 自动使用屏幕实际高度）|
 | `windowRatio` | Float | `1.5`            | 自定义比例模式下的默认宽高比（如 `1.5` = 3:2，仅 `displayMode=ratio` 时生效）|
@@ -633,7 +643,7 @@ settings:
     fullscreen: "全屏"
     customWindowRatio: "自定义窗口比例"
     customWindowSize: "自定义窗口宽高"
-    displayMode: "fullscreen"         # fullscreen / ratio / size
+    displayMode: "ratio"         # fullscreen / ratio / size
     windowRatio: 1.5                  # 比例模式：3:2
     windowWidth: 0                    # 尺寸模式：0 = 屏幕实际宽度
     windowHeight: 0                   # 尺寸模式：0 = 屏幕实际高度

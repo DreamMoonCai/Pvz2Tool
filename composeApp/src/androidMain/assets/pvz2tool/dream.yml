@@ -1946,7 +1946,7 @@ ui:
     # 按钮文字
     cancelButton: "取消"
     confirmButton: "确认"
-    shareButton: "分享所有本地存档"
+    shareButton: "导出所有本地存档"
     exportButton: "导出游玩存档"
     importButton: "导入存档到本地"
     backupButton: "备份游玩存档"
@@ -1960,7 +1960,7 @@ ui:
     selectLocalSaveTip: "请先选中要覆盖的本地存档"
 
     # 操作结果提示（%s 为占位符，运行时替换具体内容）
-    backupSuccessTip: "存档备份成功：%s"
+    backupSuccessTip: "存档备份成功（已备份存档到本地中）：%s"
     backupFailTipPrefix: "备份失败：%s"
     exportSuccessTip: "存档导出成功"
     exportFailTipPrefix: "导出失败：%s"

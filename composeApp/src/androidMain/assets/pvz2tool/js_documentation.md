@@ -98,7 +98,7 @@
 | `file.writeBytes()` | `file.写字节()` | 写入字节数组 |
 | `file.writeText()` | `file.写文本()` | 写入文本（UTF-8） |
 | `file.appendText()` | `file.追加文本()` | 追加文本（UTF-8） |
-| `file.copy()` | `file.复制()` / `file.复制到()` | 通过解压管线复制文件（toPath 为目标目录） |
+| `file.copy()` | `file.复制()` / `file.复制到()` | 通过解压管线复制文件（toPath 详见下方说明，按扩展名决定目标目录或目标文件名） |
 | `file.rename()` | `file.重命名()` / `file.移动到()` | 重命名/移动文件 |
 | `file.delete()` | `file.删除()` | 删除文件或目录 |
 | `file.exists()` | `file.存在()` | 检查文件是否存在 |
@@ -146,6 +146,14 @@
 | `ui.progress().close()` | `ui.进度.关闭()` | 关闭进度 |
 | `ui.extract()` | `ui.解压()` | 解压根资源 |
 
+#### audio 对象
+| 英文 | 中文别名 | 说明 |
+|------|----------|------|
+| `audio.getBgmVolume()` | `audio.获取背景音乐音量()` | 获取背景音乐音量（0.0~1.0） |
+| `audio.setBgmVolume(v)` | `audio.设置背景音乐音量()` | 设置背景音乐音量（0.0~1.0） |
+| `audio.getSfxVolume()` | `audio.获取音效音量()` | 获取音效音量（0.0~1.0） |
+| `audio.setSfxVolume(v)` | `audio.设置音效音量()` | 设置音效音量（0.0~1.0） |
+
 #### assets 对象
 | 英文 | 中文别名 |
 |------|----------|
@@ -173,7 +181,7 @@
 | `response.statusText` | | 状态文本（如 "OK"） |
 | `response.body` | | 响应体文本（string） |
 | `response.headers` | | 响应头对象 |
-| `response.json()` | `response.解析JSON()` | 将 body 解析为 JSON 字符串（可再用 JSON.parse） |
+| `response.json()` | `response.解析JSON()` | 将 body 直接解析为 JS 对象（已自动 JSON.parse，无需再调用 JSON.parse；解析失败返回 null） |
 
 #### this 对象
 | 英文 | 中文别名 | 说明 |
@@ -252,6 +260,8 @@
 | `pvz` | 植物大战僵尸 | 数字加密/存档操作/游戏数据访问 | 全局 |
 | `ui` | 界面 | 弹窗、进度条、解压 | 全局 |
 | `js` | JS执行器 | 动态执行JS代码/文件 | 全局 |
+| `http` | 网络 | HTTP 网络请求（GET/POST/PUT/DELETE/PATCH/HEAD） | 全局 |
+| `audio` | 音频 | 背景音乐/音效音量控制 | 全局 |
 | `assets` | 资源 | 工具箱资源访问（本地优先+URL支持） | 全局 |
 | `storage` | 存储 | 持久化键值存储 | 全局 |
 | `data` | 数据 | SMF 数据访问（通过 smfList 配置） | 局部 |
@@ -352,7 +362,7 @@ var uri = path.resolveUri("$WORK_DIR/data.bin");
 - `$ITEM/xxx` → `version/id/sectionId/itemId/xxx`（不存在则降级到 `$SMF`，再降级到 `baseAssetPath`）
 - `$JS_DIR/xxx` → `version/enterGamePath` 的父目录（不存在则逐级向上降级）
 - `/absolute/path` → 原样返回（绝对路径不经过 `pvz2tool/` 前缀处理）
-- `relative/path` → `relative/path`（相对路径原样返回）
+- `relative/path`（不以 `$` 或 `/` 开头）→ 自动视为 `$WORK_DIR/relative/path` 处理，因此返回的 internalPath 即为 `relative/path` 这一段子路径
 
 **参数**：
 - `placeholderPath` (string): 包含占位符的路径
@@ -438,7 +448,7 @@ rton.encode(
 
 #### rton.load / rton.加载
 
-加载 RTON 文件为 JS 对象，并注入 `save()` 方法。
+加载文件为 JS 对象，并注入 `save()` 方法。输入可以是 `.rton` 文件（自动解码为 JSON）或 `.json` 文件（直接作为 JSON 读取，无需解码）。
 
 **参数**：
 - `inputPath` (string): 输入 RTON 文件路径
@@ -840,7 +850,9 @@ pvz.<type>.all
 pvz.<中文名>.全部
 ```
 
-**返回**：Object - 以代码(code)或名称(name)为键的数据对象
+**返回**：Array - 数据对象数组，每个元素包含该条目的全部字段（id/name/code 等）。
+
+> **说明**：`all` / `全部` 返回的是**数组**，可用 `for...of` 遍历；同时父对象上仍可按 **代码** 或 **名称** 直接访问单个条目（如 `pvz.plants.peashooter`、`pvz.植物.向日葵`）。两者不要混淆：`pvz.plants.all` 是数组，`pvz.plants.peashooter` 是单个对象。
 
 **示例**：
 ```javascript
@@ -1106,11 +1118,15 @@ let keys = storage.keys();  // ["username", "level", "settings"]
 
 ##### storage.getAll / storage.获取全部
 
-获取所有存储的数据。
+获取所有存储的数据。**返回数组**（按 key 顺序排列），每个元素为对应 key 的值，而非以 key 为字段的对象。
 
 ```javascript
 let all = storage.getAll();
-// { username: "张三", level: 99, settings: { theme: "dark", sound: true } }
+// 返回数组，例如：["张三", 99, { theme: "dark", sound: true }]
+// 如需 key-value 形式，可结合 storage.keys() 自行组装：
+let keys = storage.keys();
+let map = {};
+for (let i = 0; i < keys.length; i++) map[keys[i]] = all[i];
 ```
 
 ---
@@ -1126,8 +1142,9 @@ let all = storage.getAll();
 ### 一、顶层简写方法（传路径，直接返回结果）
 
 > **路径不存在时的行为**：
-> 顶层简写方法（如 `file.readText(path)`、`file.size(path)` 等）在路径不存在时会**抛出异常**。
-> 若需要优雅处理"路径可能不存在"的场景，请使用 `file.resolve(path)`（返回中性对象，写操作可成功，读操作抛异常）。
+> - **读写类方法**（`readText` / `readBytes` / `writeText` / `writeBytes` / `appendText` / `rename` / `delete`）在路径不存在（或无法解析）时会**抛出异常**。
+> - **属性类方法**（`size` / `lastModified` / `isDirectory` / `isFile` / `exists` / `parent`）在路径不存在时**不会抛异常**，而是返回安全默认值：`size`/`lastModified` 返回 `0`、`isDirectory`/`isFile`/`exists` 返回 `false`、`parent` 返回 `null`。
+> - 若需要优雅处理"路径可能不存在"的场景，请使用 `file.resolve(path)`（返回中性对象，写操作可成功，读操作抛异常）。
 
 以下方法直接传入占位符路径，无需先 `resolve()`。
 
@@ -1185,27 +1202,35 @@ file.appendText("$WORK_DIR/log.txt", "new line\n");
 
 #### file.copy / file.复制 / file.复制到
 
-通过解压管线（extract）复制文件。源路径会先转换为 `internalPath`（支持 `$SMF`/`$ITEM`/`$JS_DIR` 降级规则），然后以原文件名解压到目标目录中。
+通过解压管线（extract）复制文件。源路径会先转换为 `internalPath`（支持 `$SMF`/`$ITEM`/`$JS_DIR` 降级规则），然后解压到目标位置。`toPath` 的**判定规则**（取决于是否带扩展名）如下：
 
-> **注意**：`toPath` 表示**目标目录**（而非目标文件路径），源文件会以原文件名复制到该目录下。
+- **目标目录**：当 `toPath` 为目录，或**不带文件扩展名**时，视为目标目录，源文件以**原文件名**复制进该目录。
+- **目标文件**：当 `toPath` **带有文件扩展名**（或已存在同名文件）时，视为目标文件路径，复制后会将文件**重命名为 `toPath` 指定的文件名**。
+
+> **注意**：`toPath` 既可以填目录也可以填带扩展名的文件路径，二者行为不同，请按需选择。
 
 **参数**：`fromPath` (string), `toPath` (string)
 
 **示例**：
 ```javascript
-// 将 SMF 中的文件复制到工作目录
+// toPath 不带扩展名 → 视为目标目录，源文件以原文件名 source.bin 复制
 file.copy("$SMF/source.bin", "$WORK_DIR/output/");
+// 结果：$WORK_DIR/output/source.bin
+
+// toPath 带扩展名 → 视为目标文件，复制后重命名为 target.bin
+file.copy("$SMF/source.bin", "$WORK_DIR/output/target.bin");
+// 结果：$WORK_DIR/output/target.bin
 
 // 将 ITEM 资源复制到指定目录（支持降级）
 file.copy("$ITEM/config.bin", "$WORK_DIR/extracted/");
 ```
 
-**等价实现**：
+**等价实现**（以目标目录为例）：
 ```javascript
 var internalPath = path.toInternalPath(fromPath);
-var targetFile = file.resolve(toPath);
-file.mkdir(toPath); // 确保目标目录存在
+file.mkdir(toPath);          // 确保目标目录存在
 ui.extract([internalPath], toPath, "");
+// 若 toPath 带扩展名（目标文件），extract 后会额外将文件重命名为该文件名
 ```
 
 #### file.rename / file.重命名 / file.移动到
@@ -1247,11 +1272,11 @@ if (file.exists("$ITEM/config.txt")) { ... }
 
 - 使用 `listDirectory()` 实现，**不拷贝 assets/SAF 内容到缓存**，只返回子项名列表
 - 返回的文件对象使用**占位符路径**（如 `$SMF/xxx`），而非缓存路径
-- 路径不是目录或不存在时返回 `null`
+- 路径不是目录或不存在时返回空数组 `[]`（不会返回 `null`）
 - 目录为空时返回空数组 `[]`
 
 **参数**：`placeholderPath` (string)
-**返回**：Array\<文件对象\> | null
+**返回**：Array\<文件对象\>（路径无效时为空数组 `[]`）
 
 **示例**：
 ```javascript
@@ -1340,7 +1365,7 @@ let p = file.parent("$ITEM/config.txt"); // "$ITEM"
 
 - **路径存在且为目录** → 返回**目录对象**（`isDirectory=true`）：提供 `list()`、`mkdir()`，不提供文件读写 API
 - **路径存在且为文件** → 返回**文件对象**（`isFile=true`）：提供 `readText()`、`writeText()`、`copyTo()` 等文件 API，不提供 `list()`、`mkdir()`
-- **路径不存在** → 返回**中性对象**：提供全部 API，属性返回默认值（`size=0`、`exists=false`），写操作可成功（自动创建），读操作会抛异常
+- **路径不存在** → 返回**中性对象**：同时提供文件对象与目录对象的全部 API（`readText()`/`readBytes()`/`writeText()`/`writeBytes()`/`copyTo()`/`appendText()` 与 `list()`/`mkdir()` 均可用）；属性方面 `isDirectory=false`、`isFile=true`、`exists()=false`、`size` 为 `0`，写操作可成功（自动创建），读操作会抛异常（注意：因兼具文件对象特征，中性对象的 `isFile` 实际为 `true` 而非 `false`）
 
 ```javascript
 let f = file.resolve("$SMF/packages/icon.bin");
@@ -1368,7 +1393,7 @@ f.writeBytes(modified);
 > **注意**：`file.resolve(path)` 根据路径类型返回不同的对象，API 不同：
 > - **目录对象**（`isDirectory=true`）：提供 `list()`、`mkdir()`，**不提供** `readText()`、`readBytes()`、`writeText()`、`writeBytes()`、`copyTo()`、`appendText()`
 > - **文件对象**（`isFile=true`）：提供 `readText()`、`readBytes()`、`writeText()`、`writeBytes()`、`copyTo()`、`appendText()`，**不提供** `list()`、`mkdir()`
-> - **中性对象**（路径不存在）：提供全部 API，属性返回默认值（`size=0`、`isDirectory=false`、`isFile=false`、`exists=false`），写操作可成功（自动创建），读操作会抛异常
+> - **中性对象**（路径不存在）：提供全部 API，属性返回默认值（`size=0`、`isDirectory=false`、`isFile=true`、`exists=false`），写操作可成功（自动创建），读操作会抛异常
 
 | 方法 | 中文别名 | 说明 |
 |------|----------|------|
@@ -1377,7 +1402,7 @@ f.writeBytes(modified);
 | `writeBytes(bytes)` | `写字节(bytes)` | （仅文件对象）写入字节数组 |
 | `writeText(text)` | `写文本(text)` | （仅文件对象）写入文本（UTF-8） |
 | `appendText(text)` | `追加文本(text)` | （仅文件对象）追加文本 |
-| `copyTo(toPath)` | `复制到(toPath)` | （仅文件对象）通过解压管线复制文件到目标目录 |
+| `copyTo(toPath)` | `复制到(toPath)` | （仅文件对象）通过解压管线复制文件；`toPath` 带扩展名时按目标文件处理并重命名，否则视为目标目录 |
 | `renameTo(newPath)` | `重命名到(newPath)` / `移动到(newPath)` | 重命名/移动（文件/目录均支持） |
 | `delete()` | `删除()` | 删除（文件/目录均支持） |
 | `exists()` | `存在()` | 是否存在（文件/目录均支持） |
@@ -1600,6 +1625,60 @@ var result = js.run(code);  // 20
 // jsScript: |
 //   var year = js.run("new Date().getFullYear()");
 //   "当前年份：" + year;
+```
+
+---
+
+## 8.6. audio - 音频控制
+
+`audio` 对象提供背景音乐（BGM）与音效（SFX）音量控制，取值均为 `0.0`（静音）~ `1.0`（最大）。
+
+> **中文别名说明**：`audio` 下的所有方法均支持中文别名。
+
+### 方法
+
+#### audio.getBgmVolume / audio.获取背景音乐音量
+
+获取当前背景音乐音量。
+
+**返回**：number - 音量值（0.0~1.0）
+
+```javascript
+var v = audio.getBgmVolume();   // 或 audio.获取背景音乐音量()
+```
+
+#### audio.setBgmVolume / audio.设置背景音乐音量
+
+设置背景音乐音量，会立即同步更新正在播放的音乐。
+
+**参数**：`volume` (number) - 音量值（0.0~1.0，超出范围会被钳制）
+
+**返回**：void
+
+```javascript
+audio.setBgmVolume(0.5);        // 或 audio.设置背景音乐音量(0.5)
+```
+
+#### audio.getSfxVolume / audio.获取音效音量
+
+获取当前音效音量。
+
+**返回**：number - 音量值（0.0~1.0）
+
+```javascript
+var sv = audio.getSfxVolume();  // 或 audio.获取音效音量()
+```
+
+#### audio.setSfxVolume / audio.设置音效音量
+
+设置音效音量，会同步更新所有已存在的音效播放器。
+
+**参数**：`volume` (number) - 音量值（0.0~1.0，超出范围会被钳制）
+
+**返回**：void
+
+```javascript
+audio.setSfxVolume(0.8);        // 或 audio.设置音效音量(0.8)
 ```
 
 ---
@@ -2052,6 +2131,7 @@ this.setValue("autoCollectThreshold", speed * 0.8);
 | `section.sliderValues` | `滑块值` | 所有 SLIDER 的值 |
 | `section.inputValues` | `输入值` | 所有 INPUT 的值 |
 | `section.infoValues` | `信息值` | 所有 INFO 的值 |
+| `section.descriptionValues` | `描述值` | 所有 DESCRIPTION 类型项的值 |
 
 #### 栏目项属性（均支持中文别名）
 
@@ -2073,8 +2153,8 @@ this.setValue("autoCollectThreshold", speed * 0.8);
 
 | 类型 | 属性 | 中文别名 | 说明 |
 |------|------|----------|------|
-| RADIO | `item.selected` | `选中` | 是否选中（可读写） |
-| CHECKBOX | `item.checked` | `勾选` | 选中状态（可读写） |
+| RADIO | `item.selected` / `item.checked` | `选中` | 是否选中（可读写；`selected` 与 `checked` 均可，二者等价） |
+| CHECKBOX | `item.checked` | `勾选` / `选中` | 选中状态（可读写） |
 | SLIDER | `item.value` | `值` | 当前值（可读写） |
 | SLIDER | `item.minValue` | `最小值` | 最小值 |
 | SLIDER | `item.maxValue` | `最大值` | 最大值 |
@@ -2114,26 +2194,26 @@ var inputs = section.inputValues;
 // 所有 INFO 的值
 // 返回格式: { itemId1: value1, itemId2: value2, ... }
 var infos = section.infoValues;
+
+// 所有 DESCRIPTION 的值
+// 返回格式: { itemId1: value1, itemId2: value2, ... }
+var descriptions = section.descriptionValues;
 ```
 
 ### this.findById / this.查找
 
-快速查找栏目或栏目项。
+快速查找栏目或栏目项。**仅接受一个 `id` 参数**：先在全局栏目项中查找，找不到再按栏目 ID 查找；返回对应的栏目项对象或栏目对象，未找到返回 `null`。
 
 ```javascript
-// 英文写法
+// 英文写法：按栏目项 ID 查找
 var item = this.findById("auto_collect_js");
 
 // 中文写法（等效）
 var item = this.查找("auto_collect_js");
 
-// 双参数精确查找
-var item = this.findById("栏目ID", "栏目项ID");
-var item = this.查找("栏目ID", "栏目项ID");
-
-// 使用子属性查找
-var item = this.findById.item("栏目项ID");
-var section = this.findById.section("栏目ID");
+// 也可按栏目 ID 查找（返回栏目对象）
+var section = this.findById("js_linkage");
+var section2 = this.查找("js_linkage");
 ```
 
 ### 游戏 Activity
@@ -2366,10 +2446,15 @@ npcs.save();
 
 ---
 
-*文档版本: 1.9*
-*最后更新: 2026-06-08*
-*新增：path.toInternalPath() / path.转换为内部路径() 函数文档*
-*新增：file.copy/file.复制 改用 JsUiManager.extract 解压管线（toPath 改为目标目录）*
-*新增：file.resolve() 按文件/目录类型拆分 API（目录对象不含文件API，文件对象不含目录API）*
-*新增：file.resolve() 路径不存在时返回中性对象（提供全部API，属性返回默认值）*
-*补充：file.list 改用 listDirectory() 实现（不拷贝缓存，返回占位符路径）*
+*文档版本: 2.0*
+*最后更新: 2026-07-17*
+*新增：audio 音频控制对象（getBgmVolume/setBgmVolume/getSfxVolume/setSfxVolume 及中文别名），并补入内置对象总览表（同时补 http）*
+*修正：http.json()/response.解析JSON() 返回已解析的 JS 对象（解析失败返回 null），非 JSON 字符串*
+*修正：pvz.<type>.all 返回 Array（数据对象数组），单个条目仍可由父对象按 code/name 访问*
+*修正：file.copy/file.复制 当 toPath 带扩展名时按目标文件处理并重命名，否则视为目标目录*
+*修正：file.list 路径无效时返回空数组 []（非 null）*
+*修正：file.resolve() 中性对象 isFile 实际为 true（兼具文件对象特征），并区分读写类/属性类方法的异常行为*
+*修正：storage.getAll() 返回数组（非 key-value 对象）*
+*修正：this.findById 仅接受单个 id 参数（返回 item 或 section 对象），无双参及 .item/.section 子属性*
+*补充：section 对象新增 descriptionValues/描述值；RADIO 项同时支持 checked/选中 别名*
+*补充：rton.load 支持直接加载 .json 文件；path.toInternalPath 相对路径自动按 $WORK_DIR 处理*

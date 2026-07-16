@@ -217,6 +217,75 @@ object PvzSaveFileManager {
         }
     }
 
+    /**
+     * 导出所有本地存档到 SAF 选择的目标目录
+     * 每个存档在目标目录下创建同名子目录
+     */
+    fun exportAllLocalSavesToDocumentFile(
+        context: Context,
+        localSaves: List<PvzLocalSaveEntity>,
+        targetDoc: DocumentFile,
+        onResult: (PvzSaveOperationResult) -> Unit
+    ) {
+        scope.launch(Dispatchers.IO) {
+            val result = try {
+                if (localSaves.isEmpty()) {
+                    PvzSaveOperationResult(
+                        type = PvzSaveOperationType.EXPORT,
+                        isSuccess = false,
+                        message = "没有可导出的本地存档"
+                    )
+                } else {
+                    var failCount = 0
+                    localSaves.forEach { save ->
+                        val saveDir = File(save.savePath)
+                        if (saveDir.exists() && saveDir.isDirectory) {
+                            try {
+                                val subDir = targetDoc.createDirectory(save.name ?: save.id)
+                                    ?: targetDoc.createDirectory(save.id)
+                                if (subDir != null) {
+                                    copyFileToDocumentFile(context, saveDir, subDir)
+                                } else {
+                                    failCount++
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                                failCount++
+                            }
+                        } else {
+                            failCount++
+                        }
+                    }
+                    if (failCount == 0) {
+                        PvzSaveOperationResult(
+                            type = PvzSaveOperationType.EXPORT,
+                            isSuccess = true,
+                            message = "所有本地存档导出成功（共 ${localSaves.size} 个）"
+                        )
+                    } else {
+                        PvzSaveOperationResult(
+                            type = PvzSaveOperationType.EXPORT,
+                            isSuccess = false,
+                            message = "部分存档导出失败（${failCount}/${localSaves.size}）"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                PvzSaveOperationResult(
+                    type = PvzSaveOperationType.EXPORT,
+                    isSuccess = false,
+                    message = "导出失败：${e.message ?: "未知错误"}",
+                    exception = e
+                )
+            }
+
+            launch(Dispatchers.Main) {
+                onResult(result)
+            }
+        }
+    }
+
     private const val TARGET_SAVE_FILE = "pp.dat" // 目标存档文件名
 
     // ======================== 新增：批量搜索结果封装类 ========================
@@ -655,6 +724,44 @@ object PvzSaveFileManager {
         } catch (e: Exception) {
             e.printStackTrace()
             // 清理临时文件
+            tempZipFile.delete()
+            shareFile.delete()
+            null
+        }
+    }
+
+    /**
+     * 打包单个存档目录为分享文件（与 packAllLocalSavesForShare 格式兼容）
+     * @param saveDir 存档目录（如游戏存档目录）
+     * @param saveName 存档名（zip 内的子目录名）
+     * @return FileProvider Uri，失败返回 null
+     */
+    suspend fun packSingleSaveForShare(
+        context: Context,
+        saveDir: File,
+        saveName: String = "game_save"
+    ): Uri? = withContext(Dispatchers.IO) {
+        if (!saveDir.exists() || !saveDir.isDirectory) return@withContext null
+
+        val tempZipFile = File(context.cacheDir, "single_save_${System.currentTimeMillis()}.zip")
+        val shareFile = File(context.cacheDir, "single_save_${System.currentTimeMillis()}$SHARE_FILE_EXTENSION")
+
+        try {
+            FileOutputStream(tempZipFile).use { fileOut ->
+                ZipOutputStream(fileOut).use { zipOut ->
+                    addDirToZip(saveDir, saveName, zipOut)
+                    zipOut.finish()
+                }
+            }
+
+            if (tempZipFile.renameTo(shareFile)) {
+                val authority = "${context.packageName}.fileprovider"
+                androidx.core.content.FileProvider.getUriForFile(context, authority, shareFile)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
             tempZipFile.delete()
             shareFile.delete()
             null

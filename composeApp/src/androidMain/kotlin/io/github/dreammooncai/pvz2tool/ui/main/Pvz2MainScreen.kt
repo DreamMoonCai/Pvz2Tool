@@ -97,7 +97,6 @@ import java.util.Date
 import io.github.dreammooncai.manager.FilePickerManager
 import io.github.dreammooncai.pvz2tool.VersionDef
 import io.github.dreammooncai.pvz2tool.controller.SoundController
-import io.github.dreammooncai.pvz2tool.service.LocalVpnService
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.z4kn4fein.semver.Version
@@ -666,6 +665,284 @@ private fun PresetSaveSection(
     )
 }
 
+// ========== 游戏存档（游玩存档）信息展示区域 ==========
+@Composable
+private fun GameSaveSection(
+    context: Context,
+    gameSaveDir: File,
+    filePickerManager: FilePickerManager?,
+    saveInfoDialogState: PvzSaveInfoDialogState,
+    version: VersionDef
+) {
+    val config = InitializePvz2.config
+    val saveConfig = config.ui.save
+    val operationState = remember { PvzSaveOperationState() }
+    val scope = rememberCoroutineScope()
+
+    // 存档用户名 + 最后修改时间
+    var userName by remember { mutableStateOf<String?>(null) }
+    var lastModified by remember { mutableStateOf<Long?>(null) }
+    var saveExists by remember { mutableStateOf(gameSaveDir.exists() && (gameSaveDir.listFiles()?.isNotEmpty() == true)) }
+
+    // 刷新触发器：当游戏存档发生变化（删除 / 覆盖 / 外部写入等）时重新加载信息
+    val refreshTrigger = remember { mutableLongStateOf(0L) }
+
+    DisposableEffect(context) {
+        val gameSaveChangeListener = { _: Long ->
+            refreshTrigger.longValue = System.currentTimeMillis()
+        }
+        PvzSaveFileManager.addGameSaveChangeListener(gameSaveChangeListener)
+        onDispose {
+            PvzSaveFileManager.removeGameSaveChangeListener(gameSaveChangeListener)
+        }
+    }
+
+    // 加载存档信息（从 pp.dat 读取用户名和修改时间）
+    // 监听 gameSaveDir 与 refreshTrigger，确保删除 / 覆盖等操作后信息能立即刷新
+    LaunchedEffect(gameSaveDir, refreshTrigger.longValue) {
+        userName = loadUserNameFromSave(context)
+        val ppDat = File(gameSaveDir, "pp.dat")
+        lastModified = if (ppDat.exists() && ppDat.length() > 0) ppDat.lastModified().takeIf { it > 0 } else null
+        saveExists = gameSaveDir.exists() && (gameSaveDir.listFiles()?.isNotEmpty() == true)
+    }
+
+    // ==========================
+    // 二次确认弹窗
+    // ==========================
+    val showConfirmDialog = remember { mutableStateOf(false) }
+    val confirmTitle = remember { mutableStateOf("") }
+    val confirmMessage = remember { mutableStateOf("") }
+    var onConfirmAction by remember { mutableStateOf({}) }
+
+    fun showConfirmDialog(
+        title: String,
+        message: String,
+        onConfirm: () -> Unit
+    ) {
+        confirmTitle.value = title
+        confirmMessage.value = message
+        onConfirmAction = onConfirm
+        showConfirmDialog.value = true
+    }
+
+    PvzConfirmDialog(
+        isVisible = showConfirmDialog.value,
+        title = confirmTitle.value,
+        message = confirmMessage.value,
+        onConfirm = onConfirmAction,
+        onDismiss = { showConfirmDialog.value = false }
+    )
+
+    val showExportOptionDialog = remember { mutableStateOf(false) }
+    val isFileProviderAvailable = remember { PvzSaveFileManager.isFileProviderRegistered(context) }
+
+    fun performExport() {
+        if (isFileProviderAvailable) {
+            showExportOptionDialog.value = true
+        } else {
+            // FileProvider 不可用，直接走文件夹导出
+            filePickerManager?.launch { uri, doc ->
+                if (uri != null && doc != null) {
+                    PvzSaveFileManager.exportGameSaveToDocumentFile(
+                        context = context,
+                        sourceDir = gameSaveDir,
+                        targetDoc = doc,
+                        onResult = operationState::postResult
+                    )
+                } else {
+                    operationState.postResult(PvzSaveOperationType.EXPORT failed config.ui.noValidDirTip)
+                }
+            }
+        }
+    }
+
+    fun performBackup() {
+        // 异步获取存档用户名，构造 "版本名 - 用户名 (时间)" 格式的默认名称
+        scope.launch {
+            val userName = loadUserNameFromSave(context)
+            val timePrefix = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date())
+            val defaultName = if (userName != null) {
+                "${version.name} - $userName ($timePrefix)"
+            } else {
+                "${version.name} ($timePrefix)"
+            }
+            saveInfoDialogState.show(
+                title = saveConfig.saveInfoTitle,
+                name = defaultName,
+                desc = saveConfig.defaultBackupDesc,
+            ) { name, desc ->
+                val newId = PvzLocalSaveManager.generateSaveId()
+                val backupDir = File(PvzLocalSaveManager.getLocalSaveRootDir(context), newId)
+                val result = PvzSaveFileManager.backupCurrentSave(
+                    context = context,
+                    gameSaveDir = gameSaveDir,
+                    backupDir = backupDir
+                )
+                if (!result.isSuccess) {
+                    return@show
+                }
+                handleSaveLocalSaveMeta(context, newId, backupDir, name, desc)
+                operationState.postResult(result)
+            }
+        }
+    }
+    // 结果弹窗
+    PvzSaveOperationResultDialog(
+        operationState = operationState,
+        onRetry = { result ->
+            when (result.type) {
+                PvzSaveOperationType.EXPORT -> performExport()
+                PvzSaveOperationType.BACKUP -> performBackup()
+                else -> operationState.reset()
+            }
+        }
+    )
+
+    // 标题
+    PvzRichText(
+        text = saveConfig.gameSaveLabel,
+        defaultStyle = PvzTextRedStyle,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+
+    if (!saveExists) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PvzRichText(text = saveConfig.gameSaveNotExistTip, fontSize = 18.sp, defaultStyle = PvzTextGrayStyle)
+        }
+        return
+    }
+
+    // 存档信息展示
+    val displayUser = userName ?: saveConfig.gameSaveUnknownUser
+    val displayTime = lastModified?.let {
+        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(it))
+    } ?: ""
+    val infoText = saveConfig.gameSaveInfoTemplate
+        .replace("%s", displayUser)
+        .replace("%t", displayTime)
+
+    PvzRichText(
+        text = infoText,
+        fontSize = 14.sp,
+        defaultStyle = PvzTextStyle(Color(0xFF423F00)),
+        modifier = Modifier.padding(bottom = 12.dp)
+    )
+
+    // 导出选项弹窗
+    PvzStyledDialog(
+        isVisible = showExportOptionDialog.value,
+        titleText = saveConfig.exportOptionTitle,
+        onDismissRequest = { showExportOptionDialog.value = false },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        bottomContent = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                PvzGreenButton(
+                    text = saveConfig.exportToFolderOption,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    icon = Icons.Default.Folder,
+                    onClick = {
+                        showExportOptionDialog.value = false
+                        filePickerManager?.launch { uri, doc ->
+                            if (uri != null && doc != null) {
+                                PvzSaveFileManager.exportGameSaveToDocumentFile(
+                                    context = context,
+                                    sourceDir = gameSaveDir,
+                                    targetDoc = doc,
+                                    onResult = operationState::postResult
+                                )
+                            } else {
+                                operationState.postResult(PvzSaveOperationType.EXPORT failed config.ui.noValidDirTip)
+                            }
+                        }
+                    }
+                )
+                PvzBlueButton(
+                    text = saveConfig.shareAsPackageOption,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    icon = Icons.Default.Share,
+                    onClick = {
+                        showExportOptionDialog.value = false
+                        scope.launch {
+                            val shareUri = PvzSaveFileManager.packSingleSaveForShare(context, gameSaveDir)
+                            if (shareUri != null) {
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = PvzSaveFileManager.SHARE_FILE_MIME_TYPE
+                                    putExtra(Intent.EXTRA_STREAM, shareUri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, config.ui.dialog.shareSaveChooserTitle))
+                            } else {
+                                operationState.postResult(
+                                    PvzSaveOperationResult(
+                                        type = PvzSaveOperationType.EXPORT,
+                                        isSuccess = false,
+                                        message = config.ui.dialog.sharePackFailedTip
+                                    )
+                                )
+                            }
+                        }
+                    }
+                )
+            }
+        }
+    ) {}
+
+    // 导出游玩存档
+    PvzBlueButton(
+        text = saveConfig.exportGameSaveButton,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = Pvz2Constants.Dimension.PADDING_SMALL.dp)
+            .height(Pvz2Constants.Dimension.BUTTON_HEIGHT_SMALL.dp),
+        icon = Icons.Default.Upload,
+        onClick = ::performExport
+    )
+
+    // 备份游玩存档
+    PvzPurpleButton(
+        text = saveConfig.backupGameSaveButton,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = Pvz2Constants.Dimension.PADDING_SMALL.dp)
+            .height(Pvz2Constants.Dimension.BUTTON_HEIGHT_SMALL.dp),
+        icon = Icons.Default.Backup,
+        onClick = ::performBackup
+    )
+
+    // 删除游玩存档
+    PvzRedButton(
+        text = saveConfig.deleteGameSaveButton,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = Pvz2Constants.Dimension.PADDING_SMALL.dp)
+            .height(Pvz2Constants.Dimension.BUTTON_HEIGHT_SMALL.dp),
+        icon = Icons.Default.DeleteForever,
+        onClick = {
+            // 高风险操作必须弹出二次确认
+            showConfirmDialog(
+                title = saveConfig.deleteGameSaveConfirmTitle,
+                message = saveConfig.deleteGameSaveConfirmMessage,
+                onConfirm = {
+                    val result = PvzSaveFileManager.deleteCurrentGameSave(gameSaveDir = gameSaveDir)
+                    operationState.postResult(result)
+                }
+            )
+        }
+    )
+}
+
 // ========== 提取的本地存档区域组件 ==========
 @Composable
 private fun LocalSaveSection(
@@ -693,7 +970,7 @@ private fun LocalSaveSection(
     val showConfirmDialog = remember { mutableStateOf(false) }
     val confirmTitle = remember { mutableStateOf("") }
     val confirmMessage = remember { mutableStateOf("") }
-    var onConfirmAction by remember { mutableStateOf<() -> Unit>({}) }
+    var onConfirmAction by remember { mutableStateOf({}) }
 
     fun showConfirmDialog(
         title: String,
@@ -722,6 +999,10 @@ private fun LocalSaveSection(
     // 操作函数（原有逻辑保留）
     // ==========================
     val scope = rememberCoroutineScope()
+
+    // 本地存档导出选项弹窗状态（需在结果弹窗之前声明）
+    val showLocalExportOptionDialog = remember { mutableStateOf(false) }
+    val isFileProviderAvailable = remember { PvzSaveFileManager.isFileProviderRegistered(context) }
 
     fun performShareAllSaves() {
         if (localSaves.isEmpty()) {
@@ -767,15 +1048,21 @@ private fun LocalSaveSection(
     }
 
     fun performExport() {
-        filePickerManager?.launch { uri, doc ->
-            if (uri != null && doc != null) {
-                PvzSaveFileManager.exportGameSaveToDocumentFile(
-                    context = context,
-                    sourceDir = gameSaveDir,
-                    targetDoc = doc, onResult = operationState::postResult
-                )
-            } else {
-                operationState.postResult(PvzSaveOperationType.EXPORT failed config.ui.noValidDirTip)
+        if (isFileProviderAvailable) {
+            showLocalExportOptionDialog.value = true
+        } else {
+            // FileProvider 不可用，直接走文件夹导出
+            filePickerManager?.launch { uri, doc ->
+                if (uri != null && doc != null) {
+                    PvzSaveFileManager.exportAllLocalSavesToDocumentFile(
+                        context = context,
+                        localSaves = localSaves,
+                        targetDoc = doc,
+                        onResult = operationState::postResult
+                    )
+                } else {
+                    operationState.postResult(PvzSaveOperationType.EXPORT failed config.ui.noValidDirTip)
+                }
             }
         }
     }
@@ -848,6 +1135,7 @@ private fun LocalSaveSection(
                     return@show
                 }
                 handleSaveLocalSaveMeta(context, newId, backupDir, name, desc)
+                operationState.postResult(result)
             }
         }
     }
@@ -961,10 +1249,53 @@ private fun LocalSaveSection(
         }
     }
 
-    val isFileProviderAvailable = remember {
-        mutableStateOf(PvzSaveFileManager.isFileProviderRegistered(context))
-    }
-    if (localSaves.isNotEmpty() && isFileProviderAvailable.value)
+    PvzStyledDialog(
+        isVisible = showLocalExportOptionDialog.value,
+        titleText = saveConfig.exportOptionTitle,
+        onDismissRequest = { showLocalExportOptionDialog.value = false },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        bottomContent = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                PvzGreenButton(
+                    text = saveConfig.exportToFolderOption,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    icon = Icons.Default.Folder,
+                    onClick = {
+                        showLocalExportOptionDialog.value = false
+                        filePickerManager?.launch { uri, doc ->
+                            if (uri != null && doc != null) {
+                                PvzSaveFileManager.exportAllLocalSavesToDocumentFile(
+                                    context = context,
+                                    localSaves = localSaves,
+                                    targetDoc = doc,
+                                    onResult = operationState::postResult
+                                )
+                            } else {
+                                operationState.postResult(PvzSaveOperationType.EXPORT failed config.ui.noValidDirTip)
+                            }
+                        }
+                    }
+                )
+                PvzBlueButton(
+                    text = saveConfig.shareAsPackageOption,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    icon = Icons.Default.Share,
+                    onClick = {
+                        showLocalExportOptionDialog.value = false
+                        performShareAllSaves()
+                    }
+                )
+            }
+        }
+    ) {}
+
+    if (localSaves.isNotEmpty())
         PvzGreenButton(
             text = saveConfig.shareButton,
             modifier = Modifier
@@ -972,18 +1303,8 @@ private fun LocalSaveSection(
                 .padding(bottom = Pvz2Constants.Dimension.PADDING_SMALL.dp)
                 .height(Pvz2Constants.Dimension.BUTTON_HEIGHT_SMALL.dp),
             icon = Icons.Default.Share,
-            onClick = ::performShareAllSaves
+            onClick = ::performExport
         )
-
-    PvzBlueButton(
-        text = saveConfig.exportButton,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp)
-            .height(Pvz2Constants.Dimension.BUTTON_HEIGHT_SMALL.dp),
-        icon = Icons.Default.Upload,
-        onClick = ::performExport
-    )
 
     PvzOrangeButton(
         text = saveConfig.importButton,
@@ -993,36 +1314,6 @@ private fun LocalSaveSection(
             .height(Pvz2Constants.Dimension.BUTTON_HEIGHT_SMALL.dp),
         icon = Icons.Default.Download,
         onClick = ::performImport
-    )
-
-    PvzPurpleButton(
-        text = saveConfig.backupButton,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp)
-            .height(Pvz2Constants.Dimension.BUTTON_HEIGHT_SMALL.dp),
-        Icons.Default.Backup,
-        onClick = ::performBackup
-    )
-
-    PvzRedButton(
-        text = saveConfig.deleteGameSaveButton,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp)
-            .height(Pvz2Constants.Dimension.BUTTON_HEIGHT_SMALL.dp),
-        icon = Icons.Default.DeleteForever,
-        onClick = {
-            // 高风险操作必须弹出二次确认
-            showConfirmDialog(
-                title = saveConfig.deleteGameSaveConfirmTitle,
-                message = saveConfig.deleteGameSaveConfirmMessage,
-                onConfirm = {
-                    val result = PvzSaveFileManager.deleteCurrentGameSave(gameSaveDir = gameSaveDir)
-                    operationState.postResult(result)
-                }
-            )
-        }
     )
 
     PvzRedButton(
@@ -1102,6 +1393,24 @@ private fun DynamicSectionComponent(
             // 统一的弹窗状态类
             val saveInfoDialogState = remember { PvzSaveInfoDialogState() }
             PvzSaveInfoDialog(dialogState = saveInfoDialogState)
+
+            // 游戏存档（游玩存档）信息区域
+            GameSaveSection(
+                context = context,
+                gameSaveDir = gameSaveDir,
+                filePickerManager = filePickerManager,
+                saveInfoDialogState = saveInfoDialogState,
+                version = version
+            )
+
+            // 分割线
+            HorizontalDivider(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                thickness = 1.dp,
+                color = Color(0xFFA1510D)
+            )
 
             // 预设存档区域
             if (section.items.isNotEmpty()) {
