@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.documentfile.provider.DocumentFile
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import io.github.dreammooncai.pvz2tool.view.PvzCollapsiblePanelTheme
+import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import kotlinx.serialization.Serializable
 import java.io.File
 
@@ -128,7 +129,10 @@ data class DynamicSection(
     fun resolveTargetDirectory(): File {
         return when (val path = this.targetPath) {
             null -> Pvz2ToolConfig.rootDirectory.resolve(InitializePvz2.config.smfDirectory)
-            else -> Pvz2ToolConfig.rootDirectory.resolve(path)
+            else -> {
+                val resolved = JsFileResolver.resolvePlaceholders(path)
+                if (resolved.startsWith("/")) File(resolved) else Pvz2ToolConfig.rootDirectory.resolve(resolved)
+            }
         }
     }
 
@@ -137,7 +141,7 @@ data class DynamicSection(
      * 如果 jsPath 已配置则直接返回；否则返回默认路径 `version/版本ID/栏目ID/main.js`。
      */
     fun resolveJsPath(version: VersionDef): String {
-        return jsPath ?: "version/${version.id}/$id/main.js"
+        return jsPath?.let { JsFileResolver.resolvePlaceholders(it) } ?: "version/${version.id}/$id/main.js"
     }
 
     fun readJs(version: VersionDef) = jsScript ?: AssetExtractorHolder.openInputStream(resolveJsPath(version))?.use { inputStream ->
@@ -245,7 +249,7 @@ data class SectionItem(
      * @param section 当前 item 所属的 Section
      */
     fun resolvePath(section: DynamicSection, version: VersionDef): String {
-        return this.assetPath ?: "version/${version.id}/${section.id}/${this.id}"
+        return this.assetPath?.let { JsFileResolver.resolvePlaceholders(it) } ?: "version/${version.id}/${section.id}/${this.id}"
     }
 
     /**
@@ -254,7 +258,7 @@ data class SectionItem(
      * @param section 当前 item 所属的 Section
      */
     fun resolveJsPath(section: DynamicSection, version: VersionDef): String {
-        return this.jsPath ?: "version/${version.id}/${section.id}/${this.id}/main.js"
+        return this.jsPath?.let { JsFileResolver.resolvePlaceholders(it) } ?: "version/${version.id}/${section.id}/${this.id}/main.js"
     }
 
     fun readJs(section: DynamicSection, version: VersionDef) = jsScript?.takeIf { it.isNotBlank() } ?: AssetExtractorHolder.openInputStream(resolveJsPath(section,version))?.use { inputStream ->
@@ -291,7 +295,7 @@ data class VersionDef(
     }
 
     fun resolveAssetPath(): String {
-        return assetPath ?: "version/$id/smf"
+        return assetPath?.let { JsFileResolver.resolvePlaceholders(it) } ?: "version/$id/smf"
     }
 
     /**
@@ -299,7 +303,7 @@ data class VersionDef(
      * 如果 enterGamePath 已配置则直接返回；否则返回默认路径 `version/版本ID/main.js`。
      */
     fun resolveEnterGamePath(): String {
-        return enterGamePath ?: "version/$id/main.js"
+        return enterGamePath?.let { JsFileResolver.resolvePlaceholders(it) } ?: "version/$id/main.js"
     }
 
     fun readJs() = enterGameScript ?: AssetExtractorHolder.openInputStream(resolveEnterGamePath())?.use { inputStream ->
@@ -613,7 +617,7 @@ data class Pvz2ToolConfigUIAssets(
      * - 否则拼接为 assets 下的 sound 路径
      */
     val resolvedBackgroundMusic: String get() = run {
-        val musicPath = backgroundMusic
+        val musicPath = JsFileResolver.resolvePlaceholders(backgroundMusic)
         if (isUrl(musicPath) || musicPath.startsWith("/")) musicPath else "sound/$musicPath"
     }
 
@@ -624,7 +628,7 @@ data class Pvz2ToolConfigUIAssets(
      * - 否则拼接为 video 路径（用于 AssetExtractorHolder.open()）
      */
     val resolvedCgVideoPath: String get() = run {
-        val videoPath = cgVideoPath
+        val videoPath = JsFileResolver.resolvePlaceholders(cgVideoPath)
         if (isUrl(videoPath) || videoPath.startsWith("/")) videoPath else "video/$videoPath"
     }
 

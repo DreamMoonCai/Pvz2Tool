@@ -51,6 +51,7 @@ import com.petterp.floatingx.listener.IFxConfigStorage
 import com.petterp.floatingx.listener.control.IFxScopeControl
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.Pvz2ToolTheme
+import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.service.LocalVpnService
 import io.github.dreammooncai.pvz2tool.ui.main.SettingsDialogState
 import io.github.dreammooncai.pvz2tool.view.PvzGreenButton
@@ -384,7 +385,7 @@ object FloatingBallController {
         ) {
             Box(contentAlignment = Alignment.Center) {
                 AsyncImageFromAssets(
-                    if (InitializePvz2.config.ui.assets.floatingBallIcon.startsWith("/")) InitializePvz2.config.ui.assets.floatingBallIcon else "images/${InitializePvz2.config.ui.assets.floatingBallIcon}",
+                    JsFileResolver.resolvePlaceholders(InitializePvz2.config.ui.assets.floatingBallIcon).let { if (it.startsWith("/")) it else "images/$it" },
                     contentDescription = "PVZ2 戴夫",
                     modifier = Modifier
                         .size(Constants.BALL_SIZE - 8.dp)

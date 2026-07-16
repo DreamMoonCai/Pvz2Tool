@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.isEmpty
 import io.github.dreammooncai.pvz2tool.InitializePvz2
+import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import io.github.dreammooncai.pvz2tool.ui.main.GameDisplaySettingsContent
 import io.github.dreammooncai.pvz2tool.ui.main.SettingsDialogState
@@ -74,7 +75,7 @@ object GameDisplayFloatingController {
             if (contentParent.isEmpty()) return
 
             val originalGameRoot = contentParent.getChildAt(0) as ViewGroup
-            val sideBgPath = InitializePvz2.config.ui.assets.sideBgImage
+            val sideBgPath = JsFileResolver.resolvePlaceholders(InitializePvz2.config.ui.assets.sideBgImage)
             val resolvedSideBgPath = if (sideBgPath.startsWith("/")) sideBgPath else "images/$sideBgPath"
             AssetExtractorHolder.openInputStream(resolvedSideBgPath)?.use { stream ->
                 contentParent.background = android.graphics.drawable.BitmapDrawable(

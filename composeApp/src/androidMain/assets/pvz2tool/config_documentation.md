@@ -25,13 +25,13 @@
 | `versions[n].id` | String | 是 | 版本唯一标识 ID，不可重复 |
 | `versions[n].name` | String | 是 | 版本展示名称 |
 | `versions[n].desc` | String | 是 | 版本描述文本 |
-| `versions[n].icon` | String | 否 | 版本图标路径，基于 `pvz2tool/images/` 目录；以 `/` 开头则为绝对路径 |
+| `versions[n].icon` | String | 否 | 版本图标路径，基于 `pvz2tool/images/` 目录；支持绝对路径（`/` 开头）和占位符变量 |
 | `versions[n].default` | Boolean | 否 | 是否为默认选中版本，仅第一个设为 `true` 的版本生效，默认 `false` |
 | `versions[n].baseAssetPath` | String | 否 | 基础资源路径，默认 `version/base/smf`；无需基础资源时填写 `null`（不带引号） |
-| `versions[n].assetPath` | String | 否 | 该版本的核心资源路径，默认 `version/版本ID/smf` |
+| `versions[n].assetPath` | String | 否 | 该版本的核心资源路径，默认 `version/版本ID/smf`；支持占位符变量 |
 | `versions[n].forceOverride` | Boolean | 否 | 版本级强制覆盖开关，开启后该版本所有资源解压时会强制覆盖目标文件，可突破"即时模式文件保护"逻辑 |
 | `versions[n].enterGameScript` | String | 否 | 进入游戏前执行的 JS 脚本（版本级）；仅在选中该版本时触发，优先级高于根级 `enterGameScript` |
-| `versions[n].enterGamePath` | String | 否 | 进入游戏前执行的 JS 脚本文件路径（版本级）；`enterGameScript` 为空时从该路径加载；默认路径 `version/版本ID/main.js`；文件不存在且 `enterGameScript` 也为空则不执行 |
+| `versions[n].enterGamePath` | String | 否 | 进入游戏前执行的 JS 脚本文件路径（版本级）；`enterGameScript` 为空时从该路径加载；默认路径 `version/版本ID/main.js`；文件不存在且 `enterGameScript` 也为空则不执行；支持占位符变量 |
 
 **游戏存档版本隔离**：
 - 不同版本的游戏存档完全隔离，互不影响
@@ -50,13 +50,13 @@
 | `sections[n].id` | String | 是 | 功能栏唯一标识 ID，不可重复；**特殊值：`saves` 自动渲染本地存档+预设存档一体化功能** |
 | `sections[n].title` | String | 是 | 功能栏展示标题 |
 | `sections[n].visibleOnVersionIds` | Array | 否 | 配置该栏目在哪些版本下显示，不配置则所有版本可见，如 `["old","new"]` |
-| `sections[n].targetPath` | String | 否 | 资源目标目录路径，不配置则默认使用 `smfDirectory` |
+| `sections[n].targetPath` | String | 否 | 资源目标目录路径，不配置则默认使用 `smfDirectory`；支持占位符变量（如 `$ANDROID_FILES/pvz2_tools`） |
 | `sections[n].addItems` | Boolean | 否 | **本地配置专属**：是否追加模式；`true` 追加到 APK 内置配置同 ID 栏目；`false`（默认）替换 |
 | `sections[n].isExpanded` | Boolean | 否 | 是否默认展开该功能栏，默认 `false` |
 | `sections[n].confirmButtonText` | String | 否 | 保存按钮文字，默认 `null`（不显示按钮） |
 | `sections[n].theme` | String | 否 | 栏目主题颜色，默认 `BROWN`；可选值见主题颜色列表 |
 | `sections[n].jsScript` | String | 否 | 栏目级 JS 脚本；`confirmButtonText` 存在时点击按钮后执行，否则进入游戏时执行 |
-| `sections[n].jsPath` | String | 否 | 栏目级 JS 脚本文件路径；`jsScript` 为空时从该路径加载；默认路径 `version/版本ID/栏目ID/main.js`；文件不存在且 `jsScript` 也为空则不执行 |
+| `sections[n].jsPath` | String | 否 | 栏目级 JS 脚本文件路径；`jsScript` 为空时从该路径加载；默认路径 `version/版本ID/栏目ID/main.js`；文件不存在且 `jsScript` 也为空则不执行；支持占位符变量 |
 
 **功能栏类型（type）**：
 | 类型 | 说明 |
@@ -78,11 +78,11 @@
 | `items[n].type` | String | 全部 | **必填**，决定渲染类型：`RADIO` \| `CHECKBOX` \| `DESCRIPTION` \| `BUTTON` \| `SLIDER` \| `INPUT` \| `INFO` |
 | `items[n].name` | String | 全部 | 功能项展示标题 |
 | `items[n].desc` | String | 全部 | 功能项描述文本 |
-| `items[n].icon` | String | 全部 | 图标路径，基于 `pvz2tool/images/` 目录；以 `/` 开头则为绝对路径 |
-| `items[n].assetPath` | String | 全部 | 功能项的资源路径；不配置默认 `version/版本ID/栏目ID/功能项ID`（**注意**：`$SMF` 占位符指向版本目录，而非此字段） |
+| `items[n].icon` | String | 全部 | 图标路径，基于 `pvz2tool/images/` 目录；支持绝对路径（`/` 开头）和占位符变量 |
+| `items[n].assetPath` | String | 全部 | 功能项的资源路径；不配置默认 `version/版本ID/栏目ID/功能项ID`（**注意**：`$SMF` 占位符指向版本目录，而非此字段）；支持占位符变量 |
 | `items[n].default` | Boolean | RADIO/CHECKBOX | 是否默认选中/开启 |
 | `items[n].jsScript` | String | BUTTON/RADIO/CHECKBOX/SLIDER/INFO | 点击/切换时执行的 JS 脚本，支持 async/await；**当 assetPath 目录下存在 SMF 文件时，脚本可通过 `this.data` 访问并修改 SMF 数据** |
-| `items[n].jsPath` | String | BUTTON/RADIO/CHECKBOX/SLIDER/INFO | JS 脚本文件路径；当 `jsScript` 为空时从该路径加载 JS 文件；默认 `version/版本ID/栏目ID/功能项ID/main.js` |
+| `items[n].jsPath` | String | BUTTON/RADIO/CHECKBOX/SLIDER/INFO | JS 脚本文件路径；当 `jsScript` 为空时从该路径加载 JS 文件；默认 `version/版本ID/栏目ID/功能项ID/main.js`；支持占位符变量 |
 | `items[n].smfList` | Array | BUTTON/RADIO/CHECKBOX | SMF 基名列表，如 `["dynamic"]`；用于 JS 中 `$SMF` 占位符解析和 SMF 数据修改；不配置则不加载 SMF；查找顺序：1. `pvz2tool/version/版本ID/smf/<名称>(.rsb.smf/.obb)` 2. `pvz2tool/<baseAssetPath>/<名称>(.rsb.smf/.obb)`,对于obb文件内置对象名为data.obb |
 
 **按钮类型专属字段（BUTTON）**：
@@ -123,7 +123,7 @@
 |------|------|------|
 | `infoValue` | String | 信息展示的默认值，当 JS 脚本执行后返回空值时显示 |
 | `jsScript` | String | **INFO 专属**：首次加载或重新加载时执行的 JS 脚本，返回值显示在信息框中 |
-| `jsPath` | String | JS 脚本文件路径；当 `jsScript` 为空时从该路径加载 JS 文件；默认 `version/版本ID/栏目ID/功能项ID/main.js` |
+| `jsPath` | String | JS 脚本文件路径；当 `jsScript` 为空时从该路径加载 JS 文件；默认 `version/版本ID/栏目ID/功能项ID/main.js`；支持占位符变量 |
 
 > **INFO 类型 JS 执行时机**：首次加载页面或版本切换时自动执行 JS，脚本返回值作为信息框显示内容。
 
@@ -338,8 +338,8 @@ ui:
   tutorial:        # 教程内容
 ```
 
-**资源路径 URL 与绝对路径支持说明：**
-以下配置字段支持 URL（`http://` 或 `https://`）和绝对路径（以 `/` 开头），检测到 URL 则直接使用远程资源，检测到绝对路径则直接使用本地文件系统：
+**资源路径 URL、绝对路径与占位符支持说明：**
+以下配置字段支持 URL（`http://` 或 `https://`）、绝对路径（以 `/` 开头）和占位符变量，检测到 URL 则直接使用远程资源，检测到绝对路径则直接使用本地文件系统，占位符会自动展开为实际路径：
 - `ui.assets.background` — 背景图片
 - `ui.assets.backgroundMusic` — 背景音乐
 - `ui.assets.cgVideoPath` — CG 开场视频
@@ -347,6 +347,45 @@ ui:
 - `ui.assets.cgVideoPoster` — CG 开场视频加载超时或失败时的海报图片
 - `ui.sounds.*` — 所有音效文件
 - `versions[n].icon` / `items[n].icon` — 图标路径（以 `/` 开头时为绝对路径）
+- `versions[n].assetPath` / `versions[n].enterGamePath` — 资源路径 / JS 脚本路径
+- `sections[n].targetPath` — 资源目标目录路径
+- `sections[n].jsPath` / `items[n].jsPath` — JS 脚本文件路径
+- `items[n].assetPath` — 功能项资源路径
+
+**支持的占位符变量**（详见 `js_documentation.md` 占位符路径章节）：
+| 占位符 | 说明 |
+|--------|------|
+| `$WORK_DIR` | 用户 SAF 工作目录 |
+| `$GAME_SAVES` | 游戏存档目录 |
+| `$GAME_SMF` | 游戏 SMF 目录 |
+| `$APP_DATA` | 应用内部数据目录 |
+| `$APP_FILES` | 应用内部文件目录 |
+| `$APP_CACHE` | 应用内部缓存目录 |
+| `$ANDROID_DATA` | 应用外部数据根目录 |
+| `$ANDROID_FILES` | 应用外部文件目录 |
+| `$ANDROID_CACHE` | 应用外部缓存目录 |
+
+> **注意**：`$SMF`、`$ITEM`、`$JS_DIR` 依赖版本/栏目上下文，仅在 JS 环境中可用，配置文件中无法使用。
+
+**配置中使用占位符示例**：
+```yaml
+versions:
+  - id: "v2"
+    icon: "$APP_FILES/icons/v2_icon.png"    # 应用内部文件目录下的图标
+    assetPath: "$WORK_DIR/custom_assets"     # SAF 工作目录下的自定义资源
+    enterGamePath: "$ANDROID_FILES/scripts/init.js"  # 外部存储下的 JS 脚本
+
+sections:
+  - id: "tools"
+    targetPath: "$ANDROID_FILES/pvz2_tools"  # 外部存储下的工具目录
+    jsPath: "$APP_FILES/js/tools.js"         # 应用内部的 JS 脚本
+    items:
+      - id: "export"
+        type: BUTTON
+        icon: "$APP_FILES/icons/export.png"
+        assetPath: "$WORK_DIR/export_data"
+        jsPath: "$ANDROID_CACHE/scripts/export.js"
+```
 
 **title 配置详解**：
 | 属性 | 类型 | 说明 |
@@ -443,15 +482,15 @@ ui:
 **assets 配置详解：**
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `background` | String | `bg_main.jpg` | 背景图片路径（支持 URL 和绝对路径） |
+| `background` | String | `bg_main.jpg` | 背景图片路径（支持 URL、绝对路径和占位符） |
 | `isUseSolidColorBackground` | Boolean | `true` | 是否使用纯色背景（false 则使用 background 图片） |
-| `backgroundMusic` | String | `bg_music.wav` | 背景音乐文件名（支持 URL 和绝对路径） |
+| `backgroundMusic` | String | `bg_music.wav` | 背景音乐文件名（支持 URL、绝对路径和占位符） |
 | `isPlayBackgroundMusic` | Boolean | `true` | 是否默认播放背景音乐 |
-| `cgVideoPath` | String | `opening.mp4` | CG 开场视频路径，相对于 `video/` 目录（支持 URL 和绝对路径） |
+| `cgVideoPath` | String | `opening.mp4` | CG 开场视频路径，相对于 `video/` 目录（支持 URL、绝对路径和占位符） |
 | `cgVideoLoadTimeout` | Long | `5000` | CG 开场视频超时时间，默认5秒超时 |
-| `cgVideoPoster` | String | null | CG 开场视频加载超时或失败时的海报图片（支持 URL 和绝对路径） |
-| `sideBgImage` | String | `game_side_bg.jpg` | 游戏侧边背景图，相对于 `images/` 目录（支持绝对路径） |
-| `floatingBallIcon` | String | `ic_floating_dave.png` | 悬浮球图标，相对于 `images/` 目录（支持绝对路径） |
+| `cgVideoPoster` | String | null | CG 开场视频加载超时或失败时的海报图片（支持 URL、绝对路径和占位符） |
+| `sideBgImage` | String | `game_side_bg.jpg` | 游戏侧边背景图，相对于 `images/` 目录（支持绝对路径和占位符） |
+| `floatingBallIcon` | String | `ic_floating_dave.png` | 悬浮球图标，相对于 `images/` 目录（支持绝对路径和占位符） |
 
 **sounds 配置详解：**
 | 属性 | 类型 | 默认值 | 说明 |

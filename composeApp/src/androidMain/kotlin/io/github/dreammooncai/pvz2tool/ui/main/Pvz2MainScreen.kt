@@ -99,6 +99,7 @@ import io.github.dreammooncai.pvz2tool.VersionDef
 import io.github.dreammooncai.pvz2tool.controller.SoundController
 import io.github.dreammooncai.pvz2tool.service.LocalVpnService
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
+import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.z4kn4fein.semver.Version
 import io.github.dreammooncai.pvz2tool.js.JsConsole
 import io.github.dreammooncai.pvz2tool.js.JsLogLevel
@@ -289,7 +290,8 @@ private fun SectionSwitchItem(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        item.icon?.let { path ->
+        item.icon?.let { rawPath ->
+            val path = JsFileResolver.resolvePlaceholders(rawPath)
             AsyncImageFromAssets(
                 if (path.startsWith("/")) path else "images/$path",
                 contentDescription = item.name,
@@ -429,7 +431,8 @@ private fun SectionButtonItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 图标（可选）
-            item.icon?.let { path ->
+            item.icon?.let { rawPath ->
+                val path = JsFileResolver.resolvePlaceholders(rawPath)
                 AsyncImageFromAssets(
                     if (path.startsWith("/")) path else "images/$path",
                     contentDescription = item.name,
@@ -618,10 +621,9 @@ private fun PresetSaveSection(
                 )
                 onStateChange(newState)
             },
-            leadingIconPath = item.icon,
+            leadingIconPath = item.icon?.let { JsFileResolver.resolvePlaceholders(it) },
         )
     }
-
     val confirmBtnText = section.confirmButtonText ?: saveConfig.coverPresetButton
     // 确认按钮：增加二次确认
     confirmBtnText.let { btnText ->
@@ -1157,7 +1159,7 @@ private fun DynamicSectionComponent(
                                 label = item.name,
                                 subLabel = item.desc,
                                 selected = isSelected,
-                                leadingIconPath = item.icon,
+                                leadingIconPath = item.icon?.let { JsFileResolver.resolvePlaceholders(it) },
                                 theme = theme,
                                 onSelect = {
                                     val newState = state.copy(
@@ -1623,7 +1625,8 @@ private fun DynamicSectionComponent(
                                             defaultStyle = PvzTextStyle(infoTextColor),
                                             modifier = Modifier.weight(1f)
                                         )
-                                        item.icon?.let { iconPath ->
+                                        item.icon?.let { rawIconPath ->
+                                            val iconPath = JsFileResolver.resolvePlaceholders(rawIconPath)
                                             AsyncImageFromAssets(
                                                 if (iconPath.startsWith("/")) iconPath else "images/$iconPath",
                                                 contentDescription = item.name,
@@ -2412,7 +2415,7 @@ fun Pvz2MainScreen(
         // 背景与UI设置
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImageFromAssets(
-                if (config.ui.assets.background.startsWith("/")) config.ui.assets.background else "images/${config.ui.assets.background}",
+                JsFileResolver.resolvePlaceholders(config.ui.assets.background).let { if (it.startsWith("/")) it else "images/$it" },
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize()
             )
@@ -2687,7 +2690,7 @@ fun Pvz2MainScreen(
                                             subLabel = version.desc,
                                             selected = tempVersion == version,
                                             onSelect = { tempVersion = version },
-                                            leadingIconPath = version.icon
+                                            leadingIconPath = version.icon?.let { JsFileResolver.resolvePlaceholders(it) }
                                         )
                                     }
                                     Spacer(modifier = Modifier.height(Pvz2Constants.Dimension.PADDING_SMALL.dp))

@@ -37,6 +37,7 @@ import androidx.core.net.toUri
 import io.github.dreammooncai.manager.FilePickerManager
 import io.github.dreammooncai.pvz2tool.controller.GameDisplayFloatingController
 import io.github.dreammooncai.pvz2tool.controller.FloatingBallController
+import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.js.JsSmfDataManager
 import io.github.dreammooncai.pvz2tool.js.code.JsPvz
 import io.github.dreammooncai.pvz2tool.js.code.PvzToolGlobals
@@ -127,7 +128,7 @@ class Pvz2InitializeActivity : ComponentActivity() {
                         videoPath = InitializePvz2.config.ui.assets.resolvedCgVideoPath,
                         onSkip = onCgSkip,
                         onVideoEnd = onCgSkip,
-                        posterImagePath = InitializePvz2.config.ui.assets.cgVideoPoster.takeIf { !it.isNullOrEmpty() },
+                        posterImagePath = InitializePvz2.config.ui.assets.cgVideoPoster?.takeIf { it.isNotEmpty() }?.let { JsFileResolver.resolvePlaceholders(it) },
                         loadTimeoutMillis = InitializePvz2.config.ui.assets.cgVideoLoadTimeout
                     )
                     return@Pvz2ToolTheme

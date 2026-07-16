@@ -68,16 +68,16 @@ class PvzToolContexts(
 
         // path.app
         listOf("app".js, "应用".js) eq Object("app") {
-            listOf("data".js, "数据".js)  eq InitializePvz2.context.dataDir.absolutePath.js
-            listOf("files".js, "文件".js) eq InitializePvz2.context.filesDir.absolutePath.js
-            listOf("cache".js, "缓存".js) eq InitializePvz2.context.cacheDir.absolutePath.js
+            listOf("data".js, "数据".js)  eq JsFileResolver.APP_DATA.js
+            listOf("files".js, "文件".js) eq JsFileResolver.APP_FILES.js
+            listOf("cache".js, "缓存".js) eq JsFileResolver.APP_CACHE.js
         }
 
         // path.android
         listOf("android".js, "安卓".js) eq Object("android") {
-            listOf("data".js, "数据".js)  eq InitializePvz2.context.getExternalFilesDir(null)!!.parent!!.js
-            listOf("files".js, "文件".js) eq InitializePvz2.context.getExternalFilesDir(null)!!.absolutePath.js
-            listOf("cache".js, "缓存".js) eq InitializePvz2.context.externalCacheDir!!.absolutePath.js
+            listOf("data".js, "数据".js)  eq JsFileResolver.ANDROID_DATA.js
+            listOf("files".js, "文件".js) eq JsFileResolver.ANDROID_FILES.js
+            listOf("cache".js, "缓存".js) eq JsFileResolver.ANDROID_CACHE.js
         }
 
         // path.pvz

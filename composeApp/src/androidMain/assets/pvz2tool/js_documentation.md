@@ -297,18 +297,18 @@ console.日志("开始处理...");
 
 | 属性 | 中文别名 | 说明 | 示例值 |
 |------|----------|------|--------|
-| `path.app.data` | `path.应用.数据` | 应用私有数据目录 | `/data/data/com.popcap.pvz2restart` |
-| `path.app.files` | `path.应用.文件` | 应用文件目录 | `/data/data/com.popcap.pvz2restart/files` |
-| `path.app.cache` | `path.应用.缓存` | 应用缓存目录 | `/data/data/com.popcap.pvz2restart/cache` |
-| `path.android.data` | `path.安卓.数据` | Android 外部数据目录 | `/storage/emulated/0/Android/data/com.popcap.pvz2restart` |
-| `path.android.files` | `path.安卓.文件` | Android 外部文件目录 | `/storage/emulated/0/Android/data/com.popcap.pvz2restart/files` |
-| `path.android.cache` | `path.安卓.缓存` | Android 外部缓存目录 | `/storage/emulated/0/Android/data/com.popcap.pvz2restart/cache` |
-| `path.pvz.saves` | `path.植物大战僵尸.存档` | 游戏存档目录 | 解析后的绝对路径 |
-| `path.pvz.smf` | `path.植物大战僵尸.资源` | 游戏 smf 目录 | 解析后的绝对路径 |
-| `path.pvz2tool.files` | `path.工具.文件` | 工具箱工作目录 | 解析后的绝对路径 |
-| `path.pvz2tool.smf` | `path.工具.SMF` | 当前选中版本的 SMF 目录 | `<WORK_DIR>/<version.assetPath>` |
-| `path.pvz2tool.section` | `path.工具.资源` | 当前功能所在的资源目录（$ITEM） | `<WORK_DIR>/<item.assetPath>` |
-| `path.pvz2tool.jsDir` | `path.工具.JS目录` | 执行当前JS所在的 JS 目录 | `<WORK_DIR>/<item.jsPath.dir/section.jsPath.dir>` |
+| `path.app.data` | `path.应用.数据` | 应用私有数据目录 | `$APP_DATA`（即 `/data/user/0/<包名>`） |
+| `path.app.files` | `path.应用.文件` | 应用文件目录 | `$APP_FILES`（即 `/data/user/0/<包名>/files`） |
+| `path.app.cache` | `path.应用.缓存` | 应用缓存目录 | `$APP_CACHE`（即 `/data/user/0/<包名>/cache`） |
+| `path.android.data` | `path.安卓.数据` | Android 外部数据目录 | `$ANDROID_DATA`（即 `/storage/emulated/0/Android/data/<包名>`） |
+| `path.android.files` | `path.安卓.文件` | Android 外部文件目录 | `$ANDROID_FILES`（即 `/storage/emulated/0/Android/data/<包名>/files`） |
+| `path.android.cache` | `path.安卓.缓存` | Android 外部缓存目录 | `$ANDROID_CACHE`（即 `/storage/emulated/0/Android/data/<包名>/cache`） |
+| `path.pvz.saves` | `path.植物大战僵尸.存档` | 游戏存档目录 | `$GAME_SAVES` |
+| `path.pvz.smf` | `path.植物大战僵尸.资源` | 游戏 smf 目录 | `$GAME_SMF` |
+| `path.pvz2tool.files` | `path.工具.文件` | 工具箱工作目录 | `$WORK_DIR` |
+| `path.pvz2tool.smf` | `path.工具.SMF` | 当前选中版本的 SMF 目录 | `$SMF` |
+| `path.pvz2tool.section` | `path.工具.资源` | 当前功能所在的资源目录 | `$ITEM` |
+| `path.pvz2tool.jsDir` | `path.工具.JS目录` | 执行当前JS所在的 JS 目录 | `$JS_DIR` |
 
 ### 方法
 
@@ -2198,7 +2198,13 @@ if (this.all.js_linkage.speed_normal.selected) {
 | `$GAME_SMF` | 游戏 smf 目录（基于 config.smfDirectory） | `$GAME_SMF/main.rton` |
 | `$SMF` | 当前选中版本的 smf 目录 | `$SMF/resources.rsb` |
 | `$ITEM` | 栏目下的 item assetPath，降级到 $SMF | `$ITEM/config.json` |
-| `$JS_DIR` | 栏目下的 item jsPath.dir，没有则逐级递升 | `$ITEM/config.json` |
+| `$JS_DIR` | 栏目下的 item jsPath.dir，没有则逐级递升 | `$JS_DIR/helper.js` |
+| `$APP_DATA` | 应用内部数据目录 | `$APP_DATA/shared_prefs/` |
+| `$APP_FILES` | 应用内部文件目录 | `$APP_FILES/config.json` |
+| `$APP_CACHE` | 应用内部缓存目录 | `$APP_CACHE/temp.dat` |
+| `$ANDROID_DATA` | 应用外部数据根目录 | `$ANDROID_DATA/files/` |
+| `$ANDROID_FILES` | 应用外部文件目录 | `$ANDROID_FILES/saves/` |
+| `$ANDROID_CACHE` | 应用外部缓存目录 | `$ANDROID_CACHE/export/` |
 
 ### 占位符解析规则
 
@@ -2208,6 +2214,8 @@ if (this.all.js_linkage.speed_normal.selected) {
 - `$GAME_SAVES` - 从配置 `sections[id="saves"].targetPath` 解析
 - `$GAME_SMF` - `rootDirectory + config.smfDirectory`
 - `$WORK_DIR` - 用户选择的 SAF 工作目录
+- `$APP_DATA` / `$APP_FILES` / `$APP_CACHE` - 应用内部存储绝对路径（`/data/user/0/<包名>/...`），不依赖版本/栏目上下文
+- `$ANDROID_DATA` / `$ANDROID_FILES` / `$ANDROID_CACHE` - 应用外部存储绝对路径（`/storage/emulated/0/Android/data/<包名>/...`），不依赖版本/栏目上下文
 
 ### 示例
 
@@ -2225,6 +2233,15 @@ var configPath = path.resolve("$WORK_DIR/config.json");
 // 解包游戏资源
 var gameSmfDir = path.resolve("$GAME_SMF");
 rsb.unpack(gameSmfDir + "/resources.rsb", gameSmfDir + "/unpacked");
+
+// 读取应用内部文件
+var internalFile = file.readText("$APP_FILES/my_config.json");
+
+// 列出外部数据目录下的文件
+var files = file.list("$ANDROID_FILES/");
+
+// 读取外部缓存中的临时文件
+var data = file.readText("$ANDROID_CACHE/export/result.json");
 ```
 
 ---

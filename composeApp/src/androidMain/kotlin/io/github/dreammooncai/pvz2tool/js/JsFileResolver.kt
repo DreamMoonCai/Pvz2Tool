@@ -6,18 +6,13 @@ import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import io.github.dreammooncai.pvz2tool.DynamicSection
 import io.github.dreammooncai.pvz2tool.InitializePvz2
+import io.github.dreammooncai.pvz2tool.Pvz2ToolConfig
 import io.github.dreammooncai.pvz2tool.SectionItem
 import io.github.dreammooncai.pvz2tool.VersionDef
-import io.github.dreammooncai.pvz2tool.js.JsFileResolver.Companion.GAME_SAVES
-import io.github.dreammooncai.pvz2tool.js.JsFileResolver.Companion.GAME_SMF
-import io.github.dreammooncai.pvz2tool.js.JsFileResolver.Companion.JS_DIR
-import io.github.dreammooncai.pvz2tool.js.JsFileResolver.Companion.ITEM
-import io.github.dreammooncai.pvz2tool.js.JsFileResolver.Companion.SMF
-import io.github.dreammooncai.pvz2tool.js.JsFileResolver.Companion.WORK_DIR
 import java.io.File
 import java.io.FileOutputStream
 
-private val SUPPORTED_PREFIXES = listOf(WORK_DIR, GAME_SAVES, GAME_SMF, SMF, ITEM, JS_DIR)
+private val SUPPORTED_PREFIXES = listOf(JsFileResolver.WORK_DIR, JsFileResolver.GAME_SAVES, JsFileResolver.GAME_SMF, JsFileResolver.SMF, JsFileResolver.ITEM, JsFileResolver.JS_DIR, JsFileResolver.APP_DATA, JsFileResolver.APP_FILES, JsFileResolver.APP_CACHE, JsFileResolver.ANDROID_DATA, JsFileResolver.ANDROID_FILES, JsFileResolver.ANDROID_CACHE)
 
 /**
  * JS 环境中的文件路径解析器。
@@ -55,6 +50,99 @@ open class JsFileResolver(
         const val ITEM = $$"$ITEM"
         const val JS_DIR = $$"$JS_DIR"
 
+        // 应用内部存储（/data/user/0/<pkg>/...）
+        const val APP_DATA = $$"$APP_DATA"
+        const val APP_FILES = $$"$APP_FILES"
+        const val APP_CACHE = $$"$APP_CACHE"
+
+        // 应用外部存储（/storage/emulated/0/Android/data/<pkg>/...）
+        const val ANDROID_DATA = $$"$ANDROID_DATA"
+        const val ANDROID_FILES = $$"$ANDROID_FILES"
+        const val ANDROID_CACHE = $$"$ANDROID_CACHE"
+
+
+        // ======================== 占位符路径解析（非 JS 环境可用） ========================
+
+        /**
+         * 将路径字符串中的占位符变量展开为实际绝对路径。
+         * 此方法不依赖 JS 上下文，可在配置解析、UI 渲染等场景中直接调用。
+         *
+         * 支持的占位符：
+         * - `$WORK_DIR` → 用户 SAF 工作目录
+         * - `$GAME_SAVES` → 游戏存档目录
+         * - `$GAME_SMF` → 游戏 SMF 目录
+         * - `$APP_DATA` / `$APP_FILES` / `$APP_CACHE` → 应用内部存储
+         * - `$ANDROID_DATA` / `$ANDROID_FILES` / `$ANDROID_CACHE` → 应用外部存储
+         *
+         * 注意：`$SMF`、`$ITEM`、`$JS_DIR` 依赖版本/栏目上下文，此方法无法解析，
+         * 仅在 JS 环境中通过 JsFileResolver 实例解析。
+         *
+         * @param path 可能包含占位符的路径字符串，如 `$APP_DATA/custom/file.txt`
+         * @return 展开后的绝对路径；若占位符无法解析则原样返回
+         */
+        fun resolvePlaceholders(path: String): String {
+            if (!path.startsWith("$")) return path
+
+            val ctx = InitializePvz2.context
+
+            // 简单占位符：不需要上下文即可解析
+            val resolved = when {
+                path == WORK_DIR || path.startsWith("$WORK_DIR/") -> {
+                    val workDir = InitializePvz2.config.getLocalWorkDir(ctx)
+                    val root = workDir?.uri?.path?.let { File(it) }
+                    resolveWithRoot(root, path, WORK_DIR)
+                }
+                path == GAME_SAVES || path.startsWith("$GAME_SAVES/") -> {
+                    // 内联解析，避免通过 resolveTargetDirectory() 递归回调
+                    val savesSection = InitializePvz2.config.sections.find { it.id == "saves" }
+                    val root = savesSection?.let { section ->
+                        val tp = section.targetPath
+                        when (tp) {
+                            null -> Pvz2ToolConfig.rootDirectory.resolve(InitializePvz2.config.smfDirectory)
+                            else -> {
+                                val resolvedTp = if (tp.startsWith("/")) tp else tp  // targetPath 本身不递归展开
+                                if (resolvedTp.startsWith("/")) File(resolvedTp) else Pvz2ToolConfig.rootDirectory.resolve(resolvedTp)
+                            }
+                        }
+                    }
+                    resolveWithRoot(root, path, GAME_SAVES)
+                }
+                path == GAME_SMF || path.startsWith("$GAME_SMF/") -> {
+                    val root = Pvz2ToolConfig.rootDirectory.resolve(InitializePvz2.config.smfDirectory)
+                    resolveWithRoot(root, path, GAME_SMF)
+                }
+                path == APP_DATA || path.startsWith("$APP_DATA/") -> {
+                    resolveWithRoot(ctx.dataDir, path, APP_DATA)
+                }
+                path == APP_FILES || path.startsWith("$APP_FILES/") -> {
+                    resolveWithRoot(ctx.filesDir, path, APP_FILES)
+                }
+                path == APP_CACHE || path.startsWith("$APP_CACHE/") -> {
+                    resolveWithRoot(ctx.cacheDir, path, APP_CACHE)
+                }
+                path == ANDROID_DATA || path.startsWith("$ANDROID_DATA/") -> {
+                    val root = ctx.getExternalFilesDir(null)?.parentFile
+                    resolveWithRoot(root, path, ANDROID_DATA)
+                }
+                path == ANDROID_FILES || path.startsWith("$ANDROID_FILES/") -> {
+                    val root = ctx.getExternalFilesDir(null)
+                    resolveWithRoot(root, path, ANDROID_FILES)
+                }
+                path == ANDROID_CACHE || path.startsWith("$ANDROID_CACHE/") -> {
+                    val root = ctx.externalCacheDir
+                    resolveWithRoot(root, path, ANDROID_CACHE)
+                }
+                else -> null
+            }
+
+            return resolved ?: path
+        }
+
+        private fun resolveWithRoot(root: File?, path: String, placeholder: String): String? {
+            if (root == null) return null
+            val subPath = path.removePrefix(placeholder).trimStart('/')
+            return if (subPath.isEmpty()) root.absolutePath else File(root, subPath).absolutePath
+        }
 
         // ======================== 工具方法 ========================
 
@@ -201,6 +289,9 @@ open class JsFileResolver(
             path.startsWith(ITEM) -> ITEM
             path.startsWith(SMF) -> SMF
             path.startsWith("/") -> return path
+            // 绝对路径占位符没有 assets 内部路径对应
+            path.startsWith(APP_DATA) || path.startsWith(APP_FILES) || path.startsWith(APP_CACHE) ||
+            path.startsWith(ANDROID_DATA) || path.startsWith(ANDROID_FILES) || path.startsWith(ANDROID_CACHE) -> return null
             else -> return path // 相对路径原样返回
         }
 
@@ -298,6 +389,10 @@ open class JsFileResolver(
      * - "/absolute/path/to/file"       → 绝对路径，直接返回 DocumentFile
      */
     fun resolve(path: String, context: Context): DocumentFile? {
+        // 绝对路径占位符：直接解析为本地目录
+        val absDoc = resolveAbsolutePlaceholder(path, context)
+        if (absDoc != null) return absDoc
+
         // $SMF 特殊处理
         if (path == SMF || path.startsWith("$SMF/") || path == ITEM || path.startsWith("$ITEM/") || path == JS_DIR || path.startsWith("$JS_DIR/") || path == WORK_DIR || path.startsWith("$WORK_DIR/")) {
             val docFile = resolveSmfDocumentFile(path, context) ?: return null
@@ -317,6 +412,40 @@ open class JsFileResolver(
         }
 
         return null
+    }
+
+    // ======================== 绝对路径占位符解析 ========================
+
+    /**
+     * 解析绝对路径占位符（$APP_DATA、$ANDROID_FILES 等）。
+     * 这些占位符对应固定的本地目录，不依赖版本/栏目上下文。
+     *
+     * @return 解析后的 DocumentFile，若路径不匹配任何绝对路径占位符则返回 null
+     */
+    private fun resolveAbsolutePlaceholder(path: String, context: Context): DocumentFile? {
+        val basePlaceholder = when {
+            path.startsWith(APP_DATA) -> APP_DATA
+            path.startsWith(APP_FILES) -> APP_FILES
+            path.startsWith(APP_CACHE) -> APP_CACHE
+            path.startsWith(ANDROID_DATA) -> ANDROID_DATA
+            path.startsWith(ANDROID_FILES) -> ANDROID_FILES
+            path.startsWith(ANDROID_CACHE) -> ANDROID_CACHE
+            else -> return null
+        }
+
+        val rootFile: File = when (basePlaceholder) {
+            APP_DATA -> context.dataDir
+            APP_FILES -> context.filesDir
+            APP_CACHE -> context.cacheDir
+            ANDROID_DATA -> context.getExternalFilesDir(null)?.parentFile ?: return null
+            ANDROID_FILES -> context.getExternalFilesDir(null) ?: return null
+            ANDROID_CACHE -> context.externalCacheDir ?: return null
+            else -> return null
+        }
+
+        val subPath = path.removePrefix(basePlaceholder).trimStart('/')
+        val target = if (subPath.isEmpty()) rootFile else File(rootFile, subPath)
+        return if (target.exists()) DocumentFile.fromFile(target) else null
     }
 
     // ======================== $SMF 特殊解析 ========================
