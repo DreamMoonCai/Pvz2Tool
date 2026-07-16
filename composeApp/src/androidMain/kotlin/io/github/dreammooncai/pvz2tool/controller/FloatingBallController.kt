@@ -384,7 +384,7 @@ object FloatingBallController {
         ) {
             Box(contentAlignment = Alignment.Center) {
                 AsyncImageFromAssets(
-                    "images/${InitializePvz2.config.ui.assets.floatingBallIcon}",
+                    if (InitializePvz2.config.ui.assets.floatingBallIcon.startsWith("/")) InitializePvz2.config.ui.assets.floatingBallIcon else "images/${InitializePvz2.config.ui.assets.floatingBallIcon}",
                     contentDescription = "PVZ2 戴夫",
                     modifier = Modifier
                         .size(Constants.BALL_SIZE - 8.dp)

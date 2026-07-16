@@ -353,7 +353,7 @@ private fun PosterFallback(
     ) {
         if (posterPath != null) {
             AsyncImageFromAssets(
-                "images/${posterPath}",
+                if (posterPath.startsWith("/")) posterPath else "images/${posterPath}",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize()
             )

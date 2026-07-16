@@ -609,21 +609,23 @@ data class Pvz2ToolConfigUIAssets(
     /**
      * 解析背景音乐路径：
      * - 如果是 URL，直接返回
+     * - 如果是绝对路径（/ 开头），直接返回
      * - 否则拼接为 assets 下的 sound 路径
      */
     val resolvedBackgroundMusic: String get() = run {
         val musicPath = backgroundMusic
-        if (isUrl(musicPath)) musicPath else "sound/$musicPath"
+        if (isUrl(musicPath) || musicPath.startsWith("/")) musicPath else "sound/$musicPath"
     }
 
     /**
      * 解析 CG 视频路径：
      * - 如果是 URL，直接返回
+     * - 如果是绝对路径（/ 开头），直接返回
      * - 否则拼接为 video 路径（用于 AssetExtractorHolder.open()）
      */
     val resolvedCgVideoPath: String get() = run {
         val videoPath = cgVideoPath
-        if (isUrl(videoPath)) videoPath else "video/$videoPath"
+        if (isUrl(videoPath) || videoPath.startsWith("/")) videoPath else "video/$videoPath"
     }
 
 }

@@ -209,11 +209,11 @@ object DreamRootPath {
      * 手机类型
      */
     @JvmStatic
-    fun getPhoneType(tm: TelephonyManager): Int? {
+    fun getPhoneType(tm: TelephonyManager): Int {
         return try {
             tm.phoneType
         } catch (_: Exception) {
-            null
+            -1
         }
     }
 
@@ -222,11 +222,11 @@ object DreamRootPath {
      */
     @JvmStatic
     @RequiresPermission("android.permission.READ_PHONE_STATE")
-    fun getNetworkType(tm: TelephonyManager): Int? {
+    fun getNetworkType(tm: TelephonyManager): Int {
         return try {
             tm.networkType
         } catch (_: Exception) {
-            null
+            -1
         }
     }
 
@@ -234,11 +234,11 @@ object DreamRootPath {
      * SIM卡状态
      */
     @JvmStatic
-    fun getSimState(tm: TelephonyManager): Int? {
+    fun getSimState(tm: TelephonyManager): Int {
         return try {
             tm.simState
         } catch (_: Exception) {
-            null
+            -1
         }
     }
 
@@ -247,11 +247,11 @@ object DreamRootPath {
      */
     @JvmStatic
     @RequiresPermission("android.permission.READ_PHONE_STATE")
-    fun isNetworkRoaming(tm: TelephonyManager): Boolean? {
+    fun isNetworkRoaming(tm: TelephonyManager): Boolean {
         return try {
             tm.isNetworkRoaming
         } catch (_: Exception) {
-            null
+            false
         }
     }
 

@@ -252,7 +252,7 @@ private fun RadioButtonItem(
         ) {
             leadingIconPath?.let { path ->
                 AsyncImageFromAssets(
-                    "images/$path",
+                    if (path.startsWith("/")) path else "images/$path",
                     modifier = Modifier.size(30.dp)
                 )
                 Spacer(modifier = Modifier.width(Pvz2Constants.Dimension.PADDING_SMALL.dp))
@@ -291,7 +291,7 @@ private fun SectionSwitchItem(
     ) {
         item.icon?.let { path ->
             AsyncImageFromAssets(
-                "images/$path",
+                if (path.startsWith("/")) path else "images/$path",
                 contentDescription = item.name,
                 modifier = Modifier.size(30.dp)
             )
@@ -431,7 +431,7 @@ private fun SectionButtonItem(
             // 图标（可选）
             item.icon?.let { path ->
                 AsyncImageFromAssets(
-                    "images/$path",
+                    if (path.startsWith("/")) path else "images/$path",
                     contentDescription = item.name,
                     modifier = Modifier.size(30.dp)
                 )
@@ -1625,7 +1625,7 @@ private fun DynamicSectionComponent(
                                         )
                                         item.icon?.let { iconPath ->
                                             AsyncImageFromAssets(
-                                                "images/$iconPath",
+                                                if (iconPath.startsWith("/")) iconPath else "images/$iconPath",
                                                 contentDescription = item.name,
                                                 modifier = Modifier
                                                     .size(20.dp)
@@ -2412,7 +2412,7 @@ fun Pvz2MainScreen(
         // 背景与UI设置
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImageFromAssets(
-                "images/${config.ui.assets.background}",
+                if (config.ui.assets.background.startsWith("/")) config.ui.assets.background else "images/${config.ui.assets.background}",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize()
             )

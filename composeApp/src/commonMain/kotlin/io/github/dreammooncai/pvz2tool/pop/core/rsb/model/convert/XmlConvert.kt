@@ -1,5 +1,6 @@
 package io.github.dreammooncai.pvz2tool.pop.core.rsb.model.convert
 
+import io.github.dreammooncai.pvz2tool.pop.core.rsb.util.readXml
 import io.github.dreammooncai.pvz2tool.pop.plugin.io.CoroutineBinaryStream
 import org.w3c.dom.Document
 import org.w3c.dom.Element
@@ -12,10 +13,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 object XmlConvert {
 
     suspend fun xmlToDat(inFile: String, bs: CoroutineBinaryStream) {
-        val xmlData = File(inFile).readText()
-        val dbFactory = DocumentBuilderFactory.newInstance()
-        val dBuilder = dbFactory.newDocumentBuilder()
-        val xml: Document = dBuilder.parse(xmlData.byteInputStream())
+        val xml: Document = File(inFile).readXml()
         xml.documentElement.normalize()
 
         val root = xml.getElementsByTagName("ResourceManifest").item(0)

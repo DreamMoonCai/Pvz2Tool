@@ -33,6 +33,7 @@ import io.github.dreammooncai.pvz2tool.VersionDef
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.ui.main.DynamicSectionState
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
+import java.io.File
 
 // JS 执行上下文：携带当前渲染环境信息，使 {{js:...}} 可访问 this.当前
 data class JsExecutionContext(
@@ -55,7 +56,9 @@ val LocalJsExecutionContext = compositionLocalOf<JsExecutionContext?> { null }
 private suspend fun executeJsExprWithContext(expr: String, context: JsExecutionContext): String {
     return try {
         val result = if (expr.endsWith(".js")) {
-            val jsFile = AssetExtractorHolder.openInputStream("js/$expr")
+            val jsFile = if (expr.startsWith("/")) {
+                File(expr).inputStream()
+            } else AssetExtractorHolder.openInputStream("js/$expr")
             jsFile?.use { jsFile ->
                 val jsCode = jsFile.bufferedReader().readText()
                 PvzToolJsEngine.executeScript(
@@ -102,7 +105,9 @@ private suspend fun executeJsExprWithContext(expr: String, context: JsExecutionC
 private suspend fun executeJsExprNoContext(expr: String): String {
     return try {
         val result = if (expr.endsWith(".js")) {
-            val jsFile = AssetExtractorHolder.openInputStream("js/$expr")
+            val jsFile = if (expr.startsWith("/")) {
+                File(expr).inputStream()
+            } else AssetExtractorHolder.openInputStream("js/$expr")
             jsFile?.use { jsFile ->
                 val jsCode = jsFile.bufferedReader().readText()
                 PvzToolJsEngine.executeScript(jsCode)
@@ -374,8 +379,9 @@ fun PvzRichText(
                 placeholderVerticalAlign = PlaceholderVerticalAlign.Center
             )
         ) { _ ->
+            val imagePath = if (tag.path.startsWith("/")) tag.path else "images/${tag.path}"
             AsyncImageFromAssets(
-                "images/${tag.path}",
+                imagePath,
                 contentDescription = tag.path,
                 modifier = Modifier.fillMaxSize()
             )

@@ -30,6 +30,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
+import java.io.File
 import android.util.Base64 as AndroidBase64
 
 object PvzToolGlobals {
@@ -158,25 +159,38 @@ object PvzToolGlobals {
         // 获取资源信息：assets.info(path) -> { exists, size, lastModified, isDirectory }
         listOf("info".js, "信息".js).func(FunctionParam("path")) { args ->
             val path = toString(args[0])
-            val normalizedPath = if (path.startsWith("${Pvz2ToolConfig.PATH_NAME}/")) path else "${Pvz2ToolConfig.PATH_NAME}/$path"
-            val exists = AssetExtractorHolder.exist(path)
-            val isDir = InitializePvz2.context.isAssetDirExist(normalizedPath)
-            val isFile = InitializePvz2.context.isAssetFileExist(normalizedPath)
 
-            Object("info") {
-                "exists".js eq exists.js
-                "isDirectory".js eq isDir.js
-                "isFile".js eq isFile.js
-                "size".js eq (if (isFile) {
-                    try {
-                        InitializePvz2.context.assets.openFd(normalizedPath).use { it.length }
-                    } catch (e: Exception) {
-                        -1L
-                    }
-                } else -1L).js
-                "lastModified".js eq (if (isFile || isDir) {
-                    InitializePvz2.context.getAssetLastModified(normalizedPath)
-                } else 0L).js
+            if (path.startsWith("/")) {
+                // 绝对路径：使用本地文件系统
+                val file = File(path)
+                Object("info") {
+                    "exists".js eq file.exists().js
+                    "isDirectory".js eq file.isDirectory.js
+                    "isFile".js eq file.isFile.js
+                    "size".js eq (if (file.isFile) file.length() else -1L).js
+                    "lastModified".js eq (if (file.exists()) file.lastModified() else 0L).js
+                }
+            } else {
+                val normalizedPath = if (path.startsWith("${Pvz2ToolConfig.PATH_NAME}/")) path else "${Pvz2ToolConfig.PATH_NAME}/$path"
+                val exists = AssetExtractorHolder.exist(path)
+                val isDir = InitializePvz2.context.isAssetDirExist(normalizedPath)
+                val isFile = InitializePvz2.context.isAssetFileExist(normalizedPath)
+
+                Object("info") {
+                    "exists".js eq exists.js
+                    "isDirectory".js eq isDir.js
+                    "isFile".js eq isFile.js
+                    "size".js eq (if (isFile) {
+                        try {
+                            InitializePvz2.context.assets.openFd(normalizedPath).use { it.length }
+                        } catch (e: Exception) {
+                            -1L
+                        }
+                    } else -1L).js
+                    "lastModified".js eq (if (isFile || isDir) {
+                        InitializePvz2.context.getAssetLastModified(normalizedPath)
+                    } else 0L).js
+                }
             }
         }
 

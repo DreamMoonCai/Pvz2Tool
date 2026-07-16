@@ -46,7 +46,9 @@ class PvzToolContexts(
             val expr = toString(args[0])
             try {
                 val result = if (expr.endsWith(".js")) {
-                    val jsFile = AssetExtractorHolder.openInputStream("js/$expr")
+                    val jsFile = if (expr.startsWith("/")) {
+                        File(expr).inputStream()
+                    } else AssetExtractorHolder.openInputStream("js/$expr")
                     jsFile?.use { jsFile ->
                         val jsCode = jsFile.bufferedReader().readText()
                         PvzToolJsEngine.getJSEngine().compile(jsCode).invoke(this)

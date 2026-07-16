@@ -906,6 +906,14 @@ class AssetExtractorHolder(
          * 如果本地目录存在，从本地获取；否则从 assets 获取
          */
         fun listResources(internalPath: String): List<String> {
+            // 绝对路径：直接列出本地文件系统
+            if (internalPath.startsWith("/")) {
+                val dir = File(internalPath)
+                return if (dir.exists() && dir.isDirectory) {
+                    dir.listFiles()?.map { it.name } ?: emptyList()
+                } else emptyList()
+            }
+
             val localWorkDir = runCatching { InitializePvz2.config.getLocalWorkDir(InitializePvz2.context) }.getOrNull()
 
             if (localWorkDir != null) {
@@ -931,13 +939,22 @@ class AssetExtractorHolder(
 
         /**
          * 打开一个资源流或URL
-         * 优先级：URL > getLocalWorkDir (SAF/本地文件) > Assets
+         * 优先级：URL > 绝对路径(/开头) > getLocalWorkDir (SAF/本地文件) > Assets
          */
         fun open(path: String): Uri? {
             // 0. 检测是否为 URL（支持 http:// 和 https://）
             if (path.startsWith("http://") || path.startsWith("https://")) {
                 Log.d("SmartResource", "使用远程 URL: $path")
                 return Uri.parse(path)
+            }
+
+            // 0.5 绝对路径：直接使用本地文件系统
+            if (path.startsWith("/")) {
+                val file = File(path)
+                return if (file.exists() && file.canRead()) {
+                    Log.d("SmartResource", "使用绝对路径: $path")
+                    Uri.fromFile(file)
+                } else null
             }
 
             // 1. 获取本地工作目录
@@ -968,6 +985,10 @@ class AssetExtractorHolder(
         }.getOrNull()
 
         fun exist(path: String): Boolean {
+            // 绝对路径：直接检查本地文件系统
+            if (path.startsWith("/")) {
+                return File(path).exists()
+            }
             val localWorkDir = runCatching { InitializePvz2.config.getLocalWorkDir(InitializePvz2.context) }.getOrNull()
             if (localWorkDir != null) {
                 val localDocument = buildDocumentFilePath(localWorkDir, removeThePrefix(path))
@@ -977,7 +998,7 @@ class AssetExtractorHolder(
             return InitializePvz2.context.isAssetFileExist(assetPath) || InitializePvz2.context.isAssetDirExist(assetPath)
         }
 
-        private fun complementThePrefix(path: String): String = if (path.startsWith("${Pvz2ToolConfig.PATH_NAME}/")) path else if (path.startsWith("/")) "${Pvz2ToolConfig.PATH_NAME}$path" else "${Pvz2ToolConfig.PATH_NAME}/$path"
+        private fun complementThePrefix(path: String): String = if (path.startsWith("${Pvz2ToolConfig.PATH_NAME}/")) path else "${Pvz2ToolConfig.PATH_NAME}/$path"
 
         private fun removeThePrefix(path: String): String = path.removePrefix("${Pvz2ToolConfig.PATH_NAME}/").removePrefix(Pvz2ToolConfig.PATH_NAME)
 
@@ -987,6 +1008,15 @@ class AssetExtractorHolder(
             forceOverride: Boolean = false,
             sectionName: String = "" // 【新增】
         ): ResourcePair {
+            // 绝对路径：直接使用本地文件
+            if (internalPath.startsWith("/")) {
+                val file = File(internalPath)
+                if (file.exists()) {
+                    Log.d("SmartResource", "使用绝对路径文件: $internalPath")
+                    return ResourcePair(DocumentFile.fromFile(file), targetDir, forceOverride, sectionName)
+                }
+            }
+
             val localWorkDir = InitializePvz2.config.getLocalWorkDir(InitializePvz2.context) ?: run {
                 Log.w("SmartResource", "本地工作目录为空，使用APK Assets")
                 return ResourcePair(ResourceSource.AssetPath(complementThePrefix(internalPath)), targetDir, forceOverride, sectionName)

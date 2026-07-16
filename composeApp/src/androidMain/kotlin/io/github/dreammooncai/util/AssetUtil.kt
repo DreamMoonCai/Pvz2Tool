@@ -82,7 +82,11 @@ fun DocumentFile.toFile(context: Context): File? {
             docId?.split(":")?.let { split ->
                 if (split.size >= 2) {
                     val type = split[0]
-                    val path = split[1]
+                    val path = try {
+                        java.net.URLDecoder.decode(split[1], "UTF-8")
+                    } catch (e: Exception) {
+                        split[1]
+                    }
 
                     // 处理 "primary" (内置存储)
                     if ("primary".equals(type, ignoreCase = true)) {

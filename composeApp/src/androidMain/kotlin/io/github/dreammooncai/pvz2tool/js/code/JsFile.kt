@@ -244,7 +244,7 @@ class JsFile(
      */
     private fun buildFileObject(placeholderPath: String): JsObject {
         val context = InitializePvz2.context
-        val resolvedPath = access.normalizePath(placeholderPath)
+        val resolvedPath = JsFileAccess.normalizePath(placeholderPath)
         val inputFile = access.resolveInput(resolvedPath, context) ?: return Object("file-invalid") {
             listOf("name".js, "文件名".js) eq resolvedPath.trimEnd('/').substringAfterLast('/').js
             listOf("normalizePath".js, "规范路径".js) eq resolvedPath.js

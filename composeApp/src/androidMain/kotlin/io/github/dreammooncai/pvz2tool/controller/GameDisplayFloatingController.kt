@@ -74,7 +74,9 @@ object GameDisplayFloatingController {
             if (contentParent.isEmpty()) return
 
             val originalGameRoot = contentParent.getChildAt(0) as ViewGroup
-            AssetExtractorHolder.openInputStream("images/${InitializePvz2.config.ui.assets.sideBgImage}")?.use { stream ->
+            val sideBgPath = InitializePvz2.config.ui.assets.sideBgImage
+            val resolvedSideBgPath = if (sideBgPath.startsWith("/")) sideBgPath else "images/$sideBgPath"
+            AssetExtractorHolder.openInputStream(resolvedSideBgPath)?.use { stream ->
                 contentParent.background = android.graphics.drawable.BitmapDrawable(
                     activity.resources, android.graphics.BitmapFactory.decodeStream(stream)
                 )

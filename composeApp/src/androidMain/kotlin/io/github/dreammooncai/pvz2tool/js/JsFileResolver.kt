@@ -89,7 +89,11 @@ open class JsFileResolver(
                 val split = docId.split(":", limit = 2)
                 if (split.size >= 2) {
                     val type = split[0]
-                    val relativePath = split[1]
+                    val relativePath = try {
+                        java.net.URLDecoder.decode(split[1], "UTF-8")
+                    } catch (e: Exception) {
+                        split[1]
+                    }
 
                     if ("primary".equals(type, ignoreCase = true)) {
                         // 尝试 /storage/emulated/0
@@ -262,7 +266,7 @@ open class JsFileResolver(
         if (chosenBase == null) return null
 
         val result = if (subPath.isEmpty()) chosenBase else "$chosenBase/$subPath"
-        return if (result.isEmpty()) null else result
+        return result.ifEmpty { null }
     }
 
     // ======================== 公开 API ========================

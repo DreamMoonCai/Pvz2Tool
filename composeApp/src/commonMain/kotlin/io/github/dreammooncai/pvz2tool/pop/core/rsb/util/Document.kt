@@ -10,6 +10,7 @@ import javax.xml.transform.OutputKeys
 import javax.xml.transform.TransformerFactory
 import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
+import java.io.FileInputStream
 
 // ------------- 原生 DOM 必备工具方法 -------------
 
@@ -18,7 +19,10 @@ import javax.xml.transform.stream.StreamResult
 fun File.readXml(): Document {
     val factory = DocumentBuilderFactory.newInstance()
     val builder = factory.newDocumentBuilder()
-    return builder.parse(this)
+    // 打开文件流读取，不直接传File对象，规避中文路径编码bug
+    return this.inputStream().use { inputStream ->
+        builder.parse(inputStream)
+    }
 }
 
 /**
@@ -92,8 +96,10 @@ fun Document.writeXmlToFile(file: File) {
     transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2")
 
     val source = DOMSource(this)
-    val result = StreamResult(file)
-    transformer.transform(source, result)
+    file.outputStream().use { outputStream ->
+        val result = StreamResult(outputStream)
+        transformer.transform(source, result)
+    }
 }
 
 /** 给元素添加属性 */

@@ -351,7 +351,7 @@ var uri = path.resolveUri("$WORK_DIR/data.bin");
 - `$SMF/xxx` → `version/assetPath/xxx`（不存在则降级到 `version/baseAssetPath`）
 - `$ITEM/xxx` → `version/id/sectionId/itemId/xxx`（不存在则降级到 `$SMF`，再降级到 `baseAssetPath`）
 - `$JS_DIR/xxx` → `version/enterGamePath` 的父目录（不存在则逐级向上降级）
-- `/absolute/path` → `absolute/path`（去掉开头 `/`）
+- `/absolute/path` → 原样返回（绝对路径不经过 `pvz2tool/` 前缀处理）
 - `relative/path` → `relative/path`（相对路径原样返回）
 
 **参数**：
@@ -1549,7 +1549,8 @@ ui.extract(
 
 **执行逻辑**：
 1. **如果 `expr` 以 `.js` 结尾**：
-   - 优先从 `assets/js/` 目录读取 JS 文件并执行
+   - 如果路径以 `/` 开头（如 `/data/data/com.example/files/test.js`），作为**绝对路径**直接从本地文件系统读取
+   - 否则从 `assets/js/` 目录读取 JS 文件并执行
    - 如果找不到文件，则尝试从工作目录读取
    - 如果都找不到，则直接编译执行 `expr` 字符串
 2. **如果 `expr` 不以 `.js` 结尾**：
@@ -1563,9 +1564,12 @@ ui.extract(
 var result = js.run("1 + 2");  // 3
 var result2 = js.run("new Date().getFullYear()");  // 当前年份
 
-// 执行 assets/js/ 目录下的 JS 文件
+// 执行 assets/js/ 目录下的 JS 文件（相对路径）
 js.run("test.js");  // 执行 assets/js/test.js
 js.运行("test.js");  // 中文别名
+
+// 执行绝对路径的 JS 文件
+js.run("/data/data/com.example/files/scripts/helper.js");
 
 // 混用中英文
 js.call("test.js");
@@ -1585,11 +1589,14 @@ console.log("结果：" + sum);  // 3
 // helper;
 js.run("helper.js");  // 执行后返回 helper 对象
 
-// 示例3：动态生成并执行代码
+// 示例3：执行绝对路径的 JS 文件
+js.run("/data/data/com.example/files/scripts/custom.js");
+
+// 示例4：动态生成并执行代码
 var code = "var x = 10; x * 2;";
 var result = js.run(code);  // 20
 
-// 示例4：在 BUTTON 中使用
+// 示例5：在 BUTTON 中使用
 // jsScript: |
 //   var year = js.run("new Date().getFullYear()");
 //   "当前年份：" + year;
@@ -1602,6 +1609,11 @@ var result = js.run(code);  // 20
 `assets` 对象提供对工具箱内置资源的访问功能，支持本地覆盖优先和 URL 资源。
 
 此API仅支持 pvz2tool 目录(手动狗头)
+
+> **路径规则**：
+> - **相对路径**（如 `pvz2tool/config.json`）：相对于 `pvz2tool` 工作目录解析（本地优先 > Assets）
+> - **绝对路径**（以 `/` 开头，如 `/data/data/com.example/files/config.json`）：直接使用本地文件系统，无视工作目录
+> - **URL**（以 `http://` 或 `https://` 开头）：直接使用远程资源
 
 ### 方法
 

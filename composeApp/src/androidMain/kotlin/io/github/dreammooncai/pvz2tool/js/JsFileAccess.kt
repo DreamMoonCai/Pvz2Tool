@@ -30,12 +30,6 @@ open class JsFileAccess(
                 item: SectionItem?,
                 version: VersionDef): this(JsFileResolver(ActiveJsContext(section, item, version)))
 
-    /**
-     * 实例方法：规范化路径（委托给 companion object 的实现）。
-     * 裸相对路径（不以 / 或 $ 开头）自动补充 $WORK_DIR/ 前缀。
-     */
-    open fun normalizePath(path: String): String = Companion.normalizePath(path)
-
     companion object : JsFileAccess(JsFileResolver) {
 
         val cacheFileList = mutableListOf<InputFile>()
@@ -44,7 +38,7 @@ open class JsFileAccess(
          * 规范化路径：裸相对路径（不以 / 或 $ 开头）自动补充 $WORK_DIR/ 前缀。
          * 例如 "version" → "$WORK_DIR/version"
          */
-        override fun normalizePath(path: String): String {
+        fun normalizePath(path: String): String {
             if (path.startsWith("/") || path.startsWith("$")) return path
             return "${JsFileResolver.WORK_DIR}/$path"
         }
@@ -75,7 +69,7 @@ open class JsFileAccess(
                     mkdirs()
                     deleteOnExit()
                 }
-                docDir.listFiles()?.forEach { child ->
+                docDir.listFiles().forEach { child ->
                     val target = File(cacheDirFile, child.name ?: "temp")
                     if (child.isDirectory) {
                         target.mkdirs()
@@ -83,8 +77,7 @@ open class JsFileAccess(
                         try {
                             val data = JsFileResolver.readFromDocumentFile(child, context)
                             target.writeBytes(data)
-                        } catch (_: Exception) {
-                            // 跳过无法读取的子文件
+                        } catch (_: Exception) { // 跳过无法读取的子文件
                         }
                     }
                 }
@@ -320,7 +313,7 @@ open class JsFileAccess(
         // 尝试解析为 DocumentFile
         val docFile = resolver.resolve(path, context)
         if (docFile != null && docFile.isDirectory) {
-            return docFile.listFiles()?.mapNotNull { it.name } ?: emptyList()
+            return docFile.listFiles().mapNotNull { it.name }
         }
 
         // 工作目录未选择，尝试从 assets 列出

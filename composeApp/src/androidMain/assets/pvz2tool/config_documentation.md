@@ -25,7 +25,7 @@
 | `versions[n].id` | String | 是 | 版本唯一标识 ID，不可重复 |
 | `versions[n].name` | String | 是 | 版本展示名称 |
 | `versions[n].desc` | String | 是 | 版本描述文本 |
-| `versions[n].icon` | String | 否 | 版本图标路径，基于 `pvz2tool/images/` 目录 |
+| `versions[n].icon` | String | 否 | 版本图标路径，基于 `pvz2tool/images/` 目录；以 `/` 开头则为绝对路径 |
 | `versions[n].default` | Boolean | 否 | 是否为默认选中版本，仅第一个设为 `true` 的版本生效，默认 `false` |
 | `versions[n].baseAssetPath` | String | 否 | 基础资源路径，默认 `version/base/smf`；无需基础资源时填写 `null`（不带引号） |
 | `versions[n].assetPath` | String | 否 | 该版本的核心资源路径，默认 `version/版本ID/smf` |
@@ -78,7 +78,7 @@
 | `items[n].type` | String | 全部 | **必填**，决定渲染类型：`RADIO` \| `CHECKBOX` \| `DESCRIPTION` \| `BUTTON` \| `SLIDER` \| `INPUT` \| `INFO` |
 | `items[n].name` | String | 全部 | 功能项展示标题 |
 | `items[n].desc` | String | 全部 | 功能项描述文本 |
-| `items[n].icon` | String | 全部 | 图标路径，基于 `pvz2tool/images/` 目录 |
+| `items[n].icon` | String | 全部 | 图标路径，基于 `pvz2tool/images/` 目录；以 `/` 开头则为绝对路径 |
 | `items[n].assetPath` | String | 全部 | 功能项的资源路径；不配置默认 `version/版本ID/栏目ID/功能项ID`（**注意**：`$SMF` 占位符指向版本目录，而非此字段） |
 | `items[n].default` | Boolean | RADIO/CHECKBOX | 是否默认选中/开启 |
 | `items[n].jsScript` | String | BUTTON/RADIO/CHECKBOX/SLIDER/INFO | 点击/切换时执行的 JS 脚本，支持 async/await；**当 assetPath 目录下存在 SMF 文件时，脚本可通过 `this.data` 访问并修改 SMF 数据** |
@@ -338,14 +338,15 @@ ui:
   tutorial:        # 教程内容
 ```
 
-**资源路径 URL 支持说明：**
-以下配置字段支持 URL（`http://` 或 `https://`），检测到 URL 则直接使用远程资源：
+**资源路径 URL 与绝对路径支持说明：**
+以下配置字段支持 URL（`http://` 或 `https://`）和绝对路径（以 `/` 开头），检测到 URL 则直接使用远程资源，检测到绝对路径则直接使用本地文件系统：
 - `ui.assets.background` — 背景图片
 - `ui.assets.backgroundMusic` — 背景音乐
 - `ui.assets.cgVideoPath` — CG 开场视频
 - `ui.assets.cgVideoLoadTimeout` — CG 开场视频加载超时时间
 - `ui.assets.cgVideoPoster` — CG 开场视频加载超时或失败时的海报图片
 - `ui.sounds.*` — 所有音效文件
+- `versions[n].icon` / `items[n].icon` — 图标路径（以 `/` 开头时为绝对路径）
 
 **title 配置详解**：
 | 属性 | 类型 | 说明 |
@@ -442,15 +443,15 @@ ui:
 **assets 配置详解：**
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `background` | String | `bg_main.jpg` | 背景图片路径（支持 URL） |
+| `background` | String | `bg_main.jpg` | 背景图片路径（支持 URL 和绝对路径） |
 | `isUseSolidColorBackground` | Boolean | `true` | 是否使用纯色背景（false 则使用 background 图片） |
-| `backgroundMusic` | String | `bg_music.wav` | 背景音乐文件名（支持 URL） |
+| `backgroundMusic` | String | `bg_music.wav` | 背景音乐文件名（支持 URL 和绝对路径） |
 | `isPlayBackgroundMusic` | Boolean | `true` | 是否默认播放背景音乐 |
-| `cgVideoPath` | String | `opening.mp4` | CG 开场视频路径，相对于 `video/` 目录（支持 URL） |
+| `cgVideoPath` | String | `opening.mp4` | CG 开场视频路径，相对于 `video/` 目录（支持 URL 和绝对路径） |
 | `cgVideoLoadTimeout` | Long | `5000` | CG 开场视频超时时间，默认5秒超时 |
-| `cgVideoPoster` | String | null | CG 开场视频加载超时或失败时的海报图片 |
-| `sideBgImage` | String | `game_side_bg.jpg` | 游戏侧边背景图，相对于 `images/` 目录 |
-| `floatingBallIcon` | String | `ic_floating_dave.png` | 悬浮球图标，相对于 `images/` 目录 |
+| `cgVideoPoster` | String | null | CG 开场视频加载超时或失败时的海报图片（支持 URL 和绝对路径） |
+| `sideBgImage` | String | `game_side_bg.jpg` | 游戏侧边背景图，相对于 `images/` 目录（支持绝对路径） |
+| `floatingBallIcon` | String | `ic_floating_dave.png` | 悬浮球图标，相对于 `images/` 目录（支持绝对路径） |
 
 **sounds 配置详解：**
 | 属性 | 类型 | 默认值 | 说明 |
@@ -587,118 +588,28 @@ settings:
 - **行内图标 (Icon)**：
   - **格式**：`{{icon|width=宽度|height=高度:文件名}}`（`width`/`height` 可选，单位 dp）。
   - **参数**：
-     - `文件名`：`pvz2tool/images/` 下的图片文件名。
+     - `文件名`：`pvz2tool/images/` 下的图片文件名；以 `/` 开头则为绝对路径（如 `/data/data/com.example/files/icon.png`）。
      - `width=宽度`（可选）：图片宽度，单位 dp，默认 `fontSize * 1.2`。
      - `height=高度`（可选）：图片高度，单位 dp，默认 `fontSize * 1.2`。
-  - **自动化处理**：组件会自动扫描文本中的 `icon` 标签，并尝试从 `${Pvz2ToolConfig.PATH_NAME}/images/文件名` 加载图片。
+  - **自动化处理**：组件会自动扫描文本中的 `icon` 标签，并尝试从 `${Pvz2ToolConfig.PATH_NAME}/images/文件名` 加载图片（绝对路径则直接从本地文件系统加载）。
   - **视觉对齐**：图标大小会随字体大小（fontSize）自动缩放（约 1.2 倍），并保持垂直居中。
   - **示例**：
      - `消耗 {{icon:sun.png}} 50 点阳光`（默认宽度，高度 18dp）。
      - `{{icon|width=32|height=32:coin.png}}`（32dp 正方形图标）。
+     - `{{icon|width=24|height=24:/data/data/com.example/files/sword.png}}`（绝对路径图标）。
 
 - **JS 表达式 (JS)**：
   - **作用**：执行一段 JavaScript 表达式，并将结果插入到文本中。
   - **格式**：`{{js:表达式}}`/`{{js:JS路径}}`。
   - **参数**：
-    - `JS路径`：`pvz2tool/js/` 下的脚本文件名。
+    - `JS路径`：`pvz2tool/js/` 下的脚本文件名；以 `/` 开头则为绝对路径。
   - **递归解析**：JS 表达式的返回值如果包含 `{{...}}` 复合文本标签，会自动递归解析（支持颜色标签、链接标签、图标标签、嵌套 `{{js:...}}` 标签等）。
   - **示例**：
     - `{{js:test.js}}` → 执行`pvz2tool/js/test.js`并显示返回结果。
+    - `{{js:/data/data/com.example/files/helper.js}}` → 执行绝对路径的 JS 文件。
     - `{{js:1 + 2}}` → 显示为 `3`。
     - `{{js:new Date().getFullYear()}}` → 显示为当前年份。
     - `{{js: '状态：' + (hp > 0 ? '{{green:存活}}' : '{{red:阵亡}}') }}` → JS 返回的字符串中含有 `{{green:...}}` / `{{red:...}}` 标签，会被继续解析为对应颜色的文本。
     - `{{js: '道具：' + itemIcon }}`（其中 `itemIcon = '{{icon|height=18:sword.png}}'`）→ JS 返回的字符串中含有 `{{icon|...}}` 标签，会被继续解析并渲染为图标。
 
 ---
-
-### JS 脚本内置对象
-
-`BUTTON` 类型栏目的 `jsScript` 脚本运行在 KeightJS 沙箱环境中，可使用以下全局对象。
-
----
-
-#### `path` — 路径工具
-
-工作模式与微信小程序一致：使用**占位符前缀**代替硬编码绝对路径，运行时统一解析。
-
-所有路径属性在 JS 读取时**动态解析**为实际可读写的 File 绝对路径。
-
-##### 快捷路径子对象
-
-可直接读取的子对象，属性值均为通过 `JsFileResolver` 动态解析的**实际绝对路径字符串**：
-
-```js
-path.app.data   // → /data/data/io.github.dreammooncai.pvz2tool
-path.app.files   // → /data/data/io.github.dreammooncai.pvz2tool/files
-path.app.cache   // → /data/data/io.github.dreammooncai.pvz2tool/cache
-
-path.android.data   // → /sdcard/Android/data
-path.android.files  // → /sdcard/Android/data/io.github.dreammooncai.pvz2tool/files
-path.android.cache  // → /sdcard/Android/data/io.github.dreammooncai.pvz2tool/cache
-
-path.game.saves  // → <WORK_DIR>/<sections[id="saves"].targetPath>（通过 SAF 解析）
-
-path.pvz2tool.files  // → <WORK_DIR>（工具箱 SAF 配置根目录）
-path.pvz2tool.smf    // → <WORK_DIR>/<version.assetPath>（当前选中版本的 SMF 目录）
-path.pvz2tool.item    // → <WORK_DIR>/<item.assetPath/version.assetPath>（当前功能所在的 资源 目录）
-path.pvz2tool.jsDir    // → <WORK_DIR>/<item.jsPath.dir/section.jsPath.dir>（当前JS的所在目录）
-```
-
-> **注意**：`$SMF` 和 `path.pvz2tool.smf` 指向当前选中版本的 SMF 目录（`version.assetPath`），在任何 JS 脚本执行时均可访问。
-
-##### 文件访问机制
-
-所有文件操作（`rton.decode/encode/load/save`、`rsb.pack/unpack`、`ptx.decode/encode`）都通过统一的文件访问层处理：
-
-| 场景 | 处理方式 |
-|------|----------|
-| **工作目录未选择** | 自动回退到 `asset` 目录读取 |
-| **输入文件** | DocumentFile → 尝试转 File；如果是 asset/无权限 → 复制到缓存 → 使用缓存 File |
-| **输出文件** | DocumentFile 无写入权限 → 先输出到缓存 → 再自动复制回 DocumentFile |
-
-**`$SMF` 的降级规则**：当版本目录不存在时，自动回退到 `baseAssetPath`：
-1. 优先查找 `pvz2tool/<version.assetPath>`（版本专属目录）
-2. 版本目录不存在时，回退到 `pvz2tool/<version.baseAssetPath>`（基础资源目录，默认为 `pvz2tool/version/base/smf`）
-
-当 workDir 未选择时，`$SMF` 自动从 asset 目录解析，asset 目录会按需复制到缓存。
-
-这意味着你可以直接使用占位符路径，无需关心底层是 SAF DocumentFile、普通 File 还是 asset：
-
-```js
-// 即使工作目录未选择，也能从 asset 读取
-rton.load("$SMF/default.rton");
-
-// 即使目标目录无写入权限，也能正常保存
-obj.save();  // 自动处理缓存和复制
-```
-
-##### 路径解析函数
-
-```js
-// 将占位符路径解析为实际绝对路径字符串
-// $GAME_SAVES 从 sections[id="saves"].targetPath 解析
-// $SMF 从当前选中版本的 assetPath 解析
-var absPath = path.resolve("$GAME_SAVES/UserData.rton");
-var smfRton = path.resolve("$SMF/main.rton");  // 指向版本 SMF 目录
-
-// 解析为 DocumentFile URI 字符串（用于 SAF 操作）
-var uri = path.resolveUri("$WORK_DIR/config.json");
-// → "content://com.android.externalstorage.documents/tree/primary:Android/data/..."
-```
-
-##### 占位符前缀说明
-
-| 占位符 | 说明 | 解析结果 |
-|--------|------|----------|
-| `$WORK_DIR` | 用户选择的本地工作目录（pvz2tool 配置根目录） | SAF URI 解析后的 File 路径 |
-| `$GAME_DATA` | 游戏包外部存储根目录 | `/sdcard/Android/data/<package>` |
-| `$GAME_FILES` | 游戏包外部存储 files 目录 | `<package>/files/` |
-| `$GAME_CACHE` | 游戏包外部存储 cache 目录 | `<package>/cache/` |
-| `$GAME_SAVES` | 游戏存档目录（从 `sections[id="saves"].targetPath` 动态读取） | `<WORK_DIR>/<targetPath>` |
-| `$GAME_SMF` | 游戏目录 SMF（rootDirectory + smfDirectory） | `<rootDirectory>/<smfDirectory>` |
-| `$SMF` | 当前选中版本的 SMF 目录（基于 version.assetPath） | `<WORK_DIR>/<version.assetPath>` |
-| `$ITEM` | 栏目下的 item assetPath，降级到 `$SMF` | `<WORK_DIR>/<item.assetPath>` |
-| `$JS_DIR` | 栏目下的 item jsPath 所在目录，逐级递升 | `<WORK_DIR>/<item.jsPath.dir>` |
-| `$APP_FILES` | 工具箱应用外部 files 目录 | `/sdcard/Android/data/<app_package>/files` |
-
-

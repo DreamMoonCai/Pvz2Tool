@@ -285,6 +285,14 @@ sections:
     theme: "PURPLE"
 
     items:
+      # ----- 测试0：执行简单表达式 -----
+      - id: "js_exec_expr_ui"
+        name: "执行指定表达式"
+        desc: "测试 js.run() 执行输入 JS 表达式"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: |-
+          js.run(ui.prompt("输入JS代码", "请输入JS代码/JS路径/JS本地绝对路径", ""));
       # ----- 测试1：执行简单表达式 -----
       - id: "js_exec_expr"
         name: "执行表达式"
