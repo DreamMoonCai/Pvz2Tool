@@ -255,6 +255,7 @@
 | `file` | 文件 | 通用文件读写操作 | 局部 |
 | `picker` | 选择器 | 系统文件/目录选择器（SAF），返回文件对象 | 全局 |
 | `clipboard` | 剪切板 | 系统剪切板读写（复制文本 / 读取文本 / 清空） | 全局 |
+| `device` | 设备 | 当前安卓设备信息（系统 / 屏幕 / 内存 / 存储 / 电池 / 网络 / 应用 / Root） | 全局 |
 | `rton` | RTON | RTON 文件编解码 | 局部 |
 | `rsb` | RSB | RSB 资源包解包/打包 | 局部 |
 | `zlib` | ZLIB | ZLib 压缩/解压 | 局部 |
@@ -2590,8 +2591,149 @@ clipboard.clear();
 
 ---
 
+## 13. device - 设备信息
+
+基于 Android 系统 API（`Build` / `WindowManager` / `ActivityManager` / `BatteryManager` / `ConnectivityManager` / `StatFs` 等），提供当前安卓设备的各种信息。支持按分组（`system` / `screen` / `memory` / `storage` / `battery` / `network` / `app`）获取，也支持 `device.info()` 一次性聚合全部信息。
+
+> **说明**：所有信息均为实时读取（每次调用刷新），例如电池电量、网络状态会反映当前真实值，而非注册时的快照。
+
+### 13.1 device.info / device.信息
+
+一次性返回全部设备信息（聚合对象，各分组作为子对象存在）。
+
+**返回**：`object` — 结构为 `{ system, screen, memory, storage, battery, network, app, isRooted }`
+
+```js
+let d = device.info();
+console.log(d.system.model, d.system.androidVersion, d.screen.width, d.battery.level);
+console.log("Root:", d.isRooted);
+```
+
+### 13.2 device.system / device.系统
+
+系统相关信息（设备型号、厂商、安卓版本、内核、语言时区、是否模拟器等）。
+
+| 方法 | 中文别名 | 返回 |
+|------|----------|------|
+| `system.info()` | `系统.信息()` | 系统信息聚合对象 |
+| `system.model()` | `系统.型号()` | 设备型号（如 `Pixel 8`） |
+| `system.brand()` | `系统.品牌()` | 品牌（如 `google`） |
+| `system.manufacturer()` | `系统.制造商()` | 制造商（如 `Google`） |
+| `system.device()` | `系统.设备代号()` | 设备代号（`Build.DEVICE`） |
+| `system.product()` | `系统.产品()` | 产品名（`Build.PRODUCT`） |
+| `system.board()` | `系统.主板()` | 主板（`Build.BOARD`） |
+| `system.hardware()` | `系统.硬件()` | 硬件（`Build.HARDWARE`） |
+| `system.androidVersion()` | `系统.安卓版本()` | 安卓版本号（`Build.VERSION.RELEASE`，如 `14`） |
+| `system.sdkVersion()` | `系统.SDK版本()` | SDK 版本号（`Build.VERSION.SDK_INT`，如 `34`） |
+| `system.codename()` | `系统.版本代号()` | 版本代号（`Build.VERSION.CODENAME`） |
+| `system.incremental()` | `系统.版本增量()` | 版本增量（`Build.VERSION.INCREMENTAL`） |
+| `system.securityPatch()` | `系统.安全补丁()` | 安全补丁级别（`Build.VERSION.SECURITY_PATCH`） |
+| `system.bootloader()` | `系统.引导程序()` | Bootloader（`Build.BOOTLOADER`） |
+| `system.display()` | `系统.显示版本()` | 显示版本（`Build.DISPLAY`） |
+| `system.fingerprint()` | `系统.指纹()` | 系统指纹（`Build.FINGERPRINT`） |
+| `system.kernelVersion()` | `系统.内核版本()` | 内核版本（`os.version`） |
+| `system.isEmulator()` | `系统.是否模拟器()` | 是否模拟器（`boolean`） |
+| `system.language()` | `系统.语言()` | 系统语言标签（如 `zh-CN`） |
+| `system.timezone()` | `系统.时区()` | 系统时区 ID（如 `Asia/Shanghai`） |
+
+### 13.3 device.screen / device.屏幕
+
+屏幕分辨率、密度、刷新率等信息。
+
+| 方法 | 中文别名 | 返回 |
+|------|----------|------|
+| `screen.info()` | `屏幕.信息()` | 屏幕信息聚合对象 |
+| `screen.width()` | `屏幕.宽度()` | 屏幕宽（像素，`number`） |
+| `screen.height()` | `屏幕.高度()` | 屏幕高（像素，`number`） |
+| `screen.resolution()` | `屏幕.分辨率()` | 分辨率字符串（如 `1080x2400`） |
+| `screen.densityDpi()` | `屏幕.屏幕密度DPI()` | 屏幕密度 DPI（`number`） |
+| `screen.density()` | `屏幕.密度比例()` | 密度比例（`density`，`number`） |
+| `screen.scaledDensity()` | `屏幕.缩放密度()` | 缩放密度（`scaledDensity`，`number`） |
+| `screen.refreshRate()` | `屏幕.刷新率()` | 刷新率（Hz，`number`） |
+
+### 13.4 device.memory / device.内存
+
+运行内存（RAM）信息，单位均为字节。
+
+| 方法 | 中文别名 | 返回 |
+|------|----------|------|
+| `memory.info()` | `内存.信息()` | 内存信息聚合对象 |
+| `memory.total()` | `内存.总内存()` | 总内存（字节，`number`） |
+| `memory.available()` | `内存.可用内存()` | 当前可用内存（字节，`number`） |
+| `memory.lowMemory()` | `内存.内存不足()` | 是否处于低内存状态（`boolean`） |
+| `memory.threshold()` | `内存.低内存阈值()` | 低内存阈值（字节，`number`） |
+
+### 13.5 device.storage / device.存储
+
+内部/外部存储容量，单位均为字节。外部存储不可用时对应字段返回 `undefined`。
+
+| 方法 | 中文别名 | 返回 |
+|------|----------|------|
+| `storage.info()` | `存储.信息()` | 存储信息聚合对象 |
+| `storage.internalTotal()` | `存储.内部存储总量()` | 内部存储总容量（字节，`number`） |
+| `storage.internalAvailable()` | `存储.内部存储可用()` | 内部存储可用容量（字节，`number`） |
+| `storage.externalTotal()` | `存储.外部存储总量()` | 外部存储总容量（字节，`number` / `undefined`） |
+| `storage.externalAvailable()` | `存储.外部存储可用()` | 外部存储可用容量（字节，`number` / `undefined`） |
+
+### 13.6 device.battery / device.电池
+
+电池电量、充电状态、健康度等信息（通过系统粘性广播实时读取，无需权限）。
+
+| 方法 | 中文别名 | 返回 |
+|------|----------|------|
+| `battery.info()` | `电池.信息()` | 电池信息聚合对象 |
+| `battery.level()` | `电池.电量()` | 电量百分比 `0~100`（`number`，无法获取时为 `-1`） |
+| `battery.isCharging()` | `电池.是否充电()` | 是否正在充电（`boolean`） |
+| `battery.status()` | `电池.充电状态()` | 状态：`charging` / `discharging` / `full` / `not_charging` / `unknown` |
+| `battery.plugged()` | `电池.充电方式()` | 充电方式：`ac` / `usb` / `wireless` / `none` |
+| `battery.health()` | `电池.电池健康()` | 健康度：`good` / `overheat` / `dead` / `over_voltage` / `failure` / `cold` / `unknown` |
+| `battery.temperature()` | `电池.电池温度()` | 温度（℃，如 `36.5`；未知为 `-1`） |
+| `battery.voltage()` | `电池.电池电压()` | 电压（mV，`number`） |
+| `battery.technology()` | `电池.电池技术()` | 电池技术（如 `Li-ion`） |
+
+### 13.7 device.network / device.网络
+
+网络连接状态、类型与本地 IPv4 地址。
+
+| 方法 | 中文别名 | 返回 |
+|------|----------|------|
+| `network.info()` | `网络.信息()` | 网络信息聚合对象 |
+| `network.isConnected()` | `网络.是否已连接()` | 是否已连接到网络（`boolean`） |
+| `network.isWifi()` | `网络.是否Wifi()` | 当前是否 Wifi（`boolean`） |
+| `network.type()` | `网络.网络类型()` | 类型：`wifi` / `cellular` / `ethernet` / `none` / `other` |
+| `network.ip()` | `网络.本机IP()` | 本机 IPv4 地址（如 `192.168.1.10`） |
+
+### 13.8 device.app / device.应用
+
+当前应用（Pvz2Tool 自身）的包信息。
+
+| 方法 | 中文别名 | 返回 |
+|------|----------|------|
+| `app.info()` | `应用.信息()` | 应用信息聚合对象 |
+| `app.packageName()` | `应用.包名()` | 应用包名 |
+| `app.versionName()` | `应用.版本名()` | 版本名（如 `1.2.3`） |
+| `app.versionCode()` | `应用.版本号()` | 版本号（`number`） |
+| `app.appName()` | `应用.应用名称()` | 应用显示名称 |
+| `app.isDebuggable()` | `应用.是否调试版()` | 是否 debug 构建（`boolean`） |
+| `app.targetSdk()` | `应用.目标SDK()` | 目标 SDK 版本（`number`） |
+
+### 13.9 device.isRooted / device.是否已Root
+
+判断设备是否已 Root（检查常见 `su` 路径并回退到 `which su`）。
+
+**返回**：`boolean` — 已 Root 返回 `true`
+
+```js
+if (device.isRooted()) {
+    console.log("当前设备已 Root");
+}
+```
+
+---
+
 *文档版本: 2.0*
 *最后更新: 2026-07-17*
+*新增：device 设备信息对象（system/screen/memory/storage/battery/network/app 分组 + info() 聚合，及中文别名），并补入内置对象总览表*
 *新增：audio 音频控制对象（getBgmVolume/setBgmVolume/getSfxVolume/setSfxVolume 及中文别名），并补入内置对象总览表（同时补 http）*
 *修正：http.json()/response.解析JSON() 返回已解析的 JS 对象（解析失败返回 null），非 JSON 字符串*
 *新增：picker 文件选择器（directory/file/files，返回文件对象，支持多选与 copy 到 SAF 树内新建文件）*
