@@ -205,19 +205,22 @@ open class JsFileAccess(
             return OutputHandle(context, file, null, isCache = false)
         }
 
-        // 1. 解析为 DocumentFile
+        // 1. 先尝试直接解析（目标文件/目录已存在）
         val docFile = resolver.resolve(path, context)
-            ?: return null // 输出不支持 asset
 
-        // 2. 尝试转换为普通 File
-        val file = JsFileResolver.documentFileToFile(docFile)
+        // 2. 若目标不存在（如全新写入），尝试在 SAF 树内创建输出文件
+        val targetDoc = docFile ?: resolver.resolveForOutput(path, context)
+            ?: return null // 输出不支持 asset / 只读占位符
+
+        // 3. 尝试转换为普通 File
+        val file = JsFileResolver.documentFileToFile(targetDoc)
         if (file != null && file.canWrite()) {
             return OutputHandle(context, file, null, isCache = false)
         }
 
-        // 3. 无法直接写入，使用缓存文件
-        val cacheFile = File(cacheDir, "${UUID.randomUUID()}_${docFile.name ?: "temp"}").apply { deleteOnExit() }
-        return OutputHandle(context, cacheFile, docFile, isCache = true)
+        // 4. 无法直接写入，使用缓存文件（写入完成后复制回 DocumentFile）
+        val cacheFile = File(cacheDir, "${UUID.randomUUID()}_${targetDoc.name ?: "temp"}").apply { deleteOnExit() }
+        return OutputHandle(context, cacheFile, targetDoc, isCache = true)
     }
 
     /**

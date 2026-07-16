@@ -670,7 +670,6 @@ private fun PresetSaveSection(
 private fun GameSaveSection(
     context: Context,
     gameSaveDir: File,
-    filePickerManager: FilePickerManager?,
     saveInfoDialogState: PvzSaveInfoDialogState,
     version: VersionDef
 ) {
@@ -741,7 +740,7 @@ private fun GameSaveSection(
             showExportOptionDialog.value = true
         } else {
             // FileProvider 不可用，直接走文件夹导出
-            filePickerManager?.launch { uri, doc ->
+            InitializePvz2.filePickerManager?.launch { uri, doc ->
                 if (uri != null && doc != null) {
                     PvzSaveFileManager.exportGameSaveToDocumentFile(
                         context = context,
@@ -854,7 +853,7 @@ private fun GameSaveSection(
                     icon = Icons.Default.Folder,
                     onClick = {
                         showExportOptionDialog.value = false
-                        filePickerManager?.launch { uri, doc ->
+                        InitializePvz2.filePickerManager?.launch { uri, doc ->
                             if (uri != null && doc != null) {
                                 PvzSaveFileManager.exportGameSaveToDocumentFile(
                                     context = context,
@@ -950,7 +949,6 @@ private fun LocalSaveSection(
     state: DynamicSectionState,
     onStateChange: (DynamicSectionState) -> Unit,
     gameSaveDir: File,
-    filePickerManager: FilePickerManager?,
     saveInfoDialogState: PvzSaveInfoDialogState,
     version: VersionDef,
     theme: PvzCollapsiblePanelTheme = PvzCollapsiblePanelTheme.BROWN
@@ -1052,7 +1050,7 @@ private fun LocalSaveSection(
             showLocalExportOptionDialog.value = true
         } else {
             // FileProvider 不可用，直接走文件夹导出
-            filePickerManager?.launch { uri, doc ->
+            InitializePvz2.filePickerManager?.launch { uri, doc ->
                 if (uri != null && doc != null) {
                     PvzSaveFileManager.exportAllLocalSavesToDocumentFile(
                         context = context,
@@ -1068,7 +1066,7 @@ private fun LocalSaveSection(
     }
 
     fun performImport() {
-        filePickerManager?.launch { uri, doc ->
+        InitializePvz2.filePickerManager?.launch { uri, doc ->
             if (uri != null && doc != null) {
                 PvzSaveFileManager.batchImportAllSaves(
                     context = context,
@@ -1268,7 +1266,7 @@ private fun LocalSaveSection(
                     icon = Icons.Default.Folder,
                     onClick = {
                         showLocalExportOptionDialog.value = false
-                        filePickerManager?.launch { uri, doc ->
+                        InitializePvz2.filePickerManager?.launch { uri, doc ->
                             if (uri != null && doc != null) {
                                 PvzSaveFileManager.exportAllLocalSavesToDocumentFile(
                                     context = context,
@@ -1367,7 +1365,6 @@ private fun DynamicSectionComponent(
     onStateChange: (DynamicSectionState) -> Unit,
     updateSectionState: (String, (DynamicSectionState) -> DynamicSectionState) -> Unit,
     extractorHolder: AssetExtractorHolder,
-    filePickerManager: FilePickerManager?,
     version: VersionDef,
     sectionStates: Map<String, DynamicSectionState>
 ) {
@@ -1398,7 +1395,6 @@ private fun DynamicSectionComponent(
             GameSaveSection(
                 context = context,
                 gameSaveDir = gameSaveDir,
-                filePickerManager = filePickerManager,
                 saveInfoDialogState = saveInfoDialogState,
                 version = version
             )
@@ -1439,7 +1435,6 @@ private fun DynamicSectionComponent(
                 state = state,
                 onStateChange = onStateChange,
                 gameSaveDir = gameSaveDir,
-                filePickerManager = filePickerManager,
                 saveInfoDialogState = saveInfoDialogState,
                 version = version,
                 theme = theme
@@ -2589,7 +2584,6 @@ fun Pvz2MainScreen(
     onCloseToolbox: () -> Unit,
     rootDirectory: File = InitializePvz2.context.getExternalFilesDir(null)!!.parentFile!!,
     onStateChanged: (Pvz2ScreenState) -> Unit,
-    filePickerManager: FilePickerManager? = null // 传入提前注册的PickerManager
 ) {
     val config = InitializePvz2.config
 
@@ -2610,7 +2604,7 @@ fun Pvz2MainScreen(
     JsExtractorDialog()
 
     // 2. 显示设置弹窗（仅传状态）
-    PvzSettingsDialog(filePickerManager = filePickerManager)
+    PvzSettingsDialog()
 
     if (SettingsDialogState.isShowFloatingWindow) {
         RequestPermissionsVpn({
@@ -3068,7 +3062,6 @@ fun Pvz2MainScreen(
                                                 },
                                                 updateSectionState = ::updateSectionState,
                                                 extractorHolder = extractorHolder,
-                                                filePickerManager = filePickerManager,
                                                 version = selectedVersion,
                                                 sectionStates = sectionStates
                                             )

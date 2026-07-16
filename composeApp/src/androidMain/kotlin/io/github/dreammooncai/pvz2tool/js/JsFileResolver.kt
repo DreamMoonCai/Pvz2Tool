@@ -414,6 +414,58 @@ open class JsFileResolver(
         return null
     }
 
+    /**
+     * 将占位符路径解析为「输出目标」DocumentFile，支持目标文件**尚不存在**的情况。
+     *
+     * 仅支持 SAF 树根占位符（`$WORK_DIR` / `$GAME_SAVES` / `$GAME_SMF`）：
+     * 会解析并创建父目录（含中间目录），然后确保目标文件存在（不存在则创建），
+     * 以支持「把内容写入一个此前不存在的文件」的场景（如 `picker.copy`）。
+     *
+     * 对于只读占位符（`$SMF` / `$ITEM` / `$JS_DIR`）仍返回 `null`
+     * （这些目录通常只读，不支持在树内新建输出文件）。
+     *
+     * @return 目标文件 DocumentFile；若前缀不支持创建或根目录不可用时返回 `null`
+     */
+    fun resolveForOutput(placeholderPath: String, context: Context): DocumentFile? {
+        // 绝对路径占位符（$APP_DATA 等）：其目标必须已存在
+        val absDoc = resolveAbsolutePlaceholder(placeholderPath, context)
+        if (absDoc != null) return absDoc
+
+        val parsed = parsePlaceholder(placeholderPath) ?: return null
+        val (prefix, relativePath) = parsed
+        // 仅 SAF 树根支持在树内新建输出文件
+        if (prefix != WORK_DIR && prefix != GAME_SAVES && prefix != GAME_SMF) return null
+
+        val root = when (prefix) {
+            WORK_DIR -> getWorkDir(context)
+            GAME_SAVES -> getGameSaves()
+            GAME_SMF -> getGameSmf()
+            else -> null
+        } ?: return null
+
+        val subPath = relativePath.trimStart('/')
+        if (subPath.isEmpty()) return root
+        val segments = subPath.split("/").filter { it.isNotEmpty() }
+        if (segments.isEmpty()) return root
+        val fileName = segments.last()
+        val parentRelPath = segments.dropLast(1).joinToString("/")
+
+        // 创建父目录（含中间目录）
+        val parentDir = if (parentRelPath.isEmpty()) root
+        else buildDocumentFilePath(root, parentRelPath, createIntermediate = true)
+            ?: return null
+        if (!parentDir.isDirectory) return null
+
+        // 确保目标文件存在（同名目录则删除后重建为文件）
+        val existing = parentDir.findFile(fileName)
+        if (existing != null) {
+            if (existing.isFile) return existing
+            existing.delete()
+        }
+        return parentDir.createFile("*/*", fileName)
+            ?: throw IllegalStateException("无法在 $prefix 中创建文件: $fileName")
+    }
+
     // ======================== 绝对路径占位符解析 ========================
 
     /**
@@ -473,8 +525,15 @@ open class JsFileResolver(
         val activeCtx = jsContext ?: return null
         val version = activeCtx.version
 
+        // $WORK_DIR 直接映射到 SAF 工作目录树（仅查找，不创建）
+        if (placeholderPath.startsWith(WORK_DIR)) {
+            val workDir = getWorkDir(context) ?: return null
+            val subPath = placeholderPath.removePrefix(WORK_DIR).trimStart('/')
+            return if (subPath.isEmpty()) workDir
+            else buildDocumentFilePath(workDir, subPath, createIntermediate = false)
+        }
+
         val basePlaceholder = when {
-            placeholderPath.startsWith(WORK_DIR) -> WORK_DIR
             placeholderPath.startsWith(JS_DIR) -> JS_DIR
             placeholderPath.startsWith(ITEM) -> ITEM
             else -> SMF
@@ -503,7 +562,6 @@ open class JsFileResolver(
                     Triple(version.resolveAssetPath(),version.baseAssetPath,null)
                 }
             }
-            placeholderPath.startsWith(WORK_DIR) -> Triple("",null,null)
 
             else -> Triple(version.resolveAssetPath(),version.baseAssetPath,null)
         }

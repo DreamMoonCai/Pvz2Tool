@@ -606,6 +606,37 @@ sections:
           var dec = enc.decrypt;
           dec
 
+      - id: "pick_dir"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "选择解压目录"
+        buttonColor: "purple"
+        jsScript: |-
+          var dir = picker.directory();
+          var str = ""
+          if (dir) {
+            console.log("已选择目录：" + dir.path);
+            str = "目录：" + dir.name;
+          } else {
+            str = "已取消选择";
+          }
+          str
+
+      # 选择多个文件并复制到工作目录
+      - id: "pick_files"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "导入多个图片"
+        buttonColor: "green"
+        jsScript: |-
+          var imgs = picker.files({ mimeType: "image/*" });
+          imgs.forEach(function (img, i) {
+            img.copy("$WORK_DIR/imported_" + i + "_" + img.name);
+          });
+          "已导入 " + imgs.length + " 个文件";
+
       # ---------- 示例5：全宽横条大按钮（name 和 desc 均留空） ----------
       # name 和 desc 均为空时，渲染为全宽横条按钮
       - id: "test_ui_0"

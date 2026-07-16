@@ -60,6 +60,7 @@ import kotlin.coroutines.resume
 import kotlin.system.exitProcess
 import com.highcapable.yukireflection.factory.field
 import io.github.dreammooncai.pvz2tool.controller.GeneralFloatingDialogController
+import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
 
 class Pvz2InitializeActivity : ComponentActivity() {
@@ -81,7 +82,7 @@ class Pvz2InitializeActivity : ComponentActivity() {
     }
 
     // 2. FilePickerManager 必须在这里初始化！(类属性初始化，确保在 onCreate 之前)
-    // 即使现在用不到，也要先注册好 Launcher
+    // 即使现在用不到，也要先注册好 Launcher（其 pick() 异步选择器 Launcher 也在此注册）
     private val filePickerManager = FilePickerManager(this)
 
     // ======================== 存档相关状态 ========================
@@ -104,6 +105,8 @@ class Pvz2InitializeActivity : ComponentActivity() {
     private fun proceedWithInitialization() {
         // 初始化配置
         InitializePvz2.init(this)
+        // 注入文件选择器管理器，供 JS picker API 使用（其 Launcher 已在 Activity 属性初始化阶段注册）
+        InitializePvz2.filePickerManager = filePickerManager
 
         // 设置UI
         setContent {
@@ -187,7 +190,6 @@ class Pvz2InitializeActivity : ComponentActivity() {
                             exitProcess(0)
                         },
                         onStateChanged = {},
-                        filePickerManager = filePickerManager // 直接传入已初始化好的对象
                     )
                 }
             }
@@ -489,8 +491,11 @@ interface IPvzToolBackPress
  */
 @Composable
 private fun SimplifiedLaunchScreen(
+    rootDirectory: File = InitializePvz2.context.getExternalFilesDir(null)!!.parentFile!!,
     onGotoGame: () -> Unit = {}
 ) {
+    Pvz2ToolConfig.rootDirectory = rootDirectory
+
     val context = LocalContext.current
     val extractorHolder = rememberAssetExtractor(context)
 

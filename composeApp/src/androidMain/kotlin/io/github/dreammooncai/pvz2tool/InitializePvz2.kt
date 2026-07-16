@@ -20,6 +20,7 @@ import com.russhwolf.settings.Settings
 import com.russhwolf.settings.SharedPreferencesSettings
 import com.russhwolf.settings.get
 import com.russhwolf.settings.set
+import io.github.dreammooncai.manager.FilePickerManager
 import io.github.dreammooncai.pvz2tool.ui.main.Pvz2ScreenState
 import io.github.dreammooncai.util.ContextUtil
 import io.github.z4kn4fein.semver.Version
@@ -80,6 +81,9 @@ object InitializePvz2 {
     // 精简配置（仅在 simplifiedLaunch=true 时有值）
     var simpleConfig: Pvz2ToolSimpleConfig? = null
         private set
+
+    // 文件选择器管理器（在 Activity 初始化时注入，供 JS picker API 使用）
+    var filePickerManager: FilePickerManager? = null
 
     // 初始化配置（基础配置 + 本地配置合并）
     fun initConfig() {

@@ -16,12 +16,26 @@ import androidx.documentfile.provider.DocumentFile
 import com.russhwolf.settings.get
 import com.russhwolf.settings.set
 import io.github.dreammooncai.pvz2tool.InitializePvz2
+import kotlinx.coroutines.CompletableDeferred
 
 /**
  * 为Activity提供目录选择Launcher的管理类
  * 特性：1. 提前注册避免生命周期问题 2. 持久化上次选择的目录 3. 适配多SDK版本
  */
 class FilePickerManager(private val activity: ComponentActivity) {
+
+    /**
+     * 选择模式（供 [pick] 使用）。
+     */
+    enum class PickerMode {
+        /** 选择一个目录（ACTION_OPEN_DOCUMENT_TREE） */
+        DIRECTORY,
+        /** 选择单个文件（ACTION_OPEN_DOCUMENT） */
+        FILE,
+        /** 选择多个文件（ACTION_OPEN_DOCUMENT + EXTRA_ALLOW_MULTIPLE） */
+        FILES
+    }
+
     // 通用的选择器Launcher（适配文件/目录选择）
     private val pickerLauncher: ActivityResultLauncher<Intent> =
         activity.registerForActivityResult(
@@ -62,6 +76,37 @@ class FilePickerManager(private val activity: ComponentActivity) {
             onPickerSelected = null
             // 重置当前选择类型标记
             isCurrentPickDirectory = true
+        }
+
+    // ======================== JS / 异步选择器（pick） ========================
+    private var pendingPickDeferred: CompletableDeferred<List<DocumentFile?>>? = null
+    private var currentPickMode: PickerMode = PickerMode.FILE
+
+    // 面向异步场景（JS 桥等）的选择器 Launcher，支持目录/单文件/多文件
+    private val pickLauncher: ActivityResultLauncher<Intent> =
+        activity.registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            val deferred = pendingPickDeferred ?: return@registerForActivityResult
+            pendingPickDeferred = null
+            if (result.resultCode == Activity.RESULT_OK) {
+                val docs = parsePickerResult(result.data, currentPickMode)
+                // 持久化（与 launch() 一致：保存 Uri 权限 + 上次选择记录）
+                docs.firstOrNull()?.uri?.let { uri ->
+                    try {
+                        activity.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                        )
+                    } catch (_: Exception) {
+                    }
+                    val key = if (currentPickMode == PickerMode.DIRECTORY) KEY_LAST_SELECTED_DIR else KEY_LAST_SELECTED_FILE
+                    InitializePvz2.settings[key] = uri.toString()
+                }
+                if (!deferred.isCompleted) deferred.complete(docs)
+            } else {
+                if (!deferred.isCompleted) deferred.complete(emptyList())
+            }
         }
 
     // 回调函数（单次使用，回调后清空）
@@ -164,6 +209,127 @@ class FilePickerManager(private val activity: ComponentActivity) {
             Toast.makeText(activity, "打开选择器失败：${e.message}", Toast.LENGTH_SHORT).show()
             onSelected(null, null)
             onPickerSelected = null
+        }
+    }
+
+    /**
+     * 启动选择器并以 [CompletableDeferred] 异步返回结果（面向 JS 桥等异步场景）。
+     *
+     * @param mode    选择模式：目录 / 单文件 / 多文件
+     * @param mimeType 文件类型过滤（仅 [PickerMode.FILE] / [PickerMode.FILES] 生效，默认所有类型）
+     * @return 完成时包含所选 [DocumentFile] 列表；用户取消、页面已销毁或失败时为**空列表**。
+     */
+    @SuppressLint("ObsoleteSdkInt")
+    fun pick(
+        mode: PickerMode,
+        mimeType: String = "*/*"
+    ): CompletableDeferred<List<DocumentFile?>> {
+        val deferred = CompletableDeferred<List<DocumentFile?>>()
+        // 校验 Activity 状态
+        if (activity.isFinishing || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed)) {
+            Toast.makeText(activity, "页面已销毁，无法打开选择器", Toast.LENGTH_SHORT).show()
+            deferred.complete(emptyList())
+            return deferred
+        }
+
+        pendingPickDeferred = deferred
+        currentPickMode = mode
+
+        val intent = buildPickerIntent(mode, mimeType)
+        val resolveInfo = activity.packageManager.resolveActivity(intent, PackageManager.MATCH_ALL)
+
+        // ActivityResultLauncher.launch 必须在主线程调用
+        activity.runOnUiThread {
+            try {
+                if (resolveInfo != null) {
+                    pickLauncher.launch(intent)
+                } else {
+                    pickLauncher.launch(Intent.createChooser(intent, "选择文件/目录"))
+                }
+            } catch (e: Exception) {
+                Toast.makeText(activity, "打开选择器失败：${e.message}", Toast.LENGTH_SHORT).show()
+                pendingPickDeferred = null
+                if (!deferred.isCompleted) deferred.complete(emptyList())
+            }
+        }
+        return deferred
+    }
+
+    /**
+     * 构建选择器 Intent（与 [launch] 共享初始目录逻辑）。
+     */
+    private fun buildPickerIntent(mode: PickerMode, mimeType: String): Intent {
+        return when (mode) {
+            PickerMode.DIRECTORY -> Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                            or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                            or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    putExtra("android.provider.extra.SHOW_ADVANCED", true)
+                    putExtra("android.provider.extra.SHOW_FILES", true)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    getInitialUri(true)?.let {
+                        try {
+                            putExtra(DocumentsContract.EXTRA_INITIAL_URI, it)
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+            }
+            PickerMode.FILE -> Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                            or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                            or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+                )
+                type = mimeType
+                addCategory(Intent.CATEGORY_OPENABLE)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    getInitialUri(false)?.let {
+                        try {
+                            putExtra(DocumentsContract.EXTRA_INITIAL_URI, it)
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+            }
+            PickerMode.FILES -> Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                            or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                            or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+                )
+                type = mimeType
+                addCategory(Intent.CATEGORY_OPENABLE)
+                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            }
+        }
+    }
+
+    /**
+     * 从 Intent 结果中解析出 [DocumentFile] 列表。
+     */
+    private fun parsePickerResult(data: Intent?, mode: PickerMode): List<DocumentFile?> {
+        if (data == null) return emptyList()
+        return when (mode) {
+            PickerMode.DIRECTORY -> listOf(data.data?.let { DocumentFile.fromTreeUri(activity, it) })
+            PickerMode.FILE -> listOf(data.data?.let { DocumentFile.fromSingleUri(activity, it) })
+            PickerMode.FILES -> {
+                val clip = data.clipData
+                if (clip != null && clip.itemCount > 0) {
+                    (0 until clip.itemCount).map { i ->
+                        clip.getItemAt(i).uri?.let { DocumentFile.fromSingleUri(activity, it) }
+                    }
+                } else {
+                    listOf(data.data?.let { DocumentFile.fromSingleUri(activity, it) })
+                }
+            }
         }
     }
 

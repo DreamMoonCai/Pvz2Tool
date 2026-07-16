@@ -45,11 +45,10 @@ import io.github.dreammooncai.pvz2tool.view.PvzTextStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PvzSettingsDialog(filePickerManager: FilePickerManager? = null) {
+fun PvzSettingsDialog() {
     if (!SettingsDialogState.isShow) return
     val config = InitializePvz2.config
     val settingsConfig = config.ui.settings
-    val gameDisplayConfig = settingsConfig.gameDisplay
     val context = LocalContext.current
 
     // 导入SMF所需的AssetExtractorHolder
@@ -90,7 +89,7 @@ fun PvzSettingsDialog(filePickerManager: FilePickerManager? = null) {
                             onCheckedChange = { SettingsDialogState.toggleBackgroundMode() }
                         )
                         PvzPopupItemArrow(settingsConfig.changeTheProfileReadLocation) {
-                            filePickerManager?.launch { uri, docFile ->
+                            InitializePvz2.filePickerManager?.launch { uri, docFile ->
                                 if (uri != null && docFile != null) {
                                     val yml = docFile.listFiles().find { it.name?.endsWith(".yml", ignoreCase = true) == true || it.name?.endsWith(".yaml", ignoreCase = true) == true }
                                     if (yml == null) {
@@ -117,7 +116,7 @@ fun PvzSettingsDialog(filePickerManager: FilePickerManager? = null) {
                         }
                         PvzPopupItemArrow(settingsConfig.importSmfFile) {
                             // 选择SMF文件并导入到游戏目录
-                            filePickerManager?.launch(isDirectory = false) { uri, docFile ->
+                            InitializePvz2.filePickerManager?.launch(isDirectory = false) { uri, docFile ->
                                 if (uri != null && docFile != null) {
                                     val targetDir = config.getSmfDirectoryFile()
                                     // 使用AssetExtractorHolder导入文件

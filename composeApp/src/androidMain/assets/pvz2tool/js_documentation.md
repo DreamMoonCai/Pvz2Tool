@@ -253,6 +253,7 @@
 | `console` | 控制台 | 日志输出 | 全局 |
 | `path` | 路径 | 路径解析和构建 | 局部 |
 | `file` | 文件 | 通用文件读写操作 | 局部 |
+| `picker` | 选择器 | 系统文件/目录选择器（SAF），返回文件对象 | 全局 |
 | `rton` | RTON | RTON 文件编解码 | 局部 |
 | `rsb` | RSB | RSB 资源包解包/打包 | 局部 |
 | `zlib` | ZLIB | ZLib 压缩/解压 | 局部 |
@@ -2446,6 +2447,94 @@ npcs.save();
 
 ---
 
+## 10. picker - 文件选择器
+
+`picker` 对象提供系统文件选择器（基于 Android SAF：文档/目录选择），可以让脚本在运行时由用户选择**目录、单个文件或多个文件**，并返回对应的文件对象（或文件对象数组），供后续读写使用。
+
+> **异步说明**：三个方法都会**挂起当前 JS 协程**直到用户完成选择（与 `ui.alert()` 等行为一致），请直接 `await` 或同步取值：
+> ```javascript
+> let dir = picker.directory();   // 选择完成后才继续
+> ```
+
+### 10.1 方法
+
+| 方法 | 中文别名 | 说明 |
+|------|----------|------|
+| `picker.directory(options?)` | `picker.选择目录()` / `picker.选择文件夹()` | 选择一个**目录**（ACTION_OPEN_DOCUMENT_TREE），返回文件对象；取消时返回 `undefined` |
+| `picker.file(options?)` | `picker.选择文件()` | 选择一个**文件**（ACTION_OPEN_DOCUMENT），返回文件对象；取消时返回 `undefined` |
+| `picker.files(options?)` | `picker.选择多个文件()` | 选择**多个文件**（ACTION_OPEN_DOCUMENT + 多选），返回文件对象**数组**；取消时返回空数组 `[]` |
+
+**options 参数（可选对象）**：
+- `mimeType`（string）：文件类型过滤，仅 `file` / `files` 模式生效。默认 `"*/*"`（所有类型）。例如 `"image/*"`、`"application/json"`。
+
+### 10.2 返回：文件对象
+
+`directory` / `file` 返回**单个文件对象**，`files` 返回**文件对象数组**。该文件对象的字段与方法与 [`file` 对象](#) 基本一致，但底层基于 SAF 的 `DocumentFile`（content URI），而非本地文件路径。
+
+**字段**：
+
+| 字段 | 中文别名 | 说明 |
+|------|----------|------|
+| `name` | `文件名` | 文件/目录名称 |
+| `uri` | `地址` | 内容 URI 字符串（访问该文件的真实地址） |
+| `path` / `normalizePath` | `路径` / `规范路径` | 同 `uri`（content URI） |
+| `extension` | `扩展名` | 扩展名（不含点） |
+| `size` | `大小` | 大小（字节，数字） |
+| `isDirectory` | `是目录` | 是否为目录 |
+| `isFile` | `是文件` | 是否为文件 |
+| `lastModified` | `修改时间` | 最后修改时间（Unix 毫秒时间戳） |
+| `parent` | `父目录` | 内容 URI 无法获取父目录，固定为 `undefined` |
+
+**方法**：
+
+| 方法 | 中文别名 | 说明 |
+|------|----------|------|
+| `exists()` | `存在()` | 是否存在 |
+| `delete()` | `删除()` | 删除文件/目录 |
+| `rename(newName)` | `重命名()` / `renameTo()` | 重命名 |
+| `readBytes()` | `读字节()` | 读取为字节数组（Uint8Array） |
+| `readText()` | `读文本()` | 读取为字符串（UTF-8） |
+| `writeBytes(bytes)` | `写字节()` | 写入字节数组 |
+| `writeText(text)` | `写文本()` | 写入字符串（UTF-8，覆盖） |
+| `appendText(text)` | `追加文本()` | 追加字符串（UTF-8） |
+| `list()` | `列表()` | 目录下列出子项（返回文件对象数组，仅目录可用） |
+| `mkdir()` / `mkdirs()` | `创建目录()` | 目录 tree URI 无法就地创建，固定返回 `false` |
+| `copy(toPath)` / `copyTo()` / `复制到()` | `复制()` / `复制到()` | 把选中的文件**复制**到本地/占位符路径（通过 `JsFileAccess` 解析，如 `$WORK_DIR/...`、绝对路径） |
+
+> **与 `file` 对象的差异**：
+> - `path` / `normalizePath` 是 content URI，而非本地绝对路径；无法直接用于 `file.resolve()` 等基于本地/占位符路径的 API。
+> - `parent` 不可用（内容 URI 无父目录概念）。
+> - `copy(toPath)` 方向为「选中的 SAF 文件 → 本地/工作目录路径」；反向（从占位符路径复制到 SAF）不在本对象职责内。
+> - `copy(toPath)` 的**目标文件即使不存在也会自动创建**：解析 `toPath` 时若文件不存在，会在 SAF 树根（`$WORK_DIR` / `$GAME_SAVES` / `$GAME_SMF`）内新建该文件（含中间目录），再写入内容。只读占位符（`$SMF` / `$ITEM` / `$JS_DIR`）因目录只读仍会失败。
+
+### 10.3 使用示例
+
+```javascript
+// 示例1：选择目录并列出其子文件
+let dir = picker.directory();
+if (dir) {
+  console.log("选择的目录:", dir.name, dir.uri);
+  dir.list().forEach(child => console.log("  -", child.name));
+}
+
+// 示例2：选择单个文本文件并读取/改写
+let f = picker.file({ mimeType: "text/plain" });
+if (f) {
+  let content = f.readText();
+  console.log("原内容:", content);
+  f.writeText(content + "\n// 由脚本追加");
+}
+
+// 示例3：选择多个图片并批量复制到工作目录
+let imgs = picker.files({ mimeType: "image/*" });
+imgs.forEach((img, i) => {
+  img.copy("$WORK_DIR/imported_" + i + "_" + img.name);
+});
+console.log("已导入", imgs.length, "张图片");
+```
+
+---
+
 *文档版本: 2.0*
 *最后更新: 2026-07-17*
 *新增：audio 音频控制对象（getBgmVolume/setBgmVolume/getSfxVolume/setSfxVolume 及中文别名），并补入内置对象总览表（同时补 http）*
@@ -2458,3 +2547,4 @@ npcs.save();
 *修正：this.findById 仅接受单个 id 参数（返回 item 或 section 对象），无双参及 .item/.section 子属性*
 *补充：section 对象新增 descriptionValues/描述值；RADIO 项同时支持 checked/选中 别名*
 *补充：rton.load 支持直接加载 .json 文件；path.toInternalPath 相对路径自动按 $WORK_DIR 处理*
+*新增：picker 文件选择器对象（directory/file/files 及中文别名），支持选择目录/单文件/多文件并返回文件对象（基于 SAF DocumentFile）*
