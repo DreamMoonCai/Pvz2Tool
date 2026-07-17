@@ -2,6 +2,8 @@ package io.github.dreammooncai.pvz2tool.ui.dialog
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -13,10 +15,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
 import io.github.dreammooncai.pvz2tool.InitializePvz2
+import io.github.dreammooncai.pvz2tool.controller.SoundController
+import io.github.dreammooncai.pvz2tool.icon.Hook
+import io.github.dreammooncai.pvz2tool.icon.HookSelect
+import io.github.dreammooncai.pvz2tool.icon.Pvz2Icon
+import io.github.dreammooncai.pvz2tool.rememberSoundInteractionSource
+import io.github.dreammooncai.pvz2tool.view.AsyncImageFromAssets
 import io.github.dreammooncai.pvz2tool.view.PvzCollapsiblePanelTheme
 import io.github.dreammooncai.pvz2tool.view.PvzGreenButton
 import io.github.dreammooncai.pvz2tool.view.PvzProgressBar
@@ -76,6 +88,28 @@ data class JsAlertState(
     val deferred: CompletableDeferred<Unit>? = null
 )
 
+/** 选择弹窗中的单个条目 */
+data class JsChoiceItem(
+    val name: String = "",
+    val icon: String = "",
+    val value: String = "",
+    val showIndex: Boolean? = null // 单独控制本项是否显示序号；null 时跟随外层 options.showIndex
+)
+
+/** 选择弹窗状态（单项 / 多项通用） */
+data class JsSelectState(
+    val isVisible: Boolean = false,
+    val title: String = "",
+    val items: List<JsChoiceItem> = emptyList(),
+    val mode: String = "single", // "single" | "multi"
+    val columns: Int = 4,
+    val cancelable: Boolean = false,
+    val defaultIndices: List<Int> = emptyList(),
+    val showIndex: Boolean = false, // 是否在图标上居中叠加序号（1 开始）
+    val deferredSingle: CompletableDeferred<String?>? = null,
+    val deferredMulti: CompletableDeferred<List<String>>? = null
+)
+
 // ======================== JS UI 管理器 ========================
 
 object JsUiManager {
@@ -110,10 +144,7 @@ object JsUiManager {
     fun showConfirm(title: String, message: String): CompletableDeferred<Boolean> {
         val deferred = CompletableDeferred<Boolean>()
         _confirmState.value = JsConfirmState(
-            isVisible = true,
-            title = title,
-            message = message,
-            deferred = deferred
+            isVisible = true, title = title, message = message, deferred = deferred
         )
         return deferred
     }
@@ -127,10 +158,7 @@ object JsUiManager {
     fun showAlert(title: String, message: String): CompletableDeferred<Unit> {
         val deferred = CompletableDeferred<Unit>()
         _alertState.value = JsAlertState(
-            isVisible = true,
-            title = title,
-            message = message,
-            deferred = deferred
+            isVisible = true, title = title, message = message, deferred = deferred
         )
         return deferred
     }
@@ -140,12 +168,76 @@ object JsUiManager {
         _alertState.value = JsAlertState()
     }
 
+    // 选择弹窗状态流（单项/多项通用）
+    private val _selectState = MutableStateFlow(JsSelectState())
+    val selectState: StateFlow<JsSelectState> = _selectState.asStateFlow()
+
+    /**
+     * 显示单项选择弹窗，返回 CompletableDeferred<String?>（选中项 value，取消返回 null）
+     * @param items 待选项
+     * @param defaultValue 默认选中项的 name 或 value
+     * @param columns 网格模式每排列数（仅条目 >= 8 且有图标时生效）
+     */
+    fun showSelect(
+        title: String,
+        items: List<JsChoiceItem>,
+        columns: Int = 4,
+        cancelable: Boolean = false,
+        showIndex: Boolean = false
+    ): CompletableDeferred<String?> {
+        val deferred = CompletableDeferred<String?>()
+        _selectState.value = JsSelectState(
+            isVisible = true,
+            title = title,
+            items = items,
+            mode = "single",
+            columns = columns,
+            cancelable = cancelable,
+            showIndex = showIndex,
+            deferredSingle = deferred
+        )
+        return deferred
+    }
+
+    /**
+     * 显示多项选择弹窗，返回 CompletableDeferred<List<String>>（选中项 value 列表）
+     * @param defaultValues 默认选中项的 name 或 value 列表
+     */
+    fun showMultiSelect(
+        title: String,
+        items: List<JsChoiceItem>,
+        defaultValues: List<String>? = null,
+        columns: Int = 4,
+        cancelable: Boolean = false,
+        showIndex: Boolean = false
+    ): CompletableDeferred<List<String>> {
+        val deferred = CompletableDeferred<List<String>>()
+        val defaults = defaultValues ?: emptyList()
+        val defaultIndices = items.mapIndexedNotNull { i, it ->
+            if (it.value in defaults || it.name in defaults) i else null
+        }
+        _selectState.value = JsSelectState(
+            isVisible = true,
+            title = title,
+            items = items,
+            mode = "multi",
+            columns = columns,
+            cancelable = cancelable,
+            defaultIndices = defaultIndices,
+            showIndex = showIndex,
+            deferredMulti = deferred
+        )
+        return deferred
+    }
+
+    /** 隐藏选择弹窗 */
+    fun hideSelect() {
+        _selectState.value = JsSelectState()
+    }
+
     /** 显示输入弹窗，返回 CompletableDeferred<String?> */
     fun showPrompt(
-        title: String,
-        message: String,
-        defaultValue: String = "",
-        placeholder: String = ""
+        title: String, message: String, defaultValue: String = "", placeholder: String = ""
     ): CompletableDeferred<String?> {
         val deferred = CompletableDeferred<String?>()
         _promptState.value = JsPromptState(
@@ -166,12 +258,8 @@ object JsUiManager {
 
     /** 显示进度弹窗 */
     fun showProgress(
-        title: String,
-        message: String = "",
-        isIndeterminate: Boolean = false,
-        showCancel: Boolean = false
-    ) {
-        // 每次显示都重置取消状态与回调（新的进度会话）
+        title: String, message: String = "", isIndeterminate: Boolean = false, showCancel: Boolean = false
+    ) { // 每次显示都重置取消状态与回调（新的进度会话）
         progressCancelHandler = null
         _progressState.value = JsProgressState(
             isVisible = true,
@@ -210,14 +298,11 @@ object JsUiManager {
 
     /** 更新进度弹窗 */
     fun updateProgress(message: String? = null, progress: Float? = null) {
-        _progressState.value = _progressState.value.copy(
-            message = message ?: _progressState.value.message,
-            progress = progress?.let {
-                (if (progress > 1f)
-                    progress
+        _progressState.value =
+            _progressState.value.copy(message = message ?: _progressState.value.message, progress = progress?.let {
+                (if (progress > 1f) progress
                 else (it * 100)).toInt().coerceIn(0, 100)
-            } ?: _progressState.value.progress
-        )
+            } ?: _progressState.value.progress)
     }
 
     // ======================== 解压相关方法 ========================
@@ -230,17 +315,14 @@ object JsUiManager {
      * @return CompletableDeferred<ExtractorUiState>
      */
     fun extract(
-        sourcePaths: List<String>,
-        targetDir: String,
-        sectionName: String = ""
+        sourcePaths: List<String>, targetDir: String, sectionName: String = ""
     ): CompletableDeferred<ExtractorUiState> {
         val deferred = CompletableDeferred<ExtractorUiState>()
 
         // 创建或重用 extractor
         val holder = extractorHolder ?: AssetExtractorHolder(
             AssetResourceExtractor(
-                context = InitializePvz2.context,
-                scope = extractorScope
+                context = InitializePvz2.context, scope = extractorScope
             )
         ).also { extractorHolder = it }
 
@@ -333,16 +415,12 @@ fun JsAlertDialog() {
 
                 // 确认按钮
                 PvzGreenButton(
-                    text = "确定",
-                    modifier = Modifier
+                    text = "确定", modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    onClick = {
+                        .height(48.dp), onClick = {
                         state.deferred?.complete(Unit)
-                    }
-                )
-            }
-        ) {
+                    })
+            }) {
             PvzRichText(
                 state.message,
                 fontSize = 14.sp,
@@ -387,32 +465,22 @@ fun JsConfirmDialog() {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // 取消按钮
+                    modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) { // 取消按钮
                     PvzRedButton(
-                        text = "取消",
-                        modifier = Modifier
+                        text = "取消", modifier = Modifier
                             .weight(1f)
-                            .height(48.dp),
-                        onClick = {
+                            .height(48.dp), onClick = {
                             state.deferred?.complete(false)
-                        }
-                    )
-                    // 确认按钮
+                        }) // 确认按钮
                     PvzGreenButton(
-                        text = "确认",
-                        modifier = Modifier
+                        text = "确认", modifier = Modifier
                             .weight(1f)
-                            .height(48.dp),
-                        onClick = {
+                            .height(48.dp), onClick = {
                             state.deferred?.complete(true)
-                        }
-                    )
+                        })
                 }
-            }
-        ) {
+            }) {
             PvzRichText(
                 state.message,
                 fontSize = 14.sp,
@@ -465,33 +533,22 @@ fun JsPromptDialog() {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // 取消按钮
+                    modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) { // 取消按钮
                     PvzRedButton(
-                        text = "取消",
-                        modifier = Modifier
+                        text = "取消", modifier = Modifier
                             .weight(1f)
-                            .height(48.dp),
-                        onClick = {
+                            .height(48.dp), onClick = {
                             state.deferred?.complete(null)
-                        }
-                    )
-                    // 确认按钮
+                        }) // 确认按钮
                     PvzGreenButton(
-                        text = "确定",
-                        modifier = Modifier
+                        text = "确定", modifier = Modifier
                             .weight(1f)
-                            .height(48.dp),
-                        onClick = {
+                            .height(48.dp), onClick = {
                             state.deferred?.complete(inputValue)
-                        }
-                    )
+                        })
                 }
-            }
-        ) {
-            // 提示文本
+            }) { // 提示文本
             if (state.message.isNotEmpty()) {
                 PvzRichText(
                     state.message,
@@ -504,7 +561,9 @@ fun JsPromptDialog() {
 
             // 输入框
             PvzSimpleCardBrown(
-                modifier = Modifier.fillMaxWidth().padding(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
                 borderColor = PvzCollapsiblePanelTheme.GREEN.sliderInactiveColor,
                 backgroundColor = PvzCollapsiblePanelTheme.GREEN.sliderInactiveColor
             ) {
@@ -514,7 +573,7 @@ fun JsPromptDialog() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(12.dp),
-                    textStyle = LocalTextStyle.current.copy(color = Color.White,fontSize = 14.sp),
+                    textStyle = LocalTextStyle.current.copy(color = Color.White, fontSize = 14.sp),
                     decorationBox = { innerTextField ->
                         Box {
                             if (inputValue.isEmpty()) {
@@ -531,6 +590,269 @@ fun JsPromptDialog() {
                 )
             }
         }
+    }
+}
+
+/**
+ * JS 单项 / 多项选择弹窗
+ *
+ * 布局规则（参考 SectionType.RADIO 样式）：
+ * - 任意条目带图标且总数 >= 8 → 网格模式，每排若干，单条目 = 图标(或占位矩形) + 底部文字
+ * - 任意条目带图标且总数 < 8 → 列表模式，每条目独占一行，图标(或占位矩形)在文字前
+ * - 所有条目均无图标 → 纯文字模式，每条目前带选择标记(单选=圆点/多选=勾)，独占一行
+ *
+ * 无图标条目：用与图标同尺寸的矩形，内部居中显示与底部相同的文字，超出截断以保持观感。
+ *
+ * 用法:
+ *   ui.select("选择关卡", [{name:"1",icon:"lv1.png",value:"1"}, ...], {defaultValue:"1"})
+ *   ui.multiSelect("多选", items, {defaultValues:["a","b"]})
+ */
+@Composable
+fun JsItemChoiceDialog() {
+    val state by JsUiManager.selectState.collectAsState()
+
+    val hasAnyIcon = state.items.any { it.icon.isNotBlank() }
+    val isGrid = hasAnyIcon && state.items.size >= 8
+
+    var selectedIndex by remember { mutableIntStateOf(-1) }
+    var selectedIndices by remember { mutableStateOf(setOf<Int>()) }
+
+    // 打开新弹窗时重置选中状态
+    LaunchedEffect(state.deferredSingle, state.deferredMulti) {
+        selectedIndex = -1
+        selectedIndices = state.defaultIndices.toSet()
+    } // 完成时自动隐藏弹窗
+    LaunchedEffect(state.deferredSingle, state.deferredMulti) {
+        state.deferredSingle?.invokeOnCompletion { JsUiManager.hideSelect() }
+        state.deferredMulti?.invokeOnCompletion { JsUiManager.hideSelect() }
+    }
+
+    // 统一选择处理：单项立即返回，多项切换选中集合
+    val onSelect: (Int) -> Unit = { i ->
+        if (state.mode == "single") {
+            state.deferredSingle?.complete(state.items[i].value)
+        } else {
+            selectedIndices = if (i in selectedIndices) selectedIndices - i else selectedIndices + i
+        }
+    }
+
+    if (state.isVisible) {
+        PvzStyledDialog(
+            isVisible = true,
+            titleText = state.title,
+            onDismissRequest = {
+                state.deferredSingle?.complete(null)
+                state.deferredMulti?.complete(emptyList())
+            },
+            dismissible = state.cancelable,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            bottomContent = {
+                Spacer(modifier = Modifier.height(16.dp))
+                if (state.mode == "multi") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        PvzRedButton(
+                            text = "取消", modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                        ) { state.deferredMulti?.complete(emptyList()) }
+                        PvzGreenButton(
+                            text = "确定", modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                        ) {
+                            val vals = selectedIndices.sorted().map { state.items[it].value }
+                            state.deferredMulti?.complete(vals)
+                        }
+                    }
+                } else {
+                    PvzRedButton(
+                        text = "取消", modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) { state.deferredSingle?.complete(null) }
+                }
+            }) {
+            if (isGrid) {
+                val columns = state.columns.coerceIn(2, 6)
+                val indexed = state.items.mapIndexed { i, item -> i to item }
+                val rows = indexed.chunked(columns)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()
+                ) {
+                    rows.forEach { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            row.forEach { (i, item) ->
+                                GridChoiceCell(
+                                    item = item,
+                                    index = i,
+                                    selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
+                                    isMulti = state.mode == "multi",
+                                    showIndex = state.showIndex,
+                                    onSelect = onSelect
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()
+                ) {
+                    state.items.forEachIndexed { i, item ->
+                        ListChoiceRow(
+                            item = item,
+                            index = i,
+                            hasAnyIcon = hasAnyIcon,
+                            selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
+                            isMulti = state.mode == "multi",
+                            showIndex = state.showIndex,
+                            onSelect = onSelect
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 网格单元格：图标(或占位矩形)在上，文字在下，整体居中 */
+@Composable
+private fun RowScope.GridChoiceCell(
+    item: JsChoiceItem, index: Int, selected: Boolean, isMulti: Boolean, showIndex: Boolean, onSelect: (Int) -> Unit
+) {
+    val interaction = rememberSoundInteractionSource(
+        InitializePvz2.config.ui.sounds.switchClickPress, InitializePvz2.config.ui.sounds.switchClickRelease
+    )
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .clickable(interactionSource = interaction, indication = null) {
+                SoundController.playSoundFromAssets(InitializePvz2.config.ui.sounds.switchClick)
+                onSelect(index)
+            }, horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            ItemIconOrPlaceholder(item, 48.dp, index, item.showIndex ?: showIndex)
+            if (isMulti && selected) {
+                Image(
+                    imageVector = Pvz2Icon.HookSelect,
+                    contentDescription = "已选中",
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(18.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        PvzRichText(
+            item.name, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+/** 列表行：每条目独占一行；有图标时图标(或占位矩形)在文字前，无图标时前带选择标记 */
+@Composable
+private fun ListChoiceRow(
+    item: JsChoiceItem,
+    index: Int,
+    hasAnyIcon: Boolean,
+    selected: Boolean,
+    isMulti: Boolean,
+    showIndex: Boolean,
+    onSelect: (Int) -> Unit
+) {
+    val interaction = rememberSoundInteractionSource(
+        InitializePvz2.config.ui.sounds.switchClickPress, InitializePvz2.config.ui.sounds.switchClickRelease
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp, horizontal = 20.dp)
+            .clickable(interactionSource = interaction, indication = null) {
+                SoundController.playSoundFromAssets(InitializePvz2.config.ui.sounds.switchClick)
+                onSelect(index)
+            }, verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (!hasAnyIcon) { // 纯文字模式：前面带选择标记（单选=圆点，多选=勾）
+            Image(
+                imageVector = if (selected) Pvz2Icon.HookSelect else Pvz2Icon.Hook,
+                contentDescription = if (selected) "已选中" else "未选中",
+                modifier = Modifier.size(30.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            PvzRichText(
+                item.name, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f)
+            )
+        } else {
+            ItemIconOrPlaceholder(item, 36.dp, index, item.showIndex ?: showIndex)
+            Spacer(modifier = Modifier.width(10.dp))
+            PvzRichText(
+                item.name, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f)
+            )
+            Image(
+                imageVector = if (selected) Pvz2Icon.HookSelect else Pvz2Icon.Hook,
+                contentDescription = if (selected) "已选中" else "未选中",
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+/** 图标优先；无图标时渲染与图标同尺寸的占位矩形，内部居中文字（超出截断）。showIndex 时在图标上居中叠加序号(1 开始) */
+@Composable
+private fun ItemIconOrPlaceholder(item: JsChoiceItem, size: Dp, index: Int = -1, showIndex: Boolean = false) {
+    val iconPath = item.icon.takeIf { it.isNotBlank() }?.let { p ->
+        if (p.startsWith("/")) p else "images/$p"
+    }
+    val content: @Composable () -> Unit = {
+        if (iconPath != null) {
+            AsyncImageFromAssets(
+                iconPath,
+                modifier = Modifier.size(size),
+                contentScale = ContentScale.Fit,
+                contentDescription = item.name
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(size)
+                    .background(Color(0x33999999), RoundedCornerShape(6.dp))
+                    .border(1.dp, Color(0x66999999), RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    item.name,
+                    fontSize = if (size > 36.dp) 10.sp else 12.sp,
+                    color = Color(0xFF5a4a1a),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(2.dp)
+                )
+            }
+        }
+    }
+    if (showIndex && index >= 0 && iconPath != null) { // 仅在「有图标」时居中叠加序号（不遮盖原图，便于图标本身即设计来放数字）
+        Box(
+            modifier = Modifier.size(size), contentAlignment = Alignment.Center
+        ) {
+            content()
+            Text(
+                text = (index + 1).toString(),
+                color = Color.Black,
+                fontWeight = FontWeight.Bold,
+                fontSize = if (size > 36.dp) 18.sp else 14.sp,
+                textAlign = TextAlign.Center
+            )
+        }
+    } else {
+        content()
     }
 }
 
@@ -565,9 +887,7 @@ fun JsProgressDialog() {
                 // 进度条
                 if (state.isIndeterminate) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(40.dp),
-                        color = Color(0xFF32CD32),
-                        strokeWidth = 4.dp
+                        modifier = Modifier.size(40.dp), color = Color(0xFF32CD32), strokeWidth = 4.dp
                     )
                 }
                 PvzProgressBar(
@@ -575,22 +895,17 @@ fun JsProgressDialog() {
                     label = if (progress >= 1) "完成" else if (state.showCancel) "取消" else null,
                     modifier = Modifier.fillMaxWidth(),
                     onLabelClick = {
-                        if (progress >= 1) {
-                            // 已完成：点击“完成”直接关闭
+                        if (progress >= 1) { // 已完成：点击“完成”直接关闭
                             JsUiManager.closeProgress()
-                        } else if (state.showCancel) {
-                            // 进行中：点击“取消”触发取消（隐藏弹窗 + 执行 onCancel 回调）
+                        } else if (state.showCancel) { // 进行中：点击“取消”触发取消（隐藏弹窗 + 执行 onCancel 回调）
                             scope.launch {
                                 JsUiManager.cancelProgress()
                             }
                         }
-                    }
-                )
+                    })
 
                 Spacer(modifier = Modifier.height(16.dp))
-            }
-        ) {
-            // 进度文本
+            }) { // 进度文本
             if (state.message.isNotEmpty() || !state.isIndeterminate) {
                 val displayText = if (state.isIndeterminate) {
                     state.message.ifEmpty { "处理中..." }
@@ -621,11 +936,8 @@ fun JsExtractorDialog() {
 
     if (state.isVisible) {
         PvzExtractorDialog(
-            uiState = state,
-            isShowNotUpdate = true,
-            onDismissRequest = {
+            uiState = state, isShowNotUpdate = true, onDismissRequest = {
                 JsUiManager.closeExtractor()
-            }
-        )
+            })
     }
 }

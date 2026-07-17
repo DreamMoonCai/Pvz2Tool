@@ -111,6 +111,7 @@ import io.github.dreammooncai.pvz2tool.ui.dialog.JsConfirmDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsExtractorDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsProgressDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsPromptDialog
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsItemChoiceDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzStyledDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzTutorialDialog
 import io.github.dreammooncai.pvz2tool.view.PvzTextStyle
@@ -2602,6 +2603,7 @@ fun Pvz2MainScreen(
     JsAlertDialog()
     JsConfirmDialog()
     JsPromptDialog()
+    JsItemChoiceDialog()
     JsProgressDialog()
     JsExtractorDialog()
 

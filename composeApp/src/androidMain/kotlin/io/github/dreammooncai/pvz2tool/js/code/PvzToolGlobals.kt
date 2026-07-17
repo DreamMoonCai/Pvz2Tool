@@ -22,6 +22,7 @@ import io.github.dreammooncai.pvz2tool.js.func
 import io.github.dreammooncai.pvz2tool.js.orNull
 import io.github.dreammooncai.pvz2tool.pop.plugin.crypt.Pvz2NumberCrypt
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsChoiceItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
 import io.github.dreammooncai.pvz2tool.ui.music.BackgroundMusicState
 import io.github.dreammooncai.util.getAssetLastModified
@@ -40,11 +41,9 @@ object PvzToolGlobals {
     // 持有 BackgroundMusicState 引用，供 audio 对象访问（由 Pvz2InitializeActivity 注入）
     var bgMusicState: BackgroundMusicState? = null
 
-    val ui = Object("ui") {
-        // 提示弹窗（单按钮）：ui.alert(title, message) -> void
+    val ui = Object("ui") { // 提示弹窗（单按钮）：ui.alert(title, message) -> void
         listOf("alert".js, "提示".js).func(
-            FunctionParam("title"),
-            FunctionParam("message")
+            FunctionParam("title"), FunctionParam("message")
         ) { args ->
             val title = toString(args[0])
             val message = toString(args[1])
@@ -54,8 +53,7 @@ object PvzToolGlobals {
 
         // 确认弹窗：ui.confirm(title, message) -> boolean
         listOf("confirm".js, "确认".js).func(
-            FunctionParam("title"),
-            FunctionParam("message")
+            FunctionParam("title"), FunctionParam("message")
         ) { args ->
             val title = toString(args[0])
             val message = toString(args[1])
@@ -79,8 +77,7 @@ object PvzToolGlobals {
         // 进度弹窗：ui.progress(title, options?) -> progressController
         // options: { message?, indeterminate?, showCancel?, onCancel? }
         listOf("progress".js, "进度".js).func(
-            FunctionParam("title"),
-            FunctionParam("options")
+            FunctionParam("title"), FunctionParam("options")
         ) { args ->
             val runtime = this
             val title = toString(args[0])
@@ -89,8 +86,8 @@ object PvzToolGlobals {
             // 解析 options 参数
             val message = options?.get("message".js, this)?.orNull?.let { toString(it) } ?: ""
             val indeterminate = options?.get("indeterminate".js, this)?.let { it.toKotlin(this) as? Boolean } ?: false
-            val showCancel = options?.get("showCancel".js, this)?.let { it.toKotlin(this) as? Boolean } ?: true
-            // 取消回调：用户点击“取消”时触发（供 JS 中断耗时任务）
+            val showCancel = options?.get("showCancel".js, this)?.let { it.toKotlin(this) as? Boolean }
+                ?: true // 取消回调：用户点击“取消”时触发（供 JS 中断耗时任务）
             val onCancelJs = options?.get("onCancel".js, this)?.orNull as? JSFunction
 
             // 先显示进度弹窗
@@ -102,12 +99,10 @@ object PvzToolGlobals {
             }
 
             // 返回一个 JS 对象，包含 update / close / cancel / isCancelled 方法
-            Object("controller") {
-                // 更新进度：update(message?, progress?)
+            Object("controller") { // 更新进度：update(message?, progress?)
                 // progress 是 0.0-1.0 的 Float
                 listOf("update".js, "更新".js).func(
-                    FunctionParam("message"),
-                    FunctionParam("progress")
+                    FunctionParam("message"), FunctionParam("progress")
                 ) { updateArgs ->
                     val msg = updateArgs.getOrNull(0)?.let { toString(it) }
                     val progress = updateArgs.getOrNull(1)?.let { toNumber(it).toFloat() }
@@ -135,9 +130,7 @@ object PvzToolGlobals {
         }
 
         listOf("extract".js, "解压".js).func(
-            FunctionParam("sourcePaths"),
-            FunctionParam("targetDir"),
-            FunctionParam("sectionName")
+            FunctionParam("sourcePaths"), FunctionParam("targetDir"), FunctionParam("sectionName")
         ) { args ->
             val sourcePaths = args[0]?.toKotlin(this) as? List<*> ?: emptyList<Any>()
             val targetDir = toString(args[1])
@@ -148,6 +141,39 @@ object PvzToolGlobals {
                 sectionName = sectionName
             ).await()
             Undefined
+        }
+
+        // 单项选择弹窗：ui.select(title, items, options?) -> string|null
+        // items: 字符串数组 或 对象数组 [{name, icon?, value?}]
+        // options: { columns?, cancelable?, showIndex? }
+        listOf("select".js, "选择".js).func(
+            FunctionParam("title"), FunctionParam("items"), FunctionParam("options")
+        ) { args ->
+            val title = toString(args[0])
+            val itemsRaw = args[1]?.toKotlin(this) as? List<*> ?: emptyList<Any>()
+            val options = args[2].orNull as? JsObject
+            val items = parseChoiceItems(itemsRaw)
+            val columns = (options?.get("columns".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 4).coerceIn(2, 6)
+            val cancelable = options?.get("cancelable".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val showIndex = options?.get("showIndex".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            JsUiManager.showSelect(title, items, columns, cancelable, showIndex).await()?.js
+        }
+
+        // 多项选择弹窗：ui.multiSelect(title, items, options?) -> string[]
+        // options: { defaultValues?, columns?, cancelable?, showIndex? }
+        listOf("multiSelect".js, "多选".js).func(
+            FunctionParam("title"), FunctionParam("items"), FunctionParam("options")
+        ) { args ->
+            val title = toString(args[0])
+            val itemsRaw = args[1]?.toKotlin(this) as? List<*> ?: emptyList<Any>()
+            val options = args[2].orNull as? JsObject
+            val items = parseChoiceItems(itemsRaw)
+            val defaultValues = options?.get("defaultValues".js, this)?.let { it.toKotlin(this) as? List<*> }
+                ?.mapNotNull { it?.toString() }
+            val columns = (options?.get("columns".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 4).coerceIn(2, 6)
+            val cancelable = options?.get("cancelable".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val showIndex = options?.get("showIndex".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            JsUiManager.showMultiSelect(title, items, defaultValues, columns, cancelable, showIndex).await().map { it.js }.js
         }
     }
 
@@ -376,6 +402,38 @@ object PvzToolGlobals {
                     val n = toNumber(thisRef).toLong()
                     Pvz2NumberCrypt.decrypt(n).js
                 }, runtime)
+            }
+        }
+    }
+}
+
+/**
+ * 将 JS 传入的 items 数组解析为 [JsChoiceItem] 列表。
+ * 支持两种元素：
+ * - 字符串 → 视为 name（value 同 name）
+ * - 对象   → { name/名称, icon/图标?, value/值? }，value 缺省回退 name
+ */
+private suspend fun ScriptRuntime.parseChoiceItems(raw: List<*>): List<JsChoiceItem> {
+    return raw.mapNotNull { el ->
+        when (el) {
+            is String -> JsChoiceItem(el, "", el)
+            is Number -> JsChoiceItem(el.toString(), "", el.toString())
+            is JsObject -> {
+                val name = toString((el.get("name".js,this).orNull ?: el.get("名称".js,this).orNull ?: "".js))
+                if (name.isBlank()) return@mapNotNull null
+                val icon = toString((el.get("icon".js,this).orNull ?: el.get("图标".js,this).orNull ?: "".js))
+                val value = toString((el.get("value".js,this).orNull ?: el.get("值".js,this).orNull ?: "".js))
+                val itemShowIndex = (el.get("showIndex".js, this).orNull ?: el.get("显示序号".js, this).orNull)
+                    ?.let { it.toKotlin(this) as? Boolean }
+                JsChoiceItem(name, icon, value.ifEmpty { name }, itemShowIndex)
+            }
+            is JsAny -> {
+                val s = toString(el)
+                JsChoiceItem(s, "", s)
+            }
+            else -> {
+                val s = el?.toString() ?: return@mapNotNull null
+                JsChoiceItem(s, "", s)
             }
         }
     }

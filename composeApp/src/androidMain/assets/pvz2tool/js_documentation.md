@@ -147,6 +147,8 @@
 | `ui.progress().cancel()` | `ui.进度.取消()` | 主动取消（触发 onCancel） |
 | `ui.progress().isCancelled()` | `ui.进度.是否已取消()` | 是否已取消 |
 | `ui.extract()` | `ui.解压()` | 解压根资源 |
+| `ui.select()` | `ui.选择()` | 单项选择弹窗（图标网格 / 列表 / 纯文字单选） |
+| `ui.multiSelect()` | `ui.多选()` | 多项选择弹窗（返回选中值数组） |
 
 #### audio 对象
 | 英文 | 中文别名 | 说明 |
@@ -1578,6 +1580,75 @@ ui.extract(
 );
 ```
 
+#### ui.select / ui.选择
+
+单项选择弹窗：从一批条目中任选其一。
+
+**参数**：
+- `title` (string): 标题
+- `items` (Array): 条目数组，元素可为：
+  - 字符串 → 直接作为名称（值为该字符串）
+  - 对象 → `{ name/名称, icon/图标?, value/值?, showIndex/显示序号? }`，`value` 缺省回退 `name`；`showIndex` 为单项单独控制是否显示序号（优先级高于外层 options.showIndex）
+- `options` (object, 可选):
+  - `columns` (number, 2~6): 网格模式每排列数（仅条目 > 8 且有图标时生效，默认 4）
+  - `cancelable` (boolean): 是否允许点击外部取消（默认 false）
+  - `showIndex` (boolean): 全局默认是否在每项图标上居中叠加序号（从 1 开始，黑色文字不遮盖原图）；默认 false。每个条目对象也可通过 `showIndex` 字段单独覆盖此设置；仅对有图标的项生效，无图标项不显示数字
+
+**返回**：string|null - 选中条目的 `value`，取消返回 null
+
+**布局规则（参考 SectionType.RADIO 样式）**：
+- 任意条目带图标且总数 **> 8** → 网格模式，每排若干，单条目 = 图标(或占位矩形) + 底部文字
+- 任意条目带图标且总数 **<= 8** → 列表模式，每条目独占一行，图标(或占位矩形)在文字前
+- 所有条目**均无图标** → 纯文字模式，每条目前带单选标记（圆点），独占一行
+- 无图标条目用与图标**同尺寸**的矩形占位，内部居中显示与底部相同的文字，超出自动截断
+
+**示例**：
+```javascript
+// 带图标（列表模式，<=16 条）：图标在文字前，无图标项显示占位矩形
+var items = [
+    { name: "存档1", icon: "save_icon.png", value: "s1" },
+    { name: "存档2", icon: "save_icon.png", value: "s2" },
+    { name: "存档3", value: "s3" }   // 无图标 → 占位矩形
+];
+var v = ui.select("选择存档", items);
+console.log("选择了：" + v);
+
+// 生成 > 16 条触发网格模式
+var lv = [];
+for (var i = 1; i <= 20; i++) lv.push({ name: "关卡" + i, icon: "lv.png", value: String(i) });
+var pick = ui.select("选择关卡", lv);
+
+// 纯文字单选（无图标 → 每条目前带单选圆点）
+var t = ui.select("难度", ["简单", "普通", "困难"]);
+
+// 在每项图标上居中叠加序号（从 1 开始）
+var idx = ui.select("选择关卡", lv, { showIndex: true });
+```
+
+#### ui.multiSelect / ui.多选
+
+多项选择弹窗：从一批条目中选择任意多个。
+
+**参数**：
+- `title` (string): 标题
+- `items` (Array): 同 `ui.select`（字符串或 `{ name, icon?, value?, showIndex? }`），单项 `showIndex` 可单独覆盖外层设置
+- `options` (object, 可选):
+  - `defaultValues` (Array\<string\>): 默认选中项的 name 或 value 列表
+  - `columns` (number, 2~6): 网格模式每排列数（默认 4）
+  - `cancelable` (boolean): 是否允许点击外部取消（默认 false）
+  - `showIndex` (boolean): 全局默认是否叠加序号（从 1 开始，黑色文字），默认 false；每项的 `showIndex` 字段优先级更高；仅对有图标的项生效
+
+**返回**：string[] - 选中条目的 `value` 数组（未选返回空数组）
+
+**布局**：与 `ui.select` 一致；纯文字模式每条目前带勾选标记，有图标模式选中后在图标右上角显示勾标。需点击「确定」确认，或「取消」清空。
+
+**示例**：
+```javascript
+var items = ["苹果", "香蕉", "橙子"];
+var arr = ui.multiSelect("选择水果", items, { defaultValues: ["苹果"] });
+console.log("已选：" + arr.join(", "));
+```
+
 ## 8.5. js - JS 执行器
 
 `js` 对象提供在 JS 脚本中动态执行其他 JS 代码或 JS 文件的能力。
@@ -2779,6 +2850,10 @@ if (device.isRooted()) {
 
 *文档版本: 2.0*
 *最后更新: 2026-07-17*
+*移除：ui.select/ui.选择 的 options.defaultValue —— 单选为「点选即返回」，预选仅高亮、无确认/清除场景，属无用代码；多选 defaultValues 保留（配合确定按钮生效）*
+*新增：ui.select/ui.multiSelect 的 options 新增 showIndex（boolean，默认 false）——开启后仅对「有图标」的项在其图标上居中叠加从 1 开始的序号（黑色文字，不遮盖原图）；无图标项不显示数字。每个条目对象亦可用 showIndex/显示序号 字段单独控制，优先级高于外层 options.showIndex*
+*优化：ui.select/ui.multiSelect 选择弹窗大数据量卡顿——列表改 LazyColumn、网格改 LazyVerticalGrid（仅组合可见项），并给 PvzStyledDialog 增加 contentScrollable 开关避免与 Lazy 嵌套滚动冲突*
+*新增：ui.select/ui.选择 单项选择弹窗（图标网格>8 / 列表<=8 / 纯文字单选 三态；无图标项以同尺寸占位矩形居中显示截断文字；参考 RADIO 样式）；ui.multiSelect/ui.多选 多项选择弹窗（返回选中值数组）*
 *新增：device 设备信息对象（system/screen/memory/storage/battery/network/app/cpu 分组 + info() 聚合，及中文别名），并补入内置对象总览表；cpu 分组含核心数/架构/ABI/频率(kHz与MHz)/调度器*
 *新增：ui.prompt/ui.输入 新增第 4 个可选参数 placeholder（输入框占位提示文字），state 数据类与弹窗渲染同步支持，缺省回退「请输入...」*
 *新增：audio 音频控制对象（getBgmVolume/setBgmVolume/getSfxVolume/setSfxVolume 及中文别名），并补入内置对象总览表（同时补 http）*

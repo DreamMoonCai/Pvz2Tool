@@ -670,6 +670,45 @@ sections:
           // 更新进度
           progress.update("已完成 50%", 0.5);
 
+      - id: "test_ui_3"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "选择弹窗(图标列表)"
+        buttonColor: "blue"
+        jsScript: |-
+          var items = [
+            { name: "存档1", icon: "save_icon.png", value: "s1" },
+            { name: "存档2", icon: "save_icon.png", value: "s2" },
+            { name: "存档3", value: "s3" }
+          ];
+          var r = ui.select("选择存档", items);
+          "你选择了：" + r
+
+      - id: "test_ui_4"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "多选弹窗(文字)"
+        buttonColor: "green"
+        jsScript: |-
+          var arr = ui.multiSelect("选择水果", ["苹果", "香蕉", "橙子"], { defaultValues: ["苹果"] });
+          "已选：" + arr.join(", ")
+
+      - id: "test_ui_5"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "选择弹窗(图标网格>=8)"
+        buttonColor: "orange"
+        jsScript: |-
+          var items = [];
+          for (var i = 1; i <= 8; i++) {
+            items.push({ name: "关卡" + i, icon: "save_icon.png", value: String(i) });
+          }
+          var r = ui.multiSelect("选择关卡", items, { defaultValues: ["1"] });
+          "你选择了：" + r
+
       # ---------- 测试：使用 version/new/smf/dynamic.rsb.smf ----------
       - id: "test_dynamic_手动解包"
         name: "测试 SMF 手动解包"
