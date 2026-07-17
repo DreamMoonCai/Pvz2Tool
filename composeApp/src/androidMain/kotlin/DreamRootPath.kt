@@ -13,6 +13,7 @@ import com.highcapable.yukireflection.factory.field
 import com.highcapable.yukireflection.factory.method
 import com.highcapable.yukireflection.factory.toClass
 import com.highcapable.yukireflection.type.java.IntType
+import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.ui.main.SettingsDialogState
 import io.github.dreammooncai.util.ContextUtil
 import io.github.dreammooncai.yukireflection.factory.returnType
@@ -24,7 +25,7 @@ import kotlin.random.Random
 @Suppress("DEPRECATION")
 @SuppressLint("HardwareIds")
 object DreamRootPath {
-    private val context by lazy { ContextUtil.context }
+    private val context by lazy { runCatching { InitializePvz2.context }.getOrNull() ?: ContextUtil.context }
 
     @JvmStatic
     val rootFile: File by lazy { context.filesDir }

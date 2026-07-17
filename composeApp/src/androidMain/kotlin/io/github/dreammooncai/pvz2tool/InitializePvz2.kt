@@ -21,6 +21,7 @@ import com.russhwolf.settings.SharedPreferencesSettings
 import com.russhwolf.settings.get
 import com.russhwolf.settings.set
 import io.github.dreammooncai.manager.FilePickerManager
+import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import io.github.dreammooncai.pvz2tool.ui.main.Pvz2ScreenState
 import io.github.dreammooncai.util.ContextUtil
 import io.github.z4kn4fein.semver.Version
@@ -113,6 +114,16 @@ object InitializePvz2 {
             // 正常模式：使用完整配置解码
             this.simpleConfig = null
             yaml.decodeFromYamlNode(Pvz2ToolConfig.serializer(), mergedYamlNode)
+        }
+        // 本地工作目录优先（支持 SAF content:// 与普通 File），回退 APK assets
+        val name = "pvz2font.ttf"
+        runCatching {
+            if (!AssetExtractorHolder.existFromLocalWorkDir("${Pvz2ToolConfig.PATH_NAME}/$name")) return@runCatching
+            val input = AssetExtractorHolder.openInputStream("${Pvz2ToolConfig.PATH_NAME}/$name") ?: return@runCatching
+            // Typeface 只能从本地 File 构造：SAF content:// 无法直接读取，统一复制到缓存后加载
+            val cacheFile = File(context.cacheDir, "pvz2tool_$name")
+            input.use { src -> cacheFile.outputStream().use { out -> src.copyTo(out) } }
+            font = FontFamily(Typeface.createFromFile(cacheFile))
         }
     }
 
@@ -369,10 +380,7 @@ object InitializePvz2 {
     }
 
     // ======================== 原有工具逻辑 ========================
-    val font by lazy {
-        val typeface = Typeface.createFromAsset(context.assets, "${Pvz2ToolConfig.PATH_NAME}/pvz2font.ttf")
-        FontFamily(typeface)
-    }
+    lateinit var font: FontFamily
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -452,6 +460,7 @@ object InitializePvz2 {
     // 初始化入口
     fun init(context: Context = ContextUtil.getCurrentActivity() ?: ContextUtil.context) {
         this.context = context
+        this.font = FontFamily(Typeface.createFromAsset(InitializePvz2.context.assets, "${Pvz2ToolConfig.PATH_NAME}/pvz2font.ttf"))
         runCatching {
             initConfig()
             initBgMusicVolume()

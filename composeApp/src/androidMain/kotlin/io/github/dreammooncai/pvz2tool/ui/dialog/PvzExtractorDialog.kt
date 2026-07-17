@@ -984,16 +984,21 @@ class AssetExtractorHolder(
             open(path)?.let { InitializePvz2.context.openUriInputStreamOrAsset(it) }
         }.getOrNull()
 
-        fun exist(path: String): Boolean {
-            // 绝对路径：直接检查本地文件系统
-            if (path.startsWith("/")) {
-                return File(path).exists()
-            }
+        fun existFromLocalWorkDir(path: String): Boolean {
             val localWorkDir = runCatching { InitializePvz2.config.getLocalWorkDir(InitializePvz2.context) }.getOrNull()
             if (localWorkDir != null) {
                 val localDocument = buildDocumentFilePath(localWorkDir, removeThePrefix(path))
                 if (localDocument != null && localDocument.exists()) return true
             }
+            return false
+        }
+
+        fun exist(path: String): Boolean {
+            // 绝对路径：直接检查本地文件系统
+            if (path.startsWith("/")) {
+                return File(path).exists()
+            }
+            if (existFromLocalWorkDir(path)) return true
             val assetPath = complementThePrefix(path)
             return InitializePvz2.context.isAssetFileExist(assetPath) || InitializePvz2.context.isAssetDirExist(assetPath)
         }

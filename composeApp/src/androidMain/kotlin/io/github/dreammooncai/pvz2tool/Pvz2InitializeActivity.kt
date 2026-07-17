@@ -238,9 +238,12 @@ class Pvz2InitializeActivity : ComponentActivity() {
     }
 
     private fun showAntiDistribution() {
-        assets.open("${Pvz2ToolConfig.PATH_NAME}/anti-distribution.txt").use { input ->
-            input.reader().readLines().forEach { line ->
-                Toast.makeText(this,line, Toast.LENGTH_LONG).show()
+        // 本地工作目录优先，回退 APK assets；文件缺失则静默跳过
+        val input = AssetExtractorHolder.openInputStream("${Pvz2ToolConfig.PATH_NAME}/anti-distribution.txt")
+            ?: return
+        input.use { stream ->
+            stream.reader().readLines().forEach { line ->
+                Toast.makeText(this, line, Toast.LENGTH_LONG).show()
             }
         }
     }
