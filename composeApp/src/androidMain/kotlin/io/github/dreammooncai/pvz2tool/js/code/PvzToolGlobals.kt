@@ -22,6 +22,7 @@ import io.github.dreammooncai.pvz2tool.js.func
 import io.github.dreammooncai.pvz2tool.js.orNull
 import io.github.dreammooncai.pvz2tool.pop.plugin.crypt.Pvz2NumberCrypt
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsActionItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsChoiceItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
 import io.github.dreammooncai.pvz2tool.ui.music.BackgroundMusicState
@@ -41,37 +42,75 @@ object PvzToolGlobals {
     // 持有 BackgroundMusicState 引用，供 audio 对象访问（由 Pvz2InitializeActivity 注入）
     var bgMusicState: BackgroundMusicState? = null
 
-    val ui = Object("ui") { // 提示弹窗（单按钮）：ui.alert(title, message) -> void
+    /** 将 options 中的 JS 函数字段绑定为 Kotlin 挂起回调（value 透传给 JS 函数作为第一个参数）。 */
+    private suspend fun bindJsCallback(
+        options: JsObject?,
+        key: String,
+        runtime: ScriptRuntime
+    ): (suspend (JsAny?) -> Unit)? {
+        val jsFn = options?.get(key.js, runtime)?.orNull as? JSFunction ?: return null
+        return { value -> runCatching { jsFn.invoke(listOf(value), runtime) } }
+    }
+
+    val ui = Object("ui") { // 提示弹窗（单按钮）：ui.alert(title, message, options?) -> void
         listOf("alert".js, "提示".js).func(
-            FunctionParam("title"), FunctionParam("message")
+            FunctionParam("title"), FunctionParam("message"), FunctionParam("options")
         ) { args ->
+            val runtime = this
             val title = toString(args[0])
             val message = toString(args[1])
-            JsUiManager.showAlert(title, message).await()
+            val options = args[2].orNull as? JsObject
+            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
+            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val dismissible = options?.get("dismissible".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
+                ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val onConfirm = bindJsCallback(options, "onConfirm", runtime)
+            JsUiManager.showAlert(title, message, confirmText, confirmColor, dismissible, onConfirm).await()
             Undefined
         }
 
-        // 确认弹窗：ui.confirm(title, message) -> boolean
+        // 确认弹窗：ui.confirm(title, message, options?) -> boolean
         listOf("confirm".js, "确认".js).func(
-            FunctionParam("title"), FunctionParam("message")
+            FunctionParam("title"), FunctionParam("message"), FunctionParam("options")
         ) { args ->
+            val runtime = this
             val title = toString(args[0])
             val message = toString(args[1])
-            JsUiManager.showConfirm(title, message).await().js
+            val options = args[2].orNull as? JsObject
+            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确认"
+            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
+            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val dismissible = options?.get("dismissible".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
+                ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val onConfirm = bindJsCallback(options, "onConfirm", runtime)
+            val onCancel = bindJsCallback(options, "onCancel", runtime)
+            JsUiManager.showConfirm(title, message, confirmText, cancelText, confirmColor, cancelColor, dismissible, onConfirm, onCancel).await().js
         }
 
-        // 输入弹窗：ui.prompt(title, message, defaultValue?, placeholder?) -> string|null
+        // 输入弹窗：ui.prompt(title, message, defaultValue?, placeholder?, options?) -> string|null
         listOf("prompt".js, "输入".js).func(
             FunctionParam("title"),
             FunctionParam("message"),
             FunctionParam("defaultValue"),
-            FunctionParam("placeholder")
+            FunctionParam("placeholder"),
+            FunctionParam("options")
         ) { args ->
+            val runtime = this
             val title = toString(args[0])
             val message = toString(args[1])
             val defaultValue = args.getOrNull(2)?.let { toString(it) } ?: ""
             val placeholder = args.getOrNull(3)?.let { toString(it) } ?: ""
-            JsUiManager.showPrompt(title, message, defaultValue, placeholder).await()?.js
+            val options = args[4].orNull as? JsObject
+            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
+            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
+            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val dismissible = options?.get("dismissible".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
+                ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val onConfirm = bindJsCallback(options, "onConfirm", runtime)
+            val onCancel = bindJsCallback(options, "onCancel", runtime)
+            JsUiManager.showPrompt(title, message, defaultValue, placeholder, confirmText, cancelText, confirmColor, cancelColor, dismissible, onConfirm, onCancel).await()?.js
         }
 
         // 进度弹窗：ui.progress(title, options?) -> progressController
@@ -144,11 +183,12 @@ object PvzToolGlobals {
         }
 
         // 单项选择弹窗：ui.select(title, items, options?) -> string|null
-        // items: 字符串数组 或 对象数组 [{name, icon?, value?}]
-        // options: { columns?, cancelable?, showIndex? }
+        // items: 字符串数组 或 对象数组 [{name, icon?, value?, showIndex?, showIndexColor?}]
+        // options: { columns?, cancelable?, showIndex?, showIndexColor?, confirmText?, cancelText?, confirmColor?, cancelColor?, onCancel?, onSelect? }
         listOf("select".js, "选择".js).func(
             FunctionParam("title"), FunctionParam("items"), FunctionParam("options")
         ) { args ->
+            val runtime = this
             val title = toString(args[0])
             val itemsRaw = args[1]?.toKotlin(this) as? List<*> ?: emptyList<Any>()
             val options = args[2].orNull as? JsObject
@@ -156,14 +196,22 @@ object PvzToolGlobals {
             val columns = (options?.get("columns".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 4).coerceIn(2, 6)
             val cancelable = options?.get("cancelable".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val showIndex = options?.get("showIndex".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
-            JsUiManager.showSelect(title, items, columns, cancelable, showIndex).await()?.js
+            val showIndexColor = toString((options?.get("showIndexColor".js, this).orNull ?: options?.get("序号颜色".js, this).orNull ?: "black".js))
+            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
+            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
+            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val onCancel = bindJsCallback(options, "onCancel", runtime)
+            val onSelect = bindJsCallback(options, "onSelect", runtime)
+            JsUiManager.showSelect(title, items, columns, cancelable, showIndex, showIndexColor, confirmText, cancelText, confirmColor, cancelColor, onCancel, onSelect).await()?.js
         }
 
         // 多项选择弹窗：ui.multiSelect(title, items, options?) -> string[]
-        // options: { defaultValues?, columns?, cancelable?, showIndex? }
+        // options: { defaultValues?, columns?, cancelable?, showIndex?, showIndexColor?, confirmText?, cancelText?, confirmColor?, cancelColor?, onCancel?, onSelect? }
         listOf("multiSelect".js, "多选".js).func(
             FunctionParam("title"), FunctionParam("items"), FunctionParam("options")
         ) { args ->
+            val runtime = this
             val title = toString(args[0])
             val itemsRaw = args[1]?.toKotlin(this) as? List<*> ?: emptyList<Any>()
             val options = args[2].orNull as? JsObject
@@ -173,7 +221,88 @@ object PvzToolGlobals {
             val columns = (options?.get("columns".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 4).coerceIn(2, 6)
             val cancelable = options?.get("cancelable".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val showIndex = options?.get("showIndex".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
-            JsUiManager.showMultiSelect(title, items, defaultValues, columns, cancelable, showIndex).await().map { it.js }.js
+            val showIndexColor = toString((options?.get("showIndexColor".js, this).orNull ?: options?.get("序号颜色".js, this).orNull ?: "black".js))
+            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
+            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
+            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val onCancel = bindJsCallback(options, "onCancel", runtime)
+            val onSelect = bindJsCallback(options, "onSelect", runtime)
+            JsUiManager.showMultiSelect(title, items, defaultValues, columns, cancelable, showIndex, showIndexColor, confirmText, cancelText, confirmColor, cancelColor, onCancel, onSelect).await().map { it.js }.js
+        }
+
+        // 操作菜单弹窗：ui.actionSheet(title, actions, options?) -> string|null
+        // actions: 字符串数组 或 对象数组 [{name, value?, danger?}]
+        // options: { cancelable?, cancelText?, cancelColor?, onCancel?, onSelect? }  点击某项返回其 value（或 name）；取消/点外部返回 null
+        listOf("actionSheet".js, "操作菜单".js).func(
+            FunctionParam("title"), FunctionParam("actions"), FunctionParam("options")
+        ) { args ->
+            val runtime = this
+            val title = toString(args[0])
+            val itemsRaw = args[1]?.toKotlin(this) as? List<*> ?: emptyList<Any>()
+            val options = args[2].orNull as? JsObject
+            val items = parseActionItems(itemsRaw)
+            val cancelable = options?.get("cancelable".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: true
+            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
+            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val onCancel = bindJsCallback(options, "onCancel", runtime)
+            val onSelect = bindJsCallback(options, "onSelect", runtime)
+            JsUiManager.showActionSheet(title, items, cancelable, cancelText, cancelColor, onCancel, onSelect).await()?.js
+        }
+
+        // 数值滑块弹窗：ui.slider(title, options?) -> number|null
+        // options: { min?, max?, step?, default?, unit?, decimals?, showValue?, confirmText?, cancelText?, confirmColor?, cancelColor?, dismissible?, onChange?, onConfirm?, onCancel? }  点击"取消"返回 null
+        listOf("slider".js, "滑块".js).func(
+            FunctionParam("title"), FunctionParam("options")
+        ) { args ->
+            val runtime = this
+            val title = toString(args[0])
+            val options = args[1].orNull as? JsObject
+            val min = options?.get("min".js, this)?.orNull?.let { toNumber(it).toDouble() } ?: 0.0
+            val max = options?.get("max".js, this)?.orNull?.let { toNumber(it).toDouble() } ?: 100.0
+            val step = options?.get("step".js, this)?.orNull?.let { toNumber(it).toDouble() } ?: 1.0
+            val default = options?.get("default".js, this)?.orNull?.let { toNumber(it).toDouble() } ?: min
+            val unit = options?.get("unit".js, this)?.orNull?.let { toString(it) } ?: ""
+            val decimals = options?.get("decimals".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 2
+            val showValue = options?.get("showValue".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: true
+            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
+            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
+            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val dismissible = options?.get("dismissible".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
+                ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val onChange = bindJsCallback(options, "onChange", runtime)
+            val onConfirm = bindJsCallback(options, "onConfirm", runtime)
+            val onCancel = bindJsCallback(options, "onCancel", runtime)
+            JsUiManager.showSlider(title, min, max, step, default, unit, decimals, showValue, confirmText, cancelText, confirmColor, cancelColor, dismissible, onChange, onConfirm, onCancel).await()?.js
+        }
+
+        // 加载指示弹窗：ui.loading(title, options?) -> controller{ close(), 关闭(), update(), 更新() }
+        // options: { message?, dismissible?, cancelText?, cancelColor?, onDismiss? }  不阻塞 await，返回 controller 供手动关闭/实时更新文字
+        listOf("loading".js, "加载".js).func(
+            FunctionParam("title"), FunctionParam("options")
+        ) { args ->
+            val runtime = this
+            val title = toString(args[0])
+            val options = args[1].orNull as? JsObject
+            val message = options?.get("message".js, this)?.orNull?.let { toString(it) } ?: ""
+            val dismissible = options?.get("dismissible".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
+                ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
+            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val onDismiss = bindJsCallback(options, "onDismiss", runtime)
+            JsUiManager.showLoading(title, message, dismissible, cancelText, cancelColor, onDismiss)
+            Object("controller") {
+                listOf("close".js, "关闭".js).func { _ ->
+                    JsUiManager.hideLoading()
+                    Undefined
+                }
+                listOf("update".js, "更新".js).func(FunctionParam("message")) { updateArgs ->
+                    val msg = updateArgs.getOrNull(0)?.let { toString(it) } ?: ""
+                    JsUiManager.updateLoading(msg)
+                    Undefined
+                }
+            }
         }
     }
 
@@ -425,7 +554,9 @@ private suspend fun ScriptRuntime.parseChoiceItems(raw: List<*>): List<JsChoiceI
                 val value = toString((el.get("value".js,this).orNull ?: el.get("值".js,this).orNull ?: "".js))
                 val itemShowIndex = (el.get("showIndex".js, this).orNull ?: el.get("显示序号".js, this).orNull)
                     ?.let { it.toKotlin(this) as? Boolean }
-                JsChoiceItem(name, icon, value.ifEmpty { name }, itemShowIndex)
+                val itemShowIndexColor = (el.get("showIndexColor".js, this).orNull ?: el.get("序号颜色".js, this).orNull)
+                    ?.let { toString(it) }
+                JsChoiceItem(name, icon, value.ifEmpty { name }, itemShowIndex, itemShowIndexColor)
             }
             is JsAny -> {
                 val s = toString(el)
@@ -434,6 +565,31 @@ private suspend fun ScriptRuntime.parseChoiceItems(raw: List<*>): List<JsChoiceI
             else -> {
                 val s = el?.toString() ?: return@mapNotNull null
                 JsChoiceItem(s, "", s)
+            }
+        }
+    }
+}
+
+private suspend fun ScriptRuntime.parseActionItems(raw: List<*>): List<JsActionItem> {
+    return raw.mapNotNull { el ->
+        when (el) {
+            is String -> JsActionItem(el, el, false)
+            is Number -> JsActionItem(el.toString(), el.toString(), false)
+            is JsObject -> {
+                val name = toString((el.get("name".js, this).orNull ?: el.get("名称".js, this).orNull ?: "".js))
+                if (name.isBlank()) return@mapNotNull null
+                val value = toString((el.get("value".js, this).orNull ?: el.get("值".js, this).orNull ?: "".js))
+                val danger = (el.get("danger".js, this).orNull ?: el.get("危险".js, this).orNull)
+                    ?.let { it.toKotlin(this) as? Boolean } ?: false
+                JsActionItem(name, value.ifEmpty { name }, danger)
+            }
+            is JsAny -> {
+                val s = toString(el)
+                JsActionItem(s, s, false)
+            }
+            else -> {
+                val s = el?.toString() ?: return@mapNotNull null
+                JsActionItem(s, s, false)
             }
         }
     }

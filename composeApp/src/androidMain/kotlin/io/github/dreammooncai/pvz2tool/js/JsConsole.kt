@@ -1,6 +1,7 @@
 package io.github.dreammooncai.pvz2tool.js
 
 import io.github.alexzhirkevich.keight.Console
+import io.github.alexzhirkevich.keight.js.SyntaxError
 
 object JsConsole: Console {
     override fun verbose(message: Any?) {
@@ -28,7 +29,10 @@ object JsConsole: Console {
     }
 
     fun error(message: Any?,err: Throwable) {
-        error("$message $err${if (err.cause != null) "\n${err.cause}" else ""}")
+        if (err is SyntaxError)
+            error("$message $err${if (err.cause != null) "\n${err.cause}" else ""} \n${err.stackTraceToString()}")
+        else
+            error("$message $err${if (err.cause != null) "\n${err.cause}" else ""}")
     }
 }
 

@@ -27,6 +27,9 @@ import android.view.Window
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,8 +38,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import kotlinx.coroutines.delay
 import io.github.dreammooncai.manager.FilePickerManager
@@ -60,6 +66,7 @@ import kotlin.coroutines.resume
 import kotlin.system.exitProcess
 import com.highcapable.yukireflection.factory.field
 import io.github.dreammooncai.pvz2tool.controller.GeneralFloatingDialogController
+import io.github.dreammooncai.pvz2tool.view.AsyncImageFromAssets
 import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
 

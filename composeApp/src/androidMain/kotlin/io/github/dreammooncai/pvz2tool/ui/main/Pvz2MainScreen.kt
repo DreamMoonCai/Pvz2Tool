@@ -91,6 +91,7 @@ import io.github.dreammooncai.pvz2tool.view.PvzOrangeButton
 import io.github.dreammooncai.pvz2tool.view.PvzPurpleButton
 import io.github.dreammooncai.pvz2tool.view.PvzRedButton
 import io.github.dreammooncai.pvz2tool.view.ImageSvgButton
+import io.github.dreammooncai.pvz2tool.icon.Pvz2Icon
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -112,6 +113,9 @@ import io.github.dreammooncai.pvz2tool.ui.dialog.JsExtractorDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsProgressDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsPromptDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsItemChoiceDialog
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsActionSheetDialog
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsSliderDialog
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsLoadingDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzStyledDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzTutorialDialog
 import io.github.dreammooncai.pvz2tool.view.PvzTextStyle
@@ -409,10 +413,10 @@ private fun SectionButtonItem(
                         .height(Pvz2Constants.Dimension.BUTTON_HEIGHT_MAIN.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(28.dp),
-                        strokeWidth = 2.5.dp,
-                        color = theme.primaryTextColor
+                    AsyncImageFromAssets(
+                        "images/loading.gif",
+                        modifier = Modifier.requiredSize(116.dp),
+                        contentDescription = null
                     )
                 }
             } else {
@@ -465,10 +469,10 @@ private fun SectionButtonItem(
 
             // 执行按钮 / Loading 指示
             if (isRunning) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(28.dp),
-                    strokeWidth = 2.5.dp,
-                    color = theme.primaryTextColor
+                AsyncImageFromAssets(
+                    "images/loading.gif",
+                    modifier = Modifier.requiredSize(104.dp),
+                    contentDescription = null
                 )
             } else {
                 val buttonModifier = Modifier.height(38.dp)
@@ -545,17 +549,13 @@ private fun LocalSaveRadioItem(
             )
         }
 
-        IconButton(
-            onClick = onDelete,
-            modifier = Modifier.size(20.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Delete,
-                contentDescription = InitializePvz2.config.ui.dialog.deleteSaveDesc,
-                tint = Color.Red,
-                modifier = Modifier.size(18.dp)
-            )
-        }
+        ImageSvgButton(
+            imageVector = Pvz2Icon.Delete,
+            imageVectorPress = Pvz2Icon.DeletePress,
+            contentDescription = InitializePvz2.config.ui.dialog.deleteSaveDesc,
+            modifier = Modifier.size(32.dp),
+            onClick = onDelete
+        )
     }
 }
 
@@ -2605,6 +2605,9 @@ fun Pvz2MainScreen(
     JsPromptDialog()
     JsItemChoiceDialog()
     JsProgressDialog()
+    JsActionSheetDialog()
+    JsSliderDialog()
+    JsLoadingDialog()
     JsExtractorDialog()
 
     // 2. 显示设置弹窗（仅传状态）

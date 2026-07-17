@@ -655,8 +655,11 @@ settings:
 所有文本类配置均支持**复合颜色样式**，语法：
 
 - **颜色与阴影**：
-  - 格式：`{{colorName:content}}` 或 `{{colorName-shadow:content}}`
-  - 示例：`{{green-shadow:松间烬雪}}` 会显示为带深绿阴影的绿色文字。
+  - 格式：`{{colorName:content}}`（纯色）或 `{{colorName-shadow:content}}`（带同色描边阴影）。
+  - 命名色（标签名即颜色名，直接书写即可）：`green`、`purple`、`red`、`gold`、`gray`、`white`、`olive`、`black`、`grey`、`blue`、`yellow`、`orange`、`cyan`、`pink`。
+  - `-shadow` 后缀：仅 `green / purple / red / gold / gray / white / olive` 七个支持，例如 `{{red-shadow:警告}}` 显示为带红色描边阴影的文字；其余新增色（`black / grey / blue / yellow / orange / cyan / pink`）仅提供纯色形式。
+  - 十六进制（新增）：支持 `{{#RGB:content}}` / `{{#RRGGBB:content}}` / `{{#AARRGGBB:content}}`，例如 `{{#FF5252:危险}}`、`{{#2196F3:信息}}`。
+  - 示例：`{{green-shadow:松间烬雪}}` 显示为带深绿阴影的绿色文字；`{{gold:金币}}` 显示为金色文字；`{{#FF0000:错误}}` 显示为红色文字。
 
 - **交互式链接 (Link)**：
   - **基础格式**：`{{link|URL:显示文本}}`。

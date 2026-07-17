@@ -216,6 +216,15 @@ private val DefaultPvzTagStyles = mapOf(
     "white" to PvzTextWhiteStyle.copy(shadowColor = null),
     "olive" to PvzTextOliveStyle.copy(shadowColor = null),
 
+    // 扩展命名色：供复合文本 {{color:内容}} 直接使用（无阴影）
+    "black" to PvzTextStyle(Color.Black),
+    "grey" to PvzTextStyle(Color(0xFFB0BEC5)),
+    "blue" to PvzTextStyle(Color(0xFF2196F3)),
+    "yellow" to PvzTextStyle(Color(0xFFFFEB3B)),
+    "orange" to PvzTextStyle(Color(0xFFFF9800)),
+    "cyan" to PvzTextStyle(Color(0xFF00BCD4)),
+    "pink" to PvzTextStyle(Color(0xFFE91E63)),
+
     "green-shadow" to PvzTextGreenStyle,
     "purple-shadow" to PvzTextPurpleStyle,
     "red-shadow" to PvzTextRedStyle,
@@ -494,7 +503,7 @@ private fun parseRichText(
                     builder.append("{{$inner}}")
                 }
             } else {
-                val targetStyle = DefaultPvzTagStyles[tagName] ?: defaultStyle
+                val targetStyle = parseHexColorTag(tagName) ?: (DefaultPvzTagStyles[tagName] ?: defaultStyle)
                 builder.withStyle(SpanStyle(
                     color = targetStyle.color,
                     shadow = if (targetStyle.shadowColor != null) Shadow(targetStyle.shadowColor, fixedOffset, blurRadius) else null
@@ -508,6 +517,23 @@ private fun parseRichText(
 
         currentIndex = end + 2
     }
+}
+
+/**
+ * 解析形如 #RGB / #RRGGBB / #AARRGGBB 的颜色标签名，返回对应样式；非十六进制返回 null。
+ * 使复合文本可直接书写 {{#FF0000:内容}} 进行着色。
+ */
+private fun parseHexColorTag(tag: String): PvzTextStyle? {
+    if (!tag.startsWith("#")) return null
+    val hex = tag.removePrefix("#")
+    val argb = when (hex.length) {
+        3 -> "FF" + hex.map { "$it$it" }.joinToString("")
+        6 -> "FF$hex"
+        8 -> hex
+        else -> return null
+    }
+    val color = runCatching { Color(argb.toLong(16)) }.getOrNull() ?: return null
+    return PvzTextStyle(color)
 }
 
 /**

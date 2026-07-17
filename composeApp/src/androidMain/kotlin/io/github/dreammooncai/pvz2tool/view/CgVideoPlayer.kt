@@ -22,7 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
+import io.github.dreammooncai.pvz2tool.view.AsyncImageFromAssets
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -235,7 +235,7 @@ private fun ExoPlayerDelegate(
         )
 
         if (!isReady) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center).size(48.dp), color = Color.White)
+            AsyncImageFromAssets("images/loading.gif", modifier = Modifier.align(Alignment.Center).size(184.dp), contentDescription = null)
         }
 
         SkipButtonVisibility(visible = showSkipButton && isReady, onSkip = onSkip)
@@ -313,7 +313,7 @@ private fun MediaPlayerDelegate(
         )
 
         if (!isReady) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center).size(48.dp), color = Color.White)
+            AsyncImageFromAssets("images/loading.gif", modifier = Modifier.align(Alignment.Center).size(184.dp), contentDescription = null)
         }
 
         SkipButtonVisibility(visible = showSkipButton && isReady, onSkip = {

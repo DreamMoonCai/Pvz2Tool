@@ -1454,36 +1454,104 @@ file.resolve("$WORK_DIR/old.txt").renameTo("$WORK_DIR/new.txt");
 
 提供弹窗和进度条功能。
 
+### 通用选项与回调
+
+下列选项为多数弹窗（alert / confirm / prompt / select / multiSelect / actionSheet / slider / loading）通用，仅在各自小节列出差异项。
+
+**按钮文字与颜色**
+- `confirmText` (string): 确认/主按钮文字。默认值因弹窗而异：alert / prompt / slider 为 `"确定"`，confirm 为 `"确认"`。
+- `cancelText` (string): 取消/次按钮文字，默认 `"取消"`。
+- `confirmColor` / `cancelColor` (string): 对应按钮背景色。留空或非法值则使用主题默认渐变。支持：
+  - 命名色：`black` `white` `red` `green` `blue` `yellow` `orange` `purple` `gray`(=`grey`) `gold` `cyan` `pink`
+  - 十六进制：`#RGB` / `#RRGGBB` / `#AARRGGBB`（例如 `"#FF5722"`、`"#80FFFFFF"`）
+
+**可关闭性**
+- `dismissible` / `可关闭` (boolean, 默认 `false`): 是否允许点击弹窗外部关闭。
+  - 对 confirm / prompt / slider：点外部等价于「取消」，触发 `onCancel` 并以取消值返回。
+  - 对 alert / loading：点外部即关闭（alert 触发 `onConfirm`，loading 触发 `onDismiss`）。
+- 注：`select` / `multiSelect` / `actionSheet` 使用 `cancelable` 控制同一行为（是否显示底部「取消」并允许点外部关闭）。
+
+**事件回调**
+所有回调均为 `function(value) { ... }` 形式，在对应交互发生时异步触发；回调返回值被忽略，不会阻塞 `await()`。
+
+| 回调 | 触发时机 | 收到的 value |
+|------|----------|--------------|
+| `onConfirm(value)` | 点击确认 | alert 无参数；confirm 收到 `true`；prompt 收到输入字符串；slider 收到确认的数值 |
+| `onCancel()` | 点击取消或点外部关闭 | 无参数 |
+| `onSelect(value)` | 选中某项 | select 收到选中项 `value`；multiSelect 收到选中 `value` 数组；actionSheet 收到选中项 `value` |
+| `onChange(value)` | slider 拖动过程中 | 当前数值（实时） |
+| `onDismiss()` | loading 被关闭 | 无参数 |
+
+> 示例：`ui.confirm("标题", "内容", { confirmText: "好的", onConfirm: function(){ console.log("已确认") } })`
+
 ### 方法
 
 #### ui.alert / ui.提示
 
 显示一个带单按钮的提示对话框。
 
+**语法**：`ui.alert(title, message, options?) -> void`
+
 **参数**：
 - `title` (string): 弹窗标题
 - `message` (string): 弹窗内容
+- `options` (object, 可选): 见下方
+
+**options 参数**：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `confirmText` | string | "确定" | 按钮文字 |
+| `confirmColor` | string | "" | 按钮背景色（命名色或 `#RRGGBB`，见通用说明） |
+| `dismissible` / `可关闭` | boolean | false | 是否允许点击外部关闭（关闭时触发 `onConfirm`） |
+| `onConfirm` | function | 无 | 点击按钮时触发（无参数） |
 
 **返回**：void - 用户点击确定后 resolve
 
 **示例**：
 ```javascript
-ui.alert("兑换成功", "恭喜获得豪华礼包！");
+// 自定义按钮文字与颜色，并可点击外部关闭
+ui.alert("兑换成功", "恭喜获得豪华礼包！", {
+    confirmText: "太棒了",
+    confirmColor: "gold",
+    dismissible: true,
+    onConfirm: function () { console.log("用户已查看") }
+});
 ```
 
 #### ui.confirm / ui.确认
 
 显示确认对话框。
 
+**语法**：`ui.confirm(title, message, options?) -> boolean`
+
 **参数**：
 - `title` (string): 标题
 - `message` (string): 消息内容
+- `options` (object, 可选): 见下方
+
+**options 参数**：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `confirmText` | string | "确认" | 确认按钮文字 |
+| `cancelText` | string | "取消" | 取消按钮文字 |
+| `confirmColor` | string | "" | 确认按钮背景色 |
+| `cancelColor` | string | "" | 取消按钮背景色 |
+| `dismissible` / `可关闭` | boolean | false | 点击外部关闭时等价于取消（触发 `onCancel`） |
+| `onConfirm` | function | 无 | 点击确认时触发（收到 `true`） |
+| `onCancel` | function | 无 | 点击取消 / 点外部时触发（无参数） |
 
 **返回**：boolean - 用户点击确定返回 true，取消返回 false
 
 **示例**：
 ```javascript
-var confirmed = ui.confirm("确认删除", "确定要删除这个文件吗？");
+var confirmed = ui.confirm("确认删除", "确定要删除这个文件吗？", {
+    confirmText: "删吧",
+    confirmColor: "red",
+    cancelText: "再想想",
+    onConfirm: function () { console.log("已确认删除") }
+});
 if (confirmed) {
     // 执行删除
 }
@@ -1493,17 +1561,36 @@ if (confirmed) {
 
 显示输入对话框。
 
+**语法**：`ui.prompt(title, message, defaultValue?, placeholder?, options?) -> string|null`
+
 **参数**：
 - `title` (string): 标题
 - `message` (string): 提示消息
 - `defaultValue` (string, 可选): 输入框默认值
 - `placeholder` (string, 可选): 输入框占位提示文字（空输入时显示，留空默认显示「请输入...」）
+- `options` (object, 可选): 见下方
+
+**options 参数**：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `confirmText` | string | "确定" | 确认按钮文字 |
+| `cancelText` | string | "取消" | 取消按钮文字 |
+| `confirmColor` | string | "" | 确认按钮背景色 |
+| `cancelColor` | string | "" | 取消按钮背景色 |
+| `dismissible` / `可关闭` | boolean | false | 点击外部关闭时等价于取消（触发 `onCancel`） |
+| `onConfirm` | function | 无 | 点击确认时触发（收到输入字符串） |
+| `onCancel` | function | 无 | 点击取消 / 点外部时触发（无参数） |
 
 **返回**：string|null - 用户输入的字符串，取消返回 null
 
 **示例**：
 ```javascript
-var name = ui.prompt("输入名称", "请输入文件名", "默认名称", "例如：level_1");
+var name = ui.prompt("输入名称", "请输入文件名", "默认名称", "例如：level_1", {
+    confirmText: "保存",
+    confirmColor: "green",
+    onConfirm: function (v) { console.log("提交：" + v) }
+});
 if (name !== null) {
     console.log("输入: " + name);
 }
@@ -1511,7 +1598,7 @@ if (name !== null) {
 
 #### ui.progress / ui.进度
 
-显示进度对话框。
+显示**全屏**进度弹窗（与 `ui.loading` 同款半透明阴影遮罩，覆盖刘海/小白条，内容在安全区内布局）：**进度条永远固定在底部**；上半区垂直水平居中——indeterminate 模式时 loading 动图居中、文字在图之下（与普通 `ui.loading` 一致），无加载器时文字直接居中。
 
 **参数**：
 - `title` (string): 标题
@@ -1588,41 +1675,54 @@ ui.extract(
 - `title` (string): 标题
 - `items` (Array): 条目数组，元素可为：
   - 字符串 → 直接作为名称（值为该字符串）
-  - 对象 → `{ name/名称, icon/图标?, value/值?, showIndex/显示序号? }`，`value` 缺省回退 `name`；`showIndex` 为单项单独控制是否显示序号（优先级高于外层 options.showIndex）
-- `options` (object, 可选):
-  - `columns` (number, 2~6): 网格模式每排列数（仅条目 > 8 且有图标时生效，默认 4）
-  - `cancelable` (boolean): 是否允许点击外部取消（默认 false）
-  - `showIndex` (boolean): 全局默认是否在每项图标上居中叠加序号（从 1 开始，黑色文字不遮盖原图）；默认 false。每个条目对象也可通过 `showIndex` 字段单独覆盖此设置；仅对有图标的项生效，无图标项不显示数字
+  - 对象 → `{ name/名称, icon/图标?, value/值?, showIndex/显示序号?, showIndexColor/序号颜色? }`，`value` 缺省回退 `name`；`showIndex` 为单项单独控制是否显示序号（优先级高于外层 options.showIndex），`showIndexColor` 为单项单独控制序号颜色（"black"/"white"，优先级高于外层 options.showIndexColor）
+- `options` (object, 可选): 见下方表格
+
+**options 参数**：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `columns` | number | 4 | 网格模式每排列数（2~6，仅条目 **≥ 8** 且有图标时生效） |
+| `cancelable` | boolean | false | 是否允许点击外部取消（关闭时触发 `onCancel`） |
+| `showIndex` | boolean | false | 全局默认是否叠加序号（从 1 开始），仅对有图标的项生效 |
+| `showIndexColor` | string | "black" | 序号颜色，支持命名色或 `#RRGGBB`（见通用说明）；单项可用 `showIndexColor`/`序号颜色` 覆盖 |
+| `confirmText` | string | "确定" | 「确定」按钮文字（仅多选模式显示） |
+| `cancelText` | string | "取消" | 「取消」按钮文字（单/多选底部均显示） |
+| `confirmColor` | string | "" | 确定按钮背景色（仅多选） |
+| `cancelColor` | string | "" | 取消按钮背景色 |
+| `onSelect` | function | 无 | 选中某项时触发（单选收到 `value`；多选收到 `value` 数组） |
+| `onCancel` | function | 无 | 点击取消 / 点外部时触发（无参数） |
 
 **返回**：string|null - 选中条目的 `value`，取消返回 null
 
 **布局规则（参考 SectionType.RADIO 样式）**：
-- 任意条目带图标且总数 **> 8** → 网格模式，每排若干，单条目 = 图标(或占位矩形) + 底部文字
-- 任意条目带图标且总数 **<= 8** → 列表模式，每条目独占一行，图标(或占位矩形)在文字前
+- 任意条目带图标且总数 **≥ 8** → 网格模式，每排若干，单条目 = 图标(或占位矩形) + 底部文字
+- 任意条目带图标且总数 **< 8** → 列表模式，每条目独占一行，图标(或占位矩形)在文字前
 - 所有条目**均无图标** → 纯文字模式，每条目前带单选标记（圆点），独占一行
 - 无图标条目用与图标**同尺寸**的矩形占位，内部居中显示与底部相同的文字，超出自动截断
 
 **示例**：
 ```javascript
-// 带图标（列表模式，<=16 条）：图标在文字前，无图标项显示占位矩形
+// 带图标（列表模式，< 8 条）：图标在文字前，无图标项显示占位矩形
 var items = [
     { name: "存档1", icon: "save_icon.png", value: "s1" },
     { name: "存档2", icon: "save_icon.png", value: "s2" },
     { name: "存档3", value: "s3" }   // 无图标 → 占位矩形
 ];
-var v = ui.select("选择存档", items);
+var v = ui.select("选择存档", items, {
+    cancelText: "返回",
+    cancelColor: "gray",
+    onSelect: function (val) { console.log("选中：" + val) }
+});
 console.log("选择了：" + v);
 
-// 生成 > 16 条触发网格模式
+// 生成 ≥ 8 条触发网格模式，并在每项图标上叠加金色序号
 var lv = [];
 for (var i = 1; i <= 20; i++) lv.push({ name: "关卡" + i, icon: "lv.png", value: String(i) });
-var pick = ui.select("选择关卡", lv);
+var pick = ui.select("选择关卡", lv, { showIndex: true, showIndexColor: "gold" });
 
 // 纯文字单选（无图标 → 每条目前带单选圆点）
 var t = ui.select("难度", ["简单", "普通", "困难"]);
-
-// 在每项图标上居中叠加序号（从 1 开始）
-var idx = ui.select("选择关卡", lv, { showIndex: true });
 ```
 
 #### ui.multiSelect / ui.多选
@@ -1631,12 +1731,24 @@ var idx = ui.select("选择关卡", lv, { showIndex: true });
 
 **参数**：
 - `title` (string): 标题
-- `items` (Array): 同 `ui.select`（字符串或 `{ name, icon?, value?, showIndex? }`），单项 `showIndex` 可单独覆盖外层设置
-- `options` (object, 可选):
-  - `defaultValues` (Array\<string\>): 默认选中项的 name 或 value 列表
-  - `columns` (number, 2~6): 网格模式每排列数（默认 4）
-  - `cancelable` (boolean): 是否允许点击外部取消（默认 false）
-  - `showIndex` (boolean): 全局默认是否叠加序号（从 1 开始，黑色文字），默认 false；每项的 `showIndex` 字段优先级更高；仅对有图标的项生效
+- `items` (Array): 同 `ui.select`（字符串或 `{ name, icon?, value?, showIndex?, showIndexColor? }`），单项 `showIndex`/`showIndexColor` 可单独覆盖外层设置
+- `options` (object, 可选): 见下方表格
+
+**options 参数**：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `defaultValues` | Array\<string\> | [] | 默认选中项的 name 或 value 列表 |
+| `columns` | number | 4 | 网格模式每排列数（2~6，仅条目 **≥ 8** 且有图标时生效） |
+| `cancelable` | boolean | false | 是否允许点击外部取消（关闭时触发 `onCancel`） |
+| `showIndex` | boolean | false | 全局默认是否叠加序号（从 1 开始），仅对有图标的项生效 |
+| `showIndexColor` | string | "black" | 序号颜色，支持命名色或 `#RRGGBB`（见通用说明）；单项可用 `showIndexColor`/`序号颜色` 覆盖 |
+| `confirmText` | string | "确定" | 「确定」按钮文字 |
+| `cancelText` | string | "取消" | 「取消」按钮文字 |
+| `confirmColor` | string | "" | 确定按钮背景色 |
+| `cancelColor` | string | "" | 取消按钮背景色 |
+| `onSelect` | function | 无 | 选中集合变化时触发（收到当前选中 `value` 数组） |
+| `onCancel` | function | 无 | 点击取消 / 点外部时触发（无参数） |
 
 **返回**：string[] - 选中条目的 `value` 数组（未选返回空数组）
 
@@ -1645,8 +1757,146 @@ var idx = ui.select("选择关卡", lv, { showIndex: true });
 **示例**：
 ```javascript
 var items = ["苹果", "香蕉", "橙子"];
-var arr = ui.multiSelect("选择水果", items, { defaultValues: ["苹果"] });
+var arr = ui.multiSelect("选择水果", items, {
+    defaultValues: ["苹果"],
+    confirmText: "就这些",
+    confirmColor: "green",
+    onSelect: function (vals) { console.log("当前选择：" + vals.join(",")) }
+});
 console.log("已选：" + arr.join(", "));
+```
+
+#### ui.actionSheet / ui.操作菜单
+
+**语法**：`ui.actionSheet(title, actions, options?) -> string|null`
+
+弹出底部动作列表，点击某项**立即返回**其 `value`（或 `name`），适合「执行哪个操作」的场景，比 `ui.select` 更具操作感。
+
+- `title` (string): 标题
+- `actions` (Array): 动作数组，元素可为：
+  - 字符串 → 直接作为名称（值为该字符串）
+  - 对象 → `{ name/名称, value/值?, danger/危险? }`，`value` 缺省回退 `name`；`danger=true` 时该按钮显示为红色警示样式
+- `options` (object, 可选): 见下方表格
+
+**options 参数**：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `cancelable` | boolean | true | 是否显示底部「取消」按钮且允许点击外部关闭 |
+| `cancelText` | string | "取消" | 「取消」按钮文字 |
+| `cancelColor` | string | "" | 「取消」按钮背景色 |
+| `onSelect` | function | 无 | 点击某项时触发（收到选中项的 `value`） |
+| `onCancel` | function | 无 | 点击取消 / 点外部时触发（无参数） |
+
+**返回**：string|null - 选中项的 `value`（或 `name`）；取消/点外部返回 `null`。
+
+**示例**：
+```javascript
+// 纯字符串动作
+var v = ui.actionSheet("选择操作", ["复制", "重命名", "删除"], {
+    onSelect: function (act) { console.log("执行：" + act) }
+});
+console.log("操作：" + v);
+
+// 带 danger 的危险操作（红色按钮）、无取消按钮、自定义取消文字
+var d = ui.actionSheet("确认删除？", [
+  { name: "取消", value: "cancel" },
+  { name: "彻底删除", value: "del", danger: true }
+], { cancelable: false, cancelText: "算了", cancelColor: "gray" });
+```
+
+#### ui.slider / ui.滑块
+
+**语法**：`ui.slider(title, options?) -> number`
+
+弹出数值滑块，拖动后点击「确定」返回数值。弥补当前 JS 缺少数值输入能力的问题。滑块样式参考配置栏目的 `SectionType.SLIDER`（胶囊轨道 + 主题色渐变 + 齿轮滑块随进度旋转）。
+
+- `title` (string): 标题
+- `options` (object, 可选): 见下方表格
+
+**options 参数**：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `min` | number | 0 | 最小值 |
+| `max` | number | 100 | 最大值 |
+| `step` | number | 1 | 步长（须 > 0） |
+| `default` | number | `min` | 初始值（自动约束到 [min, max]） |
+| `unit` | string | "" | 单位后缀，如 "%"、"px"，仅用于显示 |
+| `decimals` | number | 2 | 当前数值显示的小数位数 |
+| `showValue` | boolean | true | 是否在滑块上方以大字体显示当前数值 |
+| `confirmText` | string | "确定" | 「确定」按钮文字 |
+| `cancelText` | string | "取消" | 「取消」按钮文字 |
+| `confirmColor` | string | "" | 确定按钮背景色 |
+| `cancelColor` | string | "" | 取消按钮背景色 |
+| `dismissible` / `可关闭` | boolean | false | 是否允许点击外部关闭（等价于取消，触发 `onCancel`） |
+| `onChange` | function | 无 | 拖动过程中实时触发（收到当前数值） |
+| `onConfirm` | function | 无 | 点击确定时触发（收到确认的数值） |
+| `onCancel` | function | 无 | 点击取消 / 点外部时触发（无参数） |
+
+**返回**：number|null - 确认后的数值；点击「取消」返回 null。
+
+**示例**：
+```javascript
+// 基础用法
+var speed = ui.slider("移动速度", { min: 0, max: 200, step: 5, default: 60, unit: "%" });
+console.log("速度：" + speed);
+
+// 实时回调 + 自定义按钮与小数位
+var vol = ui.slider("音量", {
+    min: 0, max: 1, step: 0.05, default: 0.5, decimals: 2,
+    confirmText: "设定", confirmColor: "green",
+    onChange: function (v) { console.log("拖动中：" + v) },
+    onConfirm: function (v) { console.log("最终：" + v) }
+});
+```
+
+#### ui.loading / ui.加载
+
+**语法**：`ui.loading(title, options?) -> controller{ close(), 关闭() }`
+
+全屏「请稍候」加载遮罩：半透明阴影背景覆盖整个屏幕（含刘海/cutout 与底部手势条区域），中央显示 loading 动图（约 184dp），**标题与说明文字显示在图片下方**，且整体在安全区(safe area)内居中，自动避让刘海与底部小白条。与 `ui.progress`（任务进度/可取消）语义不同——它只表示等待，**不阻塞 `await`**，需手动调用返回的 controller 关闭。
+
+- `title` (string): 标题
+- `options` (object, 可选): 见下方表格
+
+**options 参数**：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `message` | string | "" | 说明文字 |
+| `dismissible` / `可关闭` | boolean | false | 是否允许点击外部关闭并显示「取消」按钮（关闭时触发 `onDismiss`） |
+| `cancelText` | string | "取消" | 「取消」按钮文字（仅 `dismissible` 时显示） |
+| `cancelColor` | string | "" | 「取消」按钮背景色 |
+| `onDismiss` | function | 无 | 被关闭（点取消 / 点外部）时触发（无参数） |
+
+**返回**：controller 对象，含以下方法：
+
+| 方法 | 中文别名 | 说明 |
+|------|----------|------|
+| `close()` | `关闭()` | 关闭遮罩 |
+| `update(message)` | `更新(message)` | 实时更新说明文字（不关闭遮罩） |
+
+> 与 `ui.progress` 不同，`ui.loading` **不阻塞 `await`**，需手动调用 `close()` 关闭；适合「等待某段异步逻辑完成」的场景。
+
+**示例**：
+```javascript
+// 基础：显示后手动关闭
+var ctrl = ui.loading("处理中", { message: "正在解包资源，请稍候..." });
+// ... 执行耗时任务 ...
+ctrl.close(); // 完成后关闭
+
+// 实时更新文字 + 可点击外部关闭（触发 onDismiss）
+var ctrl2 = ui.loading("同步中", {
+    message: "准备...",
+    dismissible: true,
+    cancelText: "停止",
+    onDismiss: function () { console.log("用户中止") }
+});
+// 任务进行中可随时刷新提示
+ctrl2.update("已下载 50%");
+// ... 继续 ...
+ctrl2.close();
 ```
 
 ## 8.5. js - JS 执行器
@@ -2848,8 +3098,12 @@ if (device.isRooted()) {
 
 ---
 
-*文档版本: 2.0*
+*文档版本: 2.1*
 *最后更新: 2026-07-17*
+*新增：ui 系列弹窗通用可定制化——所有弹窗（alert/confirm/prompt/select/multiSelect/actionSheet/slider/loading）新增按钮文字（confirmText/cancelText）、按钮背景色（confirmColor/cancelColor，支持命名色与 #RRGGBB/#AARRGGBB 十六进制）、可关闭性（dismissible/可关闭，alert/confirm/prompt/slider/loading 用此名；select/multiSelect/actionSheet 沿用 cancelable），以及事件回调（onConfirm/onCancel/onSelect/onChange/onDismiss，均为 function(value) 形式、异步触发且不阻塞 await）。slider 另增 decimals（小数位）/showValue（是否显示大字体数值）与实时 onChange 回调；loading 另增 update()/更新() 实时刷新文字。详见各弹窗小节与开头「通用选项与回调」*
+*优化：ui.select/ui.multiSelect 序号颜色 showIndexColor 改为透传至复合文本 PvzRichText 的 defaultStyle，从而支持任意颜色（命名色 black/white/red/green/gold/purple/gray/olive/blue/yellow/orange/cyan/pink 或 #RRGGBB/#AARRGGBB 十六进制，默认 black），不再仅限黑白；外层统一控制 + 单项字段覆盖机制不变*
+*新增：ui.select/ui.multiSelect 的 options 新增 showIndexColor（原仅 black/white）——统一控制序号颜色；每个条目对象亦可用 showIndexColor/序号颜色 字段单独控制，优先级高于外层（与 showIndex 的单项覆盖机制一致）*
+*优化：ui.slider/ui.滑块（数值滑块）——点击「取消」由返回初始默认值改为返回 null（与 ui.prompt/ui.select/ui.actionSheet 的取消语义一致）；滑块视觉改为参考 SectionType.SLIDER 的自定义齿轮滑块（胶囊轨道 + 主题色渐变 + 齿轮随进度旋转），不再是系统原生 Slider*
 *移除：ui.select/ui.选择 的 options.defaultValue —— 单选为「点选即返回」，预选仅高亮、无确认/清除场景，属无用代码；多选 defaultValues 保留（配合确定按钮生效）*
 *新增：ui.select/ui.multiSelect 的 options 新增 showIndex（boolean，默认 false）——开启后仅对「有图标」的项在其图标上居中叠加从 1 开始的序号（黑色文字，不遮盖原图）；无图标项不显示数字。每个条目对象亦可用 showIndex/显示序号 字段单独控制，优先级高于外层 options.showIndex*
 *优化：ui.select/ui.multiSelect 选择弹窗大数据量卡顿——列表改 LazyColumn、网格改 LazyVerticalGrid（仅组合可见项），并给 PvzStyledDialog 增加 contentScrollable 开关避免与 Lazy 嵌套滚动冲突*

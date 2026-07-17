@@ -663,7 +663,7 @@ sections:
         jsScript: |-
           const progress = ui.progress("正在处理...", {
               message: "初始化...",
-              indeterminate: false,
+              indeterminate: true,
               showCancel: true
           });
           
@@ -704,10 +704,155 @@ sections:
         jsScript: |-
           var items = [];
           for (var i = 1; i <= 8; i++) {
-            items.push({ name: "关卡" + i, icon: "save_icon.png", value: String(i) });
+            // 外层统一显示序号(黑色)，第 3 项单独用金色数字(任意颜色经复合文本透传)
+            items.push({ name: "关卡" + i, icon: "save_icon.png", value: String(i),
+              showIndex: true, showIndexColor: i == 3 ? "gold" : null });
           }
-          var r = ui.multiSelect("选择关卡", items, { defaultValues: ["1"] });
+          var r = ui.multiSelect("选择关卡", items, { defaultValues: ["1"], showIndex: true, showIndexColor: "black" });
           "你选择了：" + r
+
+      - id: "test_ui_6"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "操作菜单(actionSheet)"
+        buttonColor: "orange"
+        jsScript: |-
+          var r = ui.actionSheet("选择操作", ["复制", "粘贴", { name: "删除", value: "del", danger: true }]);
+          "操作：" + r
+
+      - id: "test_ui_7"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "数值滑块(slider)"
+        buttonColor: "orange"
+        jsScript: |-
+          var v = ui.slider("音量", { min: 0, max: 100, step: 5, default: 50, unit: "%" });
+          "音量：" + v
+
+      - id: "test_ui_8"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "加载指示(loading)"
+        buttonColor: "orange"
+        jsScript: |-
+          var ctrl = ui.loading("处理中", { message: "正在演示加载指示..." });
+          // 实际使用时在耗时任务完成后调用 ctrl.close() 关闭
+          //trl.close();
+          "已关闭加载指示"
+
+      - id: "test_ui_9"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "确认(自定义按钮+回调)"
+        buttonColor: "purple"
+        jsScript: |-
+          var ok = ui.confirm("确认删除", "确定要删除这个文件吗？", {
+            confirmText: "删吧", confirmColor: "red",
+            cancelText: "再想想", cancelColor: "gray",
+            onConfirm: function () { console.log("已确认删除") },
+            onCancel: function () { console.log("已取消") }
+          });
+          ok ? "用户点了删除" : "用户取消了"
+
+      - id: "test_ui_10"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "输入(自定义+回调)"
+        buttonColor: "blue"
+        jsScript: |-
+          var name = ui.prompt("输入名称", "请输入文件名", "默认名称", "例如：level_1", {
+            confirmText: "保存", confirmColor: "green",
+            cancelText: "取消", cancelColor: "red",
+            onConfirm: function (v) { console.log("提交：" + v) }
+          });
+          name !== null ? ("输入了：" + name) : "已取消输入"
+
+      - id: "test_ui_11"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "选择(自定义取消+回调)"
+        buttonColor: "blue"
+        jsScript: |-
+          var items = [
+            { name: "存档1", icon: "save_icon.png", value: "s1" },
+            { name: "存档2", icon: "save_icon.png", value: "s2" }
+          ];
+          var r = ui.select("选择存档", items, {
+            cancelText: "返回", cancelColor: "gray",
+            onSelect: function (v) { console.log("选中：" + v) },
+            onCancel: function () { console.log("已取消") }
+          });
+          r !== null ? ("你选择了：" + r) : "已取消"
+
+      - id: "test_ui_12"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "多选(自定义按钮+onSelect)"
+        buttonColor: "green"
+        jsScript: |-
+          var arr = ui.multiSelect("选择水果", ["苹果", "香蕉", "橙子"], {
+            defaultValues: ["苹果"],
+            confirmText: "就这些", confirmColor: "green",
+            cancelText: "清空", cancelColor: "gray",
+            onSelect: function (vals) { console.log("当前选择：" + vals.join(",")) }
+          });
+          "已选：" + arr.join(", ")
+
+      - id: "test_ui_13"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "操作菜单(自定义取消)"
+        buttonColor: "orange"
+        jsScript: |-
+          var r = ui.actionSheet("选择操作", [
+            "复制", "粘贴", { name: "删除", value: "del", danger: true }
+          ], {
+            cancelText: "算了", cancelColor: "gray",
+            onSelect: function (v) { console.log("执行：" + v) }
+          });
+          "操作：" + r
+
+      - id: "test_ui_14"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "滑块(小数+实时回调)"
+        buttonColor: "orange"
+        jsScript: |-
+          var v = ui.slider("音量", {
+            min: 0, max: 1, step: 0.05, default: 0.5, decimals: 2,
+            confirmText: "设定", confirmColor: "green",
+            cancelText: "取消", cancelColor: "red",
+            onChange: function (x) { console.log("拖动中：" + x) },
+            onConfirm: function (x) { console.log("最终：" + x) }
+          });
+          "音量：" + v
+
+      - id: "test_ui_15"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "加载(实时更新+可关闭)"
+        buttonColor: "orange"
+        jsScript: |-
+          var ctrl = ui.loading("同步中", {
+            message: "准备...",
+            dismissible: true,
+            cancelText: "停止", cancelColor: "red",
+            onDismiss: function () { console.log("用户中止") }
+          });
+          // 任务进行中实时刷新提示（实际场景用于在异步逻辑中调用）
+          ctrl.update("已下载 50%");
+          "已更新加载提示（演示中直接关闭）";
+          ctrl.close();
 
       # ---------- 测试：使用 version/new/smf/dynamic.rsb.smf ----------
       - id: "test_dynamic_手动解包"

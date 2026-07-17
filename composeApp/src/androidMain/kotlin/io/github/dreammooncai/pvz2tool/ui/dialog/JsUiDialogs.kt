@@ -8,12 +8,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -22,8 +24,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import io.github.alexzhirkevich.keight.js.JsAny
+import io.github.alexzhirkevich.keight.js.js
+import kotlin.math.roundToInt
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.controller.SoundController
+import io.github.dreammooncai.pvz2tool.icon.Gear
 import io.github.dreammooncai.pvz2tool.icon.Hook
 import io.github.dreammooncai.pvz2tool.icon.HookSelect
 import io.github.dreammooncai.pvz2tool.icon.Pvz2Icon
@@ -31,7 +40,6 @@ import io.github.dreammooncai.pvz2tool.rememberSoundInteractionSource
 import io.github.dreammooncai.pvz2tool.view.AsyncImageFromAssets
 import io.github.dreammooncai.pvz2tool.view.PvzCollapsiblePanelTheme
 import io.github.dreammooncai.pvz2tool.view.PvzGreenButton
-import io.github.dreammooncai.pvz2tool.view.PvzProgressBar
 import io.github.dreammooncai.pvz2tool.view.PvzRedButton
 import io.github.dreammooncai.pvz2tool.view.PvzRichText
 import io.github.dreammooncai.pvz2tool.view.PvzSimpleCardBrown
@@ -46,6 +54,41 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+// ======================== 颜色解析辅助 ========================
+// 将 JS 传入的颜色字符串解析为 Compose Color；支持命名色与十六进制；非法值返回 null（沿用默认主题色）。
+private val NAMED_COLORS = mapOf(
+    "black" to Color.Black,
+    "white" to Color.White,
+    "red" to Color(0xFFC62828),
+    "green" to Color(0xFF558B2F),
+    "blue" to Color(0xFF2196F3),
+    "yellow" to Color(0xFFFBC02D),
+    "orange" to Color(0xFFF57C00),
+    "purple" to Color(0xFF8E24AA),
+    "gray" to Color(0xFF9E9E9E),
+    "grey" to Color(0xFF9E9E9E),
+    "gold" to Color(0xFFFBC501),
+    "cyan" to Color(0xFF00ACC1),
+    "pink" to Color(0xFFE91E63)
+)
+
+private fun parseColorArg(raw: String?): Color? {
+    if (raw.isNullOrBlank()) return null
+    val s = raw.trim().lowercase()
+    NAMED_COLORS[s]?.let { return it }
+    if (s.startsWith("#")) {
+        val hex = s.removePrefix("#")
+        val argb = when (hex.length) {
+            3 -> "FF" + hex.map { "$it$it" }.joinToString("")
+            6 -> "FF$hex"
+            8 -> hex
+            else -> return null
+        }
+        return runCatching { Color(argb.toLong(16)) }.getOrNull()
+    }
+    return null
+}
+
 // ======================== UI 状态类 ========================
 
 /** 确认弹窗状态 */
@@ -53,6 +96,13 @@ data class JsConfirmState(
     val isVisible: Boolean = false,
     val title: String = "",
     val message: String = "",
+    val confirmText: String = "确认",
+    val cancelText: String = "取消",
+    val confirmColor: String = "",
+    val cancelColor: String = "",
+    val dismissible: Boolean = false,
+    val onConfirm: (suspend (JsAny?) -> Unit)? = null,
+    val onCancel: (suspend (JsAny?) -> Unit)? = null,
     val deferred: CompletableDeferred<Boolean>? = null
 )
 
@@ -63,6 +113,13 @@ data class JsPromptState(
     val message: String = "",
     val defaultValue: String = "",
     val placeholder: String = "",
+    val confirmText: String = "确定",
+    val cancelText: String = "取消",
+    val confirmColor: String = "",
+    val cancelColor: String = "",
+    val dismissible: Boolean = false,
+    val onConfirm: (suspend (JsAny?) -> Unit)? = null,
+    val onCancel: (suspend (JsAny?) -> Unit)? = null,
     val deferred: CompletableDeferred<String?>? = null
 )
 
@@ -85,6 +142,10 @@ data class JsAlertState(
     val isVisible: Boolean = false,
     val title: String = "",
     val message: String = "",
+    val confirmText: String = "确定",
+    val confirmColor: String = "",
+    val dismissible: Boolean = false,
+    val onConfirm: (suspend (JsAny?) -> Unit)? = null,
     val deferred: CompletableDeferred<Unit>? = null
 )
 
@@ -93,7 +154,8 @@ data class JsChoiceItem(
     val name: String = "",
     val icon: String = "",
     val value: String = "",
-    val showIndex: Boolean? = null // 单独控制本项是否显示序号；null 时跟随外层 options.showIndex
+    val showIndex: Boolean? = null, // 单独控制本项是否显示序号；null 时跟随外层 options.showIndex
+    val showIndexColor: String? = null // 单独控制序号颜色 "black"/"white"；null 时跟随外层 options.showIndexColor
 )
 
 /** 选择弹窗状态（单项 / 多项通用） */
@@ -104,10 +166,70 @@ data class JsSelectState(
     val mode: String = "single", // "single" | "multi"
     val columns: Int = 4,
     val cancelable: Boolean = false,
+    val confirmText: String = "确定",
+    val cancelText: String = "取消",
+    val confirmColor: String = "",
+    val cancelColor: String = "",
     val defaultIndices: List<Int> = emptyList(),
     val showIndex: Boolean = false, // 是否在图标上居中叠加序号（1 开始）
+    val showIndexColor: String = "black", // 序号颜色：外层统一控制，"black" | "white"
+    val onCancel: (suspend (JsAny?) -> Unit)? = null,
+    val onSelect: (suspend (JsAny?) -> Unit)? = null, // 单选：选中某项(value)即触发；多选：选中集合(values)变化时触发
     val deferredSingle: CompletableDeferred<String?>? = null,
     val deferredMulti: CompletableDeferred<List<String>>? = null
+)
+
+/** 操作菜单中的单个动作 */
+data class JsActionItem(
+    val name: String = "",
+    val value: String = "",
+    val danger: Boolean = false // 危险操作 → 红色按钮
+)
+
+/** 操作菜单状态（底部动作列表，点击某项即返回其 value） */
+data class JsActionSheetState(
+    val isVisible: Boolean = false,
+    val title: String = "",
+    val items: List<JsActionItem> = emptyList(),
+    val cancelable: Boolean = true,
+    val cancelText: String = "取消",
+    val cancelColor: String = "",
+    val onCancel: (suspend (JsAny?) -> Unit)? = null,
+    val onSelect: (suspend (JsAny?) -> Unit)? = null, // 点击某项(value)即触发
+    val deferred: CompletableDeferred<String?>? = null
+)
+
+/** 数值滑块状态 */
+data class JsSliderState(
+    val isVisible: Boolean = false,
+    val title: String = "",
+    val min: Double = 0.0,
+    val max: Double = 100.0,
+    val step: Double = 1.0,
+    val value: Double = 0.0,
+    val unit: String = "",
+    val decimals: Int = 2, // 显示小数位
+    val showValue: Boolean = true, // 是否显示当前数值大字体
+    val confirmText: String = "确定",
+    val cancelText: String = "取消",
+    val confirmColor: String = "",
+    val cancelColor: String = "",
+    val dismissible: Boolean = false,
+    val onChange: (suspend (JsAny?) -> Unit)? = null, // 拖动实时回调(value)
+    val onConfirm: (suspend (JsAny?) -> Unit)? = null,
+    val onCancel: (suspend (JsAny?) -> Unit)? = null,
+    val deferred: CompletableDeferred<Double?>? = null
+)
+
+/** 加载指示状态（轻量"请稍候"遮罩，无按钮，需手动关闭） */
+data class JsLoadingState(
+    val isVisible: Boolean = false,
+    val title: String = "",
+    val message: String = "",
+    val dismissible: Boolean = false,
+    val cancelText: String = "取消",
+    val cancelColor: String = "",
+    val onDismiss: (suspend (JsAny?) -> Unit)? = null
 )
 
 // ======================== JS UI 管理器 ========================
@@ -136,15 +258,41 @@ object JsUiManager {
     private val _alertState = MutableStateFlow(JsAlertState())
     val alertState: StateFlow<JsAlertState> = _alertState.asStateFlow()
 
+    // 操作菜单状态流
+    private val _actionSheetState = MutableStateFlow(JsActionSheetState())
+    val actionSheetState: StateFlow<JsActionSheetState> = _actionSheetState.asStateFlow()
+
+    // 数值滑块状态流
+    private val _sliderState = MutableStateFlow(JsSliderState())
+    val sliderState: StateFlow<JsSliderState> = _sliderState.asStateFlow()
+
+    // 加载指示状态流
+    private val _loadingState = MutableStateFlow(JsLoadingState())
+    val loadingState: StateFlow<JsLoadingState> = _loadingState.asStateFlow()
+
     // 解压器实例（由 JS 调用时创建）
     private var extractorHolder: AssetExtractorHolder? = null
     private val extractorScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     /** 显示确认弹窗，返回 CompletableDeferred<Boolean> */
-    fun showConfirm(title: String, message: String): CompletableDeferred<Boolean> {
+    fun showConfirm(
+        title: String,
+        message: String,
+        confirmText: String = "确认",
+        cancelText: String = "取消",
+        confirmColor: String = "",
+        cancelColor: String = "",
+        dismissible: Boolean = false,
+        onConfirm: (suspend (JsAny?) -> Unit)? = null,
+        onCancel: (suspend (JsAny?) -> Unit)? = null
+    ): CompletableDeferred<Boolean> {
         val deferred = CompletableDeferred<Boolean>()
         _confirmState.value = JsConfirmState(
-            isVisible = true, title = title, message = message, deferred = deferred
+            isVisible = true, title = title, message = message,
+            confirmText = confirmText, cancelText = cancelText,
+            confirmColor = confirmColor, cancelColor = cancelColor,
+            dismissible = dismissible, onConfirm = onConfirm, onCancel = onCancel,
+            deferred = deferred
         )
         return deferred
     }
@@ -155,10 +303,20 @@ object JsUiManager {
     }
 
     /** 显示提示弹窗（单按钮），返回 CompletableDeferred<Unit> */
-    fun showAlert(title: String, message: String): CompletableDeferred<Unit> {
+    fun showAlert(
+        title: String,
+        message: String,
+        confirmText: String = "确定",
+        confirmColor: String = "",
+        dismissible: Boolean = false,
+        onConfirm: (suspend (JsAny?) -> Unit)? = null
+    ): CompletableDeferred<Unit> {
         val deferred = CompletableDeferred<Unit>()
         _alertState.value = JsAlertState(
-            isVisible = true, title = title, message = message, deferred = deferred
+            isVisible = true, title = title, message = message,
+            confirmText = confirmText, confirmColor = confirmColor,
+            dismissible = dismissible, onConfirm = onConfirm,
+            deferred = deferred
         )
         return deferred
     }
@@ -183,7 +341,14 @@ object JsUiManager {
         items: List<JsChoiceItem>,
         columns: Int = 4,
         cancelable: Boolean = false,
-        showIndex: Boolean = false
+        showIndex: Boolean = false,
+        showIndexColor: String = "black",
+        confirmText: String = "确定",
+        cancelText: String = "取消",
+        confirmColor: String = "",
+        cancelColor: String = "",
+        onCancel: (suspend (JsAny?) -> Unit)? = null,
+        onSelect: (suspend (JsAny?) -> Unit)? = null
     ): CompletableDeferred<String?> {
         val deferred = CompletableDeferred<String?>()
         _selectState.value = JsSelectState(
@@ -194,6 +359,13 @@ object JsUiManager {
             columns = columns,
             cancelable = cancelable,
             showIndex = showIndex,
+            showIndexColor = showIndexColor,
+            confirmText = confirmText,
+            cancelText = cancelText,
+            confirmColor = confirmColor,
+            cancelColor = cancelColor,
+            onCancel = onCancel,
+            onSelect = onSelect,
             deferredSingle = deferred
         )
         return deferred
@@ -209,7 +381,14 @@ object JsUiManager {
         defaultValues: List<String>? = null,
         columns: Int = 4,
         cancelable: Boolean = false,
-        showIndex: Boolean = false
+        showIndex: Boolean = false,
+        showIndexColor: String = "black",
+        confirmText: String = "确定",
+        cancelText: String = "取消",
+        confirmColor: String = "",
+        cancelColor: String = "",
+        onCancel: (suspend (JsAny?) -> Unit)? = null,
+        onSelect: (suspend (JsAny?) -> Unit)? = null
     ): CompletableDeferred<List<String>> {
         val deferred = CompletableDeferred<List<String>>()
         val defaults = defaultValues ?: emptyList()
@@ -225,6 +404,13 @@ object JsUiManager {
             cancelable = cancelable,
             defaultIndices = defaultIndices,
             showIndex = showIndex,
+            showIndexColor = showIndexColor,
+            confirmText = confirmText,
+            cancelText = cancelText,
+            confirmColor = confirmColor,
+            cancelColor = cancelColor,
+            onCancel = onCancel,
+            onSelect = onSelect,
             deferredMulti = deferred
         )
         return deferred
@@ -237,7 +423,14 @@ object JsUiManager {
 
     /** 显示输入弹窗，返回 CompletableDeferred<String?> */
     fun showPrompt(
-        title: String, message: String, defaultValue: String = "", placeholder: String = ""
+        title: String, message: String, defaultValue: String = "", placeholder: String = "",
+        confirmText: String = "确定",
+        cancelText: String = "取消",
+        confirmColor: String = "",
+        cancelColor: String = "",
+        dismissible: Boolean = false,
+        onConfirm: (suspend (JsAny?) -> Unit)? = null,
+        onCancel: (suspend (JsAny?) -> Unit)? = null
     ): CompletableDeferred<String?> {
         val deferred = CompletableDeferred<String?>()
         _promptState.value = JsPromptState(
@@ -246,6 +439,13 @@ object JsUiManager {
             message = message,
             defaultValue = defaultValue,
             placeholder = placeholder,
+            confirmText = confirmText,
+            cancelText = cancelText,
+            confirmColor = confirmColor,
+            cancelColor = cancelColor,
+            dismissible = dismissible,
+            onConfirm = onConfirm,
+            onCancel = onCancel,
             deferred = deferred
         )
         return deferred
@@ -254,6 +454,124 @@ object JsUiManager {
     /** 隐藏输入弹窗 */
     fun hidePrompt() {
         _promptState.value = JsPromptState()
+    }
+
+    // ======================== 操作菜单 ========================
+
+    /**
+     * 显示操作菜单，返回 CompletableDeferred<String?>（选中项 value，取消返回 null）
+     * @param items 动作列表
+     * @param cancelable 是否显示底部"取消"按钮（默认 true）
+     */
+    fun showActionSheet(
+        title: String,
+        items: List<JsActionItem>,
+        cancelable: Boolean = true,
+        cancelText: String = "取消",
+        cancelColor: String = "",
+        onCancel: (suspend (JsAny?) -> Unit)? = null,
+        onSelect: (suspend (JsAny?) -> Unit)? = null
+    ): CompletableDeferred<String?> {
+        val deferred = CompletableDeferred<String?>()
+        _actionSheetState.value = JsActionSheetState(
+            isVisible = true, title = title, items = items, cancelable = cancelable,
+            cancelText = cancelText, cancelColor = cancelColor,
+            onCancel = onCancel, onSelect = onSelect, deferred = deferred
+        )
+        return deferred
+    }
+
+    /** 隐藏操作菜单 */
+    fun hideActionSheet() {
+        _actionSheetState.value = JsActionSheetState()
+    }
+
+    // ======================== 数值滑块 ========================
+
+    /**
+     * 显示数值滑块，返回 CompletableDeferred<Double>（确认后的数值，取消返回默认/初始值）
+     * @param min 最小值, @param max 最大值, @param step 步长, @param default 初始值, @param unit 单位后缀
+     */
+    fun showSlider(
+        title: String,
+        min: Double = 0.0,
+        max: Double = 100.0,
+        step: Double = 1.0,
+        default: Double = 0.0,
+        unit: String = "",
+        decimals: Int = 2,
+        showValue: Boolean = true,
+        confirmText: String = "确定",
+        cancelText: String = "取消",
+        confirmColor: String = "",
+        cancelColor: String = "",
+        dismissible: Boolean = false,
+        onChange: (suspend (JsAny?) -> Unit)? = null,
+        onConfirm: (suspend (JsAny?) -> Unit)? = null,
+        onCancel: (suspend (JsAny?) -> Unit)? = null
+    ): CompletableDeferred<Double?> {
+        val deferred = CompletableDeferred<Double?>()
+        val safeMin = min.coerceAtMost(max)
+        val safeMax = max.coerceAtLeast(min)
+        val safeDefault = default.coerceIn(safeMin, safeMax)
+        _sliderState.value = JsSliderState(
+            isVisible = true,
+            title = title,
+            min = safeMin,
+            max = safeMax,
+            step = if (step <= 0.0) 1.0 else step,
+            value = safeDefault,
+            unit = unit,
+            decimals = decimals.coerceAtLeast(0),
+            showValue = showValue,
+            confirmText = confirmText,
+            cancelText = cancelText,
+            confirmColor = confirmColor,
+            cancelColor = cancelColor,
+            dismissible = dismissible,
+            onChange = onChange,
+            onConfirm = onConfirm,
+            onCancel = onCancel,
+            deferred = deferred
+        )
+        return deferred
+    }
+
+    /** 隐藏数值滑块 */
+    fun hideSlider() {
+        _sliderState.value = JsSliderState()
+    }
+
+    // ======================== 加载指示 ========================
+
+    /**
+     * 显示加载指示（轻量"请稍候"，无按钮，需调用 hideLoading 关闭）
+     * @param title 标题, @param message 说明文字
+     */
+    fun showLoading(
+        title: String,
+        message: String = "",
+        dismissible: Boolean = false,
+        cancelText: String = "取消",
+        cancelColor: String = "",
+        onDismiss: (suspend (JsAny?) -> Unit)? = null
+    ) {
+        _loadingState.value = JsLoadingState(
+            isVisible = true, title = title, message = message,
+            dismissible = dismissible, cancelText = cancelText,
+            cancelColor = cancelColor, onDismiss = onDismiss
+        )
+    }
+
+    /** 实时更新加载指示的文字（供 controller.update 调用，无需重建弹窗） */
+    fun updateLoading(message: String) {
+        val cur = _loadingState.value
+        if (cur.isVisible) _loadingState.value = cur.copy(message = message)
+    }
+
+    /** 隐藏加载指示 */
+    fun hideLoading() {
+        _loadingState.value = JsLoadingState()
     }
 
     /** 显示进度弹窗 */
@@ -388,6 +706,7 @@ object JsUiManager {
 @Composable
 fun JsAlertDialog() {
     val state by JsUiManager.alertState.collectAsState()
+    val scope = rememberCoroutineScope()
 
     // 监听 deferred 完成状态，自动隐藏弹窗
     LaunchedEffect(state.deferred) {
@@ -405,7 +724,7 @@ fun JsAlertDialog() {
             onDismissRequest = {
                 state.deferred?.complete(Unit)
             },
-            dismissible = false,
+            dismissible = state.dismissible,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp),
@@ -415,9 +734,12 @@ fun JsAlertDialog() {
 
                 // 确认按钮
                 PvzGreenButton(
-                    text = "确定", modifier = Modifier
+                    text = state.confirmText,
+                    backgroundColor = parseColorArg(state.confirmColor),
+                    modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp), onClick = {
+                        scope.launch { state.onConfirm?.invoke(null) }
                         state.deferred?.complete(Unit)
                     })
             }) {
@@ -439,6 +761,7 @@ fun JsAlertDialog() {
 @Composable
 fun JsConfirmDialog() {
     val state by JsUiManager.confirmState.collectAsState()
+    val scope = rememberCoroutineScope()
 
     // 监听 deferred 完成状态，自动隐藏弹窗
     LaunchedEffect(state.deferred) {
@@ -454,9 +777,10 @@ fun JsConfirmDialog() {
             isVisible = true,
             titleText = state.title,
             onDismissRequest = {
+                scope.launch { state.onCancel?.invoke(null) }
                 state.deferred?.complete(false)
             },
-            dismissible = false,
+            dismissible = state.dismissible,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp),
@@ -468,15 +792,21 @@ fun JsConfirmDialog() {
                     modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) { // 取消按钮
                     PvzRedButton(
-                        text = "取消", modifier = Modifier
+                        text = state.cancelText,
+                        backgroundColor = parseColorArg(state.cancelColor),
+                        modifier = Modifier
                             .weight(1f)
                             .height(48.dp), onClick = {
+                            scope.launch { state.onCancel?.invoke(null) }
                             state.deferred?.complete(false)
                         }) // 确认按钮
                     PvzGreenButton(
-                        text = "确认", modifier = Modifier
+                        text = state.confirmText,
+                        backgroundColor = parseColorArg(state.confirmColor),
+                        modifier = Modifier
                             .weight(1f)
                             .height(48.dp), onClick = {
+                            scope.launch { state.onConfirm?.invoke(true.js) }
                             state.deferred?.complete(true)
                         })
                 }
@@ -499,6 +829,7 @@ fun JsConfirmDialog() {
 @Composable
 fun JsPromptDialog() {
     val state by JsUiManager.promptState.collectAsState()
+    val scope = rememberCoroutineScope()
     var inputValue by remember { mutableStateOf(state.defaultValue) }
 
     // 监听 deferred 完成状态，自动隐藏弹窗
@@ -522,9 +853,10 @@ fun JsPromptDialog() {
             isVisible = true,
             titleText = state.title,
             onDismissRequest = {
+                scope.launch { state.onCancel?.invoke(null) }
                 state.deferred?.complete(null)
             },
-            dismissible = false,
+            dismissible = state.dismissible,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp),
@@ -536,15 +868,21 @@ fun JsPromptDialog() {
                     modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) { // 取消按钮
                     PvzRedButton(
-                        text = "取消", modifier = Modifier
+                        text = state.cancelText,
+                        backgroundColor = parseColorArg(state.cancelColor),
+                        modifier = Modifier
                             .weight(1f)
                             .height(48.dp), onClick = {
+                            scope.launch { state.onCancel?.invoke(null) }
                             state.deferred?.complete(null)
                         }) // 确认按钮
                     PvzGreenButton(
-                        text = "确定", modifier = Modifier
+                        text = state.confirmText,
+                        backgroundColor = parseColorArg(state.confirmColor),
+                        modifier = Modifier
                             .weight(1f)
                             .height(48.dp), onClick = {
+                            scope.launch { state.onConfirm?.invoke(inputValue.js) }
                             state.deferred?.complete(inputValue)
                         })
                 }
@@ -610,6 +948,7 @@ fun JsPromptDialog() {
 @Composable
 fun JsItemChoiceDialog() {
     val state by JsUiManager.selectState.collectAsState()
+    val scope = rememberCoroutineScope()
 
     val hasAnyIcon = state.items.any { it.icon.isNotBlank() }
     val isGrid = hasAnyIcon && state.items.size >= 8
@@ -630,9 +969,13 @@ fun JsItemChoiceDialog() {
     // 统一选择处理：单项立即返回，多项切换选中集合
     val onSelect: (Int) -> Unit = { i ->
         if (state.mode == "single") {
-            state.deferredSingle?.complete(state.items[i].value)
+            val value = state.items[i].value
+            scope.launch { state.onSelect?.invoke(value.js) }
+            state.deferredSingle?.complete(value)
         } else {
             selectedIndices = if (i in selectedIndices) selectedIndices - i else selectedIndices + i
+            val vals = selectedIndices.sorted().map { state.items[it].value.js }
+            scope.launch { state.onSelect?.invoke(vals.js) }
         }
     }
 
@@ -641,6 +984,7 @@ fun JsItemChoiceDialog() {
             isVisible = true,
             titleText = state.title,
             onDismissRequest = {
+                scope.launch { state.onCancel?.invoke(null) }
                 state.deferredSingle?.complete(null)
                 state.deferredMulti?.complete(emptyList())
             },
@@ -656,12 +1000,19 @@ fun JsItemChoiceDialog() {
                         modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         PvzRedButton(
-                            text = "取消", modifier = Modifier
+                            text = state.cancelText,
+                            backgroundColor = parseColorArg(state.cancelColor),
+                            modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp)
-                        ) { state.deferredMulti?.complete(emptyList()) }
+                        ) {
+                            scope.launch { state.onCancel?.invoke(null) }
+                            state.deferredMulti?.complete(emptyList())
+                        }
                         PvzGreenButton(
-                            text = "确定", modifier = Modifier
+                            text = state.confirmText,
+                            backgroundColor = parseColorArg(state.confirmColor),
+                            modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp)
                         ) {
@@ -671,10 +1022,15 @@ fun JsItemChoiceDialog() {
                     }
                 } else {
                     PvzRedButton(
-                        text = "取消", modifier = Modifier
+                        text = state.cancelText,
+                        backgroundColor = parseColorArg(state.cancelColor),
+                        modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp)
-                    ) { state.deferredSingle?.complete(null) }
+                    ) {
+                        scope.launch { state.onCancel?.invoke(null) }
+                        state.deferredSingle?.complete(null)
+                    }
                 }
             }) {
             if (isGrid) {
@@ -695,6 +1051,7 @@ fun JsItemChoiceDialog() {
                                     selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
                                     isMulti = state.mode == "multi",
                                     showIndex = state.showIndex,
+                                    showIndexColor = state.showIndexColor,
                                     onSelect = onSelect
                                 )
                             }
@@ -713,6 +1070,7 @@ fun JsItemChoiceDialog() {
                             selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
                             isMulti = state.mode == "multi",
                             showIndex = state.showIndex,
+                            showIndexColor = state.showIndexColor,
                             onSelect = onSelect
                         )
                     }
@@ -725,7 +1083,7 @@ fun JsItemChoiceDialog() {
 /** 网格单元格：图标(或占位矩形)在上，文字在下，整体居中 */
 @Composable
 private fun RowScope.GridChoiceCell(
-    item: JsChoiceItem, index: Int, selected: Boolean, isMulti: Boolean, showIndex: Boolean, onSelect: (Int) -> Unit
+    item: JsChoiceItem, index: Int, selected: Boolean, isMulti: Boolean, showIndex: Boolean, showIndexColor: String, onSelect: (Int) -> Unit
 ) {
     val interaction = rememberSoundInteractionSource(
         InitializePvz2.config.ui.sounds.switchClickPress, InitializePvz2.config.ui.sounds.switchClickRelease
@@ -739,7 +1097,7 @@ private fun RowScope.GridChoiceCell(
             }, horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(contentAlignment = Alignment.Center) {
-            ItemIconOrPlaceholder(item, 48.dp, index, item.showIndex ?: showIndex)
+            ItemIconOrPlaceholder(item, 48.dp, index, item.showIndex ?: showIndex, item.showIndexColor ?: showIndexColor)
             if (isMulti && selected) {
                 Image(
                     imageVector = Pvz2Icon.HookSelect,
@@ -766,6 +1124,7 @@ private fun ListChoiceRow(
     selected: Boolean,
     isMulti: Boolean,
     showIndex: Boolean,
+    showIndexColor: String,
     onSelect: (Int) -> Unit
 ) {
     val interaction = rememberSoundInteractionSource(
@@ -791,7 +1150,7 @@ private fun ListChoiceRow(
                 item.name, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f)
             )
         } else {
-            ItemIconOrPlaceholder(item, 36.dp, index, item.showIndex ?: showIndex)
+            ItemIconOrPlaceholder(item, 36.dp, index, item.showIndex ?: showIndex, item.showIndexColor ?: showIndexColor)
             Spacer(modifier = Modifier.width(10.dp))
             PvzRichText(
                 item.name, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f)
@@ -807,7 +1166,7 @@ private fun ListChoiceRow(
 
 /** 图标优先；无图标时渲染与图标同尺寸的占位矩形，内部居中文字（超出截断）。showIndex 时在图标上居中叠加序号(1 开始) */
 @Composable
-private fun ItemIconOrPlaceholder(item: JsChoiceItem, size: Dp, index: Int = -1, showIndex: Boolean = false) {
+private fun ItemIconOrPlaceholder(item: JsChoiceItem, size: Dp, index: Int = -1, showIndex: Boolean = false, showIndexColor: String = "black") {
     val iconPath = item.icon.takeIf { it.isNotBlank() }?.let { p ->
         if (p.startsWith("/")) p else "images/$p"
     }
@@ -843,9 +1202,9 @@ private fun ItemIconOrPlaceholder(item: JsChoiceItem, size: Dp, index: Int = -1,
             modifier = Modifier.size(size), contentAlignment = Alignment.Center
         ) {
             content()
-            Text(
-                text = (index + 1).toString(),
-                color = Color.Black,
+            PvzRichText(
+                text = "{{$showIndexColor:${index + 1}}}",
+                defaultStyle = PvzTextStyle(Color.Black),
                 fontWeight = FontWeight.Bold,
                 fontSize = if (size > 36.dp) 18.sp else 14.sp,
                 textAlign = TextAlign.Center
@@ -866,61 +1225,19 @@ private fun ItemIconOrPlaceholder(item: JsChoiceItem, size: Dp, index: Int = -1,
 @Composable
 fun JsProgressDialog() {
     val state by JsUiManager.progressState.collectAsState()
-
     if (state.isVisible) {
         val progress = (state.progress / 100f).coerceIn(0f, 1f)
-        val scope = rememberCoroutineScope()
-        PvzStyledDialog(
+        PvzProgressDialog(
             isVisible = true,
-            titleText = state.title,
-            onDismissRequest = {
-                JsUiManager.closeProgress()
-            },
-            dismissible = progress >= 1,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            bottomContent = {
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // 进度条
-                if (state.isIndeterminate) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(40.dp), color = Color(0xFF32CD32), strokeWidth = 4.dp
-                    )
-                }
-                PvzProgressBar(
-                    progress = progress,
-                    label = if (progress >= 1) "完成" else if (state.showCancel) "取消" else null,
-                    modifier = Modifier.fillMaxWidth(),
-                    onLabelClick = {
-                        if (progress >= 1) { // 已完成：点击“完成”直接关闭
-                            JsUiManager.closeProgress()
-                        } else if (state.showCancel) { // 进行中：点击“取消”触发取消（隐藏弹窗 + 执行 onCancel 回调）
-                            scope.launch {
-                                JsUiManager.cancelProgress()
-                            }
-                        }
-                    })
-
-                Spacer(modifier = Modifier.height(16.dp))
-            }) { // 进度文本
-            if (state.message.isNotEmpty() || !state.isIndeterminate) {
-                val displayText = if (state.isIndeterminate) {
-                    state.message.ifEmpty { "处理中..." }
-                } else {
-                    "${state.message.ifEmpty { "处理中..." }} (${state.progress}%)"
-                }
-                PvzRichText(
-                    displayText,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 10.dp),
-                    defaultStyle = PvzTextOliveStyle.copy(shadowColor = null)
-                )
-            }
-        }
+            title = state.title,
+            message = state.message,
+            progress = progress,
+            isIndeterminate = state.isIndeterminate,
+            dismissible = progress >= 1f,
+            showCancel = state.showCancel,
+            onComplete = { JsUiManager.closeProgress() },
+            onCancel = { JsUiManager.cancelProgress() }
+        )
     }
 }
 
@@ -940,4 +1257,328 @@ fun JsExtractorDialog() {
                 JsUiManager.closeExtractor()
             })
     }
+}
+
+/**
+ * JS 操作菜单弹窗（底部动作列表，点击某项即返回其 value）
+ * 用法:
+ *   ui.actionSheet("选择操作", ["复制", "重命名"])
+ *   ui.actionSheet("危险操作", [{name:"删除", value:"del", danger:true}], {cancelable:false})
+ */
+@Composable
+fun JsActionSheetDialog() {
+    val state by JsUiManager.actionSheetState.collectAsState()
+    val scope = rememberCoroutineScope()
+
+    // 监听 deferred 完成状态，自动隐藏弹窗
+    LaunchedEffect(state.deferred) {
+        state.deferred?.let { deferred ->
+            deferred.invokeOnCompletion { JsUiManager.hideActionSheet() }
+        }
+    }
+
+    if (state.isVisible) {
+        PvzStyledDialog(
+            isVisible = true,
+            titleText = state.title,
+            onDismissRequest = {
+                if (state.cancelable) {
+                    scope.launch { state.onCancel?.invoke(null) }
+                    state.deferred?.complete(null)
+                }
+            },
+            dismissible = state.cancelable,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            bottomContent = {
+                Spacer(modifier = Modifier.height(16.dp))
+                if (state.cancelable) {
+                    PvzRedButton(
+                        text = state.cancelText,
+                        backgroundColor = parseColorArg(state.cancelColor),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        onClick = {
+                            scope.launch { state.onCancel?.invoke(null) }
+                            state.deferred?.complete(null)
+                        }
+                    )
+                }
+            }
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                state.items.forEach { item ->
+                    val value = item.value.ifEmpty { item.name }
+                    if (item.danger) {
+                        PvzRedButton(
+                            text = item.name,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            onClick = {
+                                scope.launch { state.onSelect?.invoke(value.js) }
+                                state.deferred?.complete(value)
+                            }
+                        )
+                    } else {
+                        PvzGreenButton(
+                            text = item.name,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            onClick = {
+                                scope.launch { state.onSelect?.invoke(value.js) }
+                                state.deferred?.complete(value)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * JS 数值滑块弹窗
+ * 用法: ui.slider("速度", { min:0, max:200, step:5, default:60, unit:"%" })
+ * 返回 number；点击"取消"返回 null。
+ */
+@Composable
+fun JsSliderDialog() {
+    val state by JsUiManager.sliderState.collectAsState()
+    val scope = rememberCoroutineScope()
+    var sliderValue by remember { mutableStateOf(state.value) }
+
+    LaunchedEffect(state.deferred) {
+        state.deferred?.let { deferred ->
+            deferred.invokeOnCompletion { JsUiManager.hideSlider() }
+        }
+    }
+
+    // 当弹窗打开时，用初始值重置滑块
+    LaunchedEffect(state.isVisible, state.value) {
+        if (state.isVisible) sliderValue = state.value
+    }
+
+    if (state.isVisible) {
+        val minF = state.min.toFloat()
+        val maxF = state.max.toFloat()
+        val steps = (((state.max - state.min) / state.step).toInt() - 1).coerceAtLeast(0)
+        val unitSuffix = if (state.unit.isNotEmpty()) " ${state.unit}" else ""
+        val fmt = "%.${state.decimals}f"
+        PvzStyledDialog(
+            isVisible = true,
+            titleText = state.title,
+            onDismissRequest = {
+                scope.launch { state.onCancel?.invoke(null) }
+                state.deferred?.complete(null)
+            },
+            dismissible = state.dismissible,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            bottomContent = {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    PvzRedButton(
+                        text = state.cancelText,
+                        backgroundColor = parseColorArg(state.cancelColor),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        onClick = {
+                            scope.launch { state.onCancel?.invoke(null) }
+                            state.deferred?.complete(null)
+                        }
+                    )
+                    PvzGreenButton(
+                        text = state.confirmText,
+                        backgroundColor = parseColorArg(state.confirmColor),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        onClick = {
+                            scope.launch { state.onConfirm?.invoke(sliderValue.js) }
+                            state.deferred?.complete(sliderValue)
+                        }
+                    )
+                }
+            }
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
+            if (state.showValue) {
+                Text(
+                    text = String.format(fmt, sliderValue) + unitSuffix,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF3a4a1a),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            // 自定义 PVZ2 齿轮滑块（样式参考 SectionType.SLIDER）
+            val activeColor = PvzCollapsiblePanelTheme.GREEN.sliderActiveColor
+            val inactiveColor = PvzCollapsiblePanelTheme.GREEN.sliderInactiveColor
+            val activeGradientTop = activeColor.copy(
+                red = (activeColor.red * 1.2f).coerceAtMost(1f),
+                green = (activeColor.green * 1.2f).coerceAtMost(1f),
+                blue = (activeColor.blue * 1.2f).coerceAtMost(1f)
+            )
+            val activeGradientBottom = activeColor.copy(
+                red = (activeColor.red * 0.7f),
+                green = (activeColor.green * 0.7f),
+                blue = (activeColor.blue * 0.7f)
+            )
+            val inactiveGradientTop = inactiveColor.copy(
+                red = (inactiveColor.red * 1.2f).coerceAtMost(1f),
+                green = (inactiveColor.green * 1.2f).coerceAtMost(1f),
+                blue = (inactiveColor.blue * 1.2f).coerceAtMost(1f)
+            )
+            val inactiveGradientBottom = inactiveColor.copy(
+                red = (inactiveColor.red * 0.7f),
+                green = (inactiveColor.green * 0.7f),
+                blue = (inactiveColor.blue * 0.7f)
+            )
+            val sliderProgress = ((sliderValue - state.min) / (state.max - state.min)).toFloat().coerceIn(0f, 1f)
+            val gearRotation = sliderProgress * 360f
+            val density = LocalDensity.current
+            val trackHeight = 20.dp
+            val gearSize = 32.dp
+            val gearSizePx = with(density) { gearSize.toPx() }
+            // 用 onSizeChanged 捕获宽度，避免 BoxWithConstraints(SubcomposeLayout) 在 Dialog 内被父布局请求 intrinsic 测量而崩溃
+            var trackWidthPx by remember { mutableFloatStateOf(0f) }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .onSizeChanged { trackWidthPx = it.width.toFloat() }
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // 轨道容器（圆角胶囊形状）
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(trackHeight)
+                            .clip(RoundedCornerShape(trackHeight / 2))
+                    ) {
+                        // 轨道背景（内凹感）
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            inactiveGradientTop,
+                                            inactiveColor,
+                                            inactiveGradientBottom
+                                        )
+                                    )
+                                )
+                        )
+                        // 选中部分（圆柱立体感）
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(sliderProgress)
+                                .fillMaxHeight()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            activeGradientTop,
+                                            activeColor,
+                                            activeGradientBottom
+                                        )
+                                    )
+                                )
+                        )
+                    }
+                    // 齿轮作为滑块（中心对准填充色/轨道色交界处）
+                    Box(
+                        modifier = Modifier
+                            .size(gearSize)
+                            .align(Alignment.CenterStart)
+                            .offset {
+                                IntOffset(
+                                    ((trackWidthPx * sliderProgress) - gearSizePx / 2f).roundToInt(),
+                                    0
+                                )
+                            }
+                    ) {
+                        Image(
+                            painter = rememberVectorPainter(Pvz2Icon.Gear),
+                            contentDescription = "Slider thumb",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { rotationZ = gearRotation }
+                        )
+                    }
+                    // 完全透明的 Slider 用于处理交互
+                    Slider(
+                        value = sliderValue.toFloat(),
+                        onValueChange = {
+                            sliderValue = it.toDouble()
+                            scope.launch { state.onChange?.invoke(sliderValue.js) }
+                        },
+                        valueRange = minF..maxF,
+                        steps = steps,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.Transparent,
+                            activeTrackColor = Color.Transparent,
+                            inactiveTrackColor = Color.Transparent,
+                            activeTickColor = Color.Transparent,
+                            inactiveTickColor = Color.Transparent
+                        )
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "范围 ${String.format(fmt, state.min)} ~ ${String.format(fmt, state.max)}$unitSuffix",
+                fontSize = 12.sp,
+                color = Color(0xAA3a4a1a),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+/**
+ * JS 加载指示弹窗（轻量"请稍候"，无按钮，需调用 ui.loading 返回的 controller.close() 关闭）
+ * 用法:
+ *   var ctrl = ui.loading("处理中", { message:"请稍候..." });
+ *   // ... 耗时任务 ...
+ *   ctrl.close();
+ */
+@Composable
+fun JsLoadingDialog() {
+    val state by JsUiManager.loadingState.collectAsState()
+    PvzLoadingDialog(
+        isVisible = state.isVisible,
+        title = state.title,
+        message = state.message,
+        dismissible = state.dismissible,
+        cancelText = state.cancelText,
+        cancelColor = parseColorArg(state.cancelColor),
+        onDismiss = state.onDismiss?.let { cb ->
+            suspend { cb.invoke(null) }
+        },
+        onClose = { JsUiManager.hideLoading() }
+    )
 }

@@ -38,6 +38,7 @@ fun PvzButton(
     pressedGradient: Brush,
     modifier: Modifier = Modifier,
     highlightColor: Color, // 新增：允许自定义光团颜色
+    backgroundColor: Color? = null, // JS UI 自定义按钮底色（传入时覆盖默认渐变）
     onClick: () -> Unit
 ) {
     val interactionSource = rememberSoundInteractionSource(
@@ -45,7 +46,26 @@ fun PvzButton(
         InitializePvz2.config.ui.sounds.buttonClickRelease
     )
     val isPressed by interactionSource.collectIsPressedAsState()
-    val currentBrush = if (isPressed) pressedGradient else normalGradient
+    // 自定义底色：由底色推导与原版一致的立体渐变（正常凸起/按下凹下），否则用主题渐变
+    val effNormal: Brush
+    val effPressed: Brush
+    val effHighlight: Color
+    if (backgroundColor != null) {
+        val dark = backgroundColor.copy(
+            red = (backgroundColor.red * 0.8f).coerceIn(0f, 1f),
+            green = (backgroundColor.green * 0.8f).coerceIn(0f, 1f),
+            blue = (backgroundColor.blue * 0.8f).coerceIn(0f, 1f)
+        )
+        // 与原版主题按钮约定一致：正常态上亮下暗（凸起），按下态上暗下亮（凹下）
+        effNormal = Brush.verticalGradient(listOf(backgroundColor, dark))
+        effPressed = Brush.verticalGradient(listOf(dark, backgroundColor))
+        effHighlight = backgroundColor.copy(alpha = 0.25f)
+    } else {
+        effNormal = normalGradient
+        effPressed = pressedGradient
+        effHighlight = highlightColor
+    }
+    val currentBrush = if (isPressed) effPressed else effNormal
 
     Box(
         modifier = modifier
@@ -62,7 +82,7 @@ fun PvzButton(
             .drawWithContent {
                 drawContent()
                 if (!isPressed) {
-                    drawTopLeftHighlight(highlightColor) // 传入光团颜色
+                    drawTopLeftHighlight(effHighlight) // 传入光团颜色
                 }
             }
             .clickable(
@@ -143,6 +163,7 @@ fun PvzRedButton(
     text: String,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
+    backgroundColor: Color? = null,
     onClick: () -> Unit
 ) = PvzButton(
     text = text,
@@ -160,6 +181,7 @@ fun PvzRedButton(
         colors = listOf(Color(0xFFB71C1C), Color(0xFFEF5350))
     ),
     highlightColor = Color(0xFFFFEBEE),
+    backgroundColor = backgroundColor,
     modifier = modifier,
     onClick = onClick
 )
@@ -170,6 +192,7 @@ fun PvzGreenButton(
     text: String,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
+    backgroundColor: Color? = null,
     onClick: () -> Unit
 ) = PvzButton(
     text = text,
@@ -187,6 +210,7 @@ fun PvzGreenButton(
         colors = listOf(Color(0xFF558B2F), Color(0xFF9CCC65))
     ),
     highlightColor = Color(0xFFF1F8E9), // 淡绿光团
+    backgroundColor = backgroundColor,
     modifier = modifier,
     onClick = onClick
 )
