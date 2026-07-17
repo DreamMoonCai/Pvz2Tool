@@ -563,10 +563,6 @@ data class Pvz2ToolConfigUISave(
     val exportToFolderOption: String = "导出到指定文件夹",
     /** 分享存档包选项 */
     val shareAsPackageOption: String = "分享为存档包",
-    /** 备份游玩存档按钮文字 */
-    val backupGameSaveButton: String = "备份游玩存档",
-    /** 导出游玩存档按钮文字 */
-    val exportGameSaveButton: String = "导出游玩存档",
     // 新增：重试按钮文字
     val retryButtonText: String,
     val operation: Pvz2ToolConfigOperation, // 新增操作类型

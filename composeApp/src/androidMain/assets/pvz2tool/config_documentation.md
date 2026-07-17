@@ -472,9 +472,9 @@ sections:
 | `cancelButton` | String | - | 命名弹窗中的取消按钮文字 |
 | `confirmButton` | String | - | 命名弹窗中的确认按钮文字 |
 | `shareButton` | String | `导出所有本地存档` | 本地存档区域的导出按钮文字（点击弹出导出选项弹窗或直接导出文件夹） |
-| `exportButton` | String | - | 游玩存档区域的导出按钮文字（已迁移到 `exportGameSaveButton`，保留兼容） |
+| `exportButton` | String | - | 游玩存档区域的导出按钮文字 |
 | `importButton` | String | - | 导入存档按钮文字 |
-| `backupButton` | String | - | 备份游玩存档按钮文字（已迁移到 `backupGameSaveButton`，保留兼容） |
+| `backupButton` | String | - | 备份游玩存档按钮文字 |
 | `coverLocalButton` | String | - | 用选中的本地存档覆盖当前游玩存档的按钮文字 |
 | `deleteGameSaveButton` | String | `删除游玩存档` | 删除当前游玩存档的按钮文字 |
 | `coverPresetButton` | String | - | 使用预设存档覆盖当前游玩存档的按钮文字 |
@@ -485,8 +485,6 @@ sections:
 | `exportOptionTitle` | String | `选择导出方式` | 导出选项弹窗的标题（FileProvider 可用时显示） |
 | `exportToFolderOption` | String | `导出到指定文件夹` | 导出选项弹窗中「导出到文件夹」按钮文字 |
 | `shareAsPackageOption` | String | `分享为存档包` | 导出选项弹窗中「分享为 .pvz2saves 存档包」按钮文字 |
-| `backupGameSaveButton` | String | `备份游玩存档` | 游玩存档区域的备份按钮文字 |
-| `exportGameSaveButton` | String | `导出游玩存档` | 游玩存档区域的导出按钮文字 |
 | `retryButtonText` | String | - | 操作失败结果弹窗中的重试按钮文字 |
 | `saveNameEmptyTip` | String | - | 存档名称输入为空时的提示文字 |
 | `noLocalSaveTip` | String | - | 本地存档列表为空时的占位提示文字 |

@@ -203,6 +203,7 @@ sections:
     title: "功能管理"
     theme: "BLUE"
     # 不写 targetPath，默认使用上面的 smfDirectory (files/)
+    # addItems: false  # 本地配置专属：true=追加到同名 APK 内置栏目；false(默认)=替换
 
     # 可见性控制：只有选中以下版本ID时才显示此栏目
     visibleOnVersionIds: [ "old","new" ]
@@ -1231,6 +1232,7 @@ sections:
         name: "选项二"
         desc: "第二个选项"
         type: "RADIO"
+        # groupId 默认 "root"（同 section 内全局互斥）；省略即使用默认
 
       # ----- CHECKBOX 多选 -----
       - id: "brown_checkbox"
@@ -1306,6 +1308,7 @@ sections:
         maxValue: 100
         defaultValue: 50
         step: 10
+        # step 默认 1（本例用 10）
         valueSuffix: "%"
 
       # ----- INPUT 输入框 -----
@@ -2154,6 +2157,12 @@ ui:
     deleteGameSaveConfirmMessage: "此操作将永久清空您当前的游戏进度，删除后无法恢复！确定要继续吗？"
     saveInfoTitle: "存档信息"
 
+    # 游玩存档信息区域（以下为文档默认值示例，不填则使用默认值）
+    gameSaveLabel: "游玩存档"                            # 游玩存档信息区域标题
+    gameSaveInfoTemplate: "存档用户：%s · 最后游玩：%t"  # %s=用户名(pp.dat) %t=最后修改时间
+    gameSaveUnknownUser: "未知用户"                       # 无法读取用户名时的占位文本
+    gameSaveNotExistTip: "暂无游玩存档"                    # 游戏存档为空/不存在时提示
+
     # 输入框标签
     saveNameLabel: "存档名"
     saveDescLabel: "存档描述"
@@ -2168,6 +2177,11 @@ ui:
     coverLocalButton: "使用本地存档进行游玩"
     deleteGameSaveButton: "删除游玩存档"
     coverPresetButton: "使用预设存档进行游玩"
+
+    # 导出选项弹窗（FileProvider 可用时显示；以下为文档默认值示例）
+    exportOptionTitle: "选择导出方式"
+    exportToFolderOption: "导出到指定文件夹"
+    shareAsPackageOption: "分享为存档包"
 
     # 提示文字
     saveNameEmptyTip: "存档名不能为空" # 此文本不支持复合颜色

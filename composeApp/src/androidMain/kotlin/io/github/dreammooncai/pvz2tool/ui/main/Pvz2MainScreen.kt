@@ -901,7 +901,7 @@ private fun GameSaveSection(
 
     // 导出游玩存档
     PvzBlueButton(
-        text = saveConfig.exportGameSaveButton,
+        text = saveConfig.exportButton,
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = Pvz2Constants.Dimension.PADDING_SMALL.dp)
@@ -912,7 +912,7 @@ private fun GameSaveSection(
 
     // 备份游玩存档
     PvzPurpleButton(
-        text = saveConfig.backupGameSaveButton,
+        text = saveConfig.backupButton,
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = Pvz2Constants.Dimension.PADDING_SMALL.dp)
