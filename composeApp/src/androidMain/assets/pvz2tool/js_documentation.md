@@ -141,9 +141,11 @@
 | `ui.alert()` | `ui.提示()` | 提示弹窗（单按钮） |
 | `ui.confirm()` | `ui.确认()` | 确认弹窗 |
 | `ui.prompt()` | `ui.输入()` | 输入弹窗 |
-| `ui.progress()` | `ui.进度()` | 进度弹窗 |
+| `ui.progress()` | `ui.进度()` | 进度弹窗（支持 onCancel 取消回调） |
 | `ui.progress().update()` | `ui.进度.更新()` | 更新进度 |
 | `ui.progress().close()` | `ui.进度.关闭()` | 关闭进度 |
+| `ui.progress().cancel()` | `ui.进度.取消()` | 主动取消（触发 onCancel） |
+| `ui.progress().isCancelled()` | `ui.进度.是否已取消()` | 是否已取消 |
 | `ui.extract()` | `ui.解压()` | 解压根资源 |
 
 #### audio 对象
@@ -1493,12 +1495,13 @@ if (confirmed) {
 - `title` (string): 标题
 - `message` (string): 提示消息
 - `defaultValue` (string, 可选): 输入框默认值
+- `placeholder` (string, 可选): 输入框占位提示文字（空输入时显示，留空默认显示「请输入...」）
 
 **返回**：string|null - 用户输入的字符串，取消返回 null
 
 **示例**：
 ```javascript
-var name = ui.prompt("输入名称", "请输入文件名", "默认名称");
+var name = ui.prompt("输入名称", "请输入文件名", "默认名称", "例如：level_1");
 if (name !== null) {
     console.log("输入: " + name);
 }
@@ -1519,6 +1522,7 @@ if (name !== null) {
 | `message` | string | "" | 初始消息 |
 | `indeterminate` | boolean | false | 是否不确定模式 |
 | `showCancel` | boolean | true | 是否显示取消按钮 |
+| `onCancel` | function | 无 | 用户点击“取消”时触发的回调（用于中断耗时任务） |
 
 **返回**：ProgressController - 进度控制器对象
 
@@ -1527,18 +1531,32 @@ if (name !== null) {
 | 方法 | 中文别名 | 说明 |
 |------|----------|------|
 | `update(message?, progress?)` | `更新(message?, progress?)` | 更新进度 (progress: 0.0-1.0) |
-| `close()` | `关闭()` | 关闭进度对话框 |
+| `close()` | `关闭()` | 正常完成，关闭进度对话框 |
+| `cancel()` | `取消()` | 主动取消（等效点击“取消”按钮）：隐藏对话框并触发 `onCancel` 回调 |
+| `isCancelled()` | `是否已取消()` | 返回 `boolean`，是否已取消（可在循环中轮询以中断任务） |
+
+> **取消机制说明**：点击进度条上的“取消”按钮（或调用 `controller.cancel()`）会隐藏对话框并触发 `options.onCancel` 回调；JS 应在 `onCancel` 中设置中断标志，并在循环里通过 `controller.isCancelled()` 及时退出耗时逻辑。取消后 `isCancelled()` 保持 `true`，直到下一次 `ui.progress()` 重新打开。
 
 **示例**：
 ```javascript
-var progress = ui.progress("正在处理...", { showCancel: true });
+var cancelled = false;
+var progress = ui.progress("正在处理...", {
+    showCancel: true,
+    onCancel: function () {
+        // 用户点击取消时设置标志（也可在循环里检查 isCancelled()）
+        cancelled = true;
+        console.log("用户取消了操作");
+    }
+});
 
 try {
-    progress.update("加载中...", 0.1);
-    progress.更新("处理中...", 0.5);  // 混用中英文
+    for (var i = 0; i < 100; i++) {
+        if (progress.isCancelled()) break;   // 或检查 cancelled
+        // ... 耗时工作 ...
+        progress.update("处理中 " + i + "%", i / 100);
+    }
 } finally {
     progress.close();
-    progress.关闭();  // 混用中文
 }
 ```
 
@@ -2762,6 +2780,7 @@ if (device.isRooted()) {
 *文档版本: 2.0*
 *最后更新: 2026-07-17*
 *新增：device 设备信息对象（system/screen/memory/storage/battery/network/app/cpu 分组 + info() 聚合，及中文别名），并补入内置对象总览表；cpu 分组含核心数/架构/ABI/频率(kHz与MHz)/调度器*
+*新增：ui.prompt/ui.输入 新增第 4 个可选参数 placeholder（输入框占位提示文字），state 数据类与弹窗渲染同步支持，缺省回退「请输入...」*
 *新增：audio 音频控制对象（getBgmVolume/setBgmVolume/getSfxVolume/setSfxVolume 及中文别名），并补入内置对象总览表（同时补 http）*
 *修正：http.json()/response.解析JSON() 返回已解析的 JS 对象（解析失败返回 null），非 JSON 字符串*
 *新增：picker 文件选择器（directory/file/files，返回文件对象，支持多选与 copy 到 SAF 树内新建文件）*

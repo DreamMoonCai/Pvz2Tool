@@ -64,7 +64,7 @@ object JsClipboard {
                     }
                 }.getOrNull()
             }
-            if (text == null) Undefined else text.js
+            text?.js ?: Undefined
         }
 
         // 清空剪切板：clipboard.clear() -> void

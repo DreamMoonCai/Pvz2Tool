@@ -17,11 +17,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.dreammooncai.pvz2tool.InitializePvz2
+import io.github.dreammooncai.pvz2tool.view.PvzCollapsiblePanelTheme
 import io.github.dreammooncai.pvz2tool.view.PvzGreenButton
 import io.github.dreammooncai.pvz2tool.view.PvzProgressBar
 import io.github.dreammooncai.pvz2tool.view.PvzRedButton
 import io.github.dreammooncai.pvz2tool.view.PvzRichText
+import io.github.dreammooncai.pvz2tool.view.PvzSimpleCardBrown
 import io.github.dreammooncai.pvz2tool.view.PvzTextOliveStyle
+import io.github.dreammooncai.pvz2tool.view.PvzTextStyle
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +32,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 // ======================== UI 状态类 ========================
 
@@ -46,6 +50,7 @@ data class JsPromptState(
     val title: String = "",
     val message: String = "",
     val defaultValue: String = "",
+    val placeholder: String = "",
     val deferred: CompletableDeferred<String?>? = null
 )
 
@@ -56,7 +61,8 @@ data class JsProgressState(
     val message: String = "",
     val progress: Int = 0,
     val isIndeterminate: Boolean = false,
-    val showCancel: Boolean = true
+    val showCancel: Boolean = true,
+    val isCancelled: Boolean = false
 )
 
 /** 解压根弹窗状态（复用 ExtractorUiState） */
@@ -84,6 +90,9 @@ object JsUiManager {
     // 进度弹窗状态流
     private val _progressState = MutableStateFlow(JsProgressState())
     val progressState: StateFlow<JsProgressState> = _progressState.asStateFlow()
+
+    // 进度取消相关：JS 通过 options.onCancel 注册的回调，点击取消按钮时触发
+    private var progressCancelHandler: (suspend () -> Unit)? = null
 
     // 解压根弹窗状态流
     private val _extractorState = MutableStateFlow(ExtractorUiState())
@@ -132,13 +141,19 @@ object JsUiManager {
     }
 
     /** 显示输入弹窗，返回 CompletableDeferred<String?> */
-    fun showPrompt(title: String, message: String, defaultValue: String = ""): CompletableDeferred<String?> {
+    fun showPrompt(
+        title: String,
+        message: String,
+        defaultValue: String = "",
+        placeholder: String = ""
+    ): CompletableDeferred<String?> {
         val deferred = CompletableDeferred<String?>()
         _promptState.value = JsPromptState(
             isVisible = true,
             title = title,
             message = message,
             defaultValue = defaultValue,
+            placeholder = placeholder,
             deferred = deferred
         )
         return deferred
@@ -156,19 +171,41 @@ object JsUiManager {
         isIndeterminate: Boolean = false,
         showCancel: Boolean = false
     ) {
+        // 每次显示都重置取消状态与回调（新的进度会话）
+        progressCancelHandler = null
         _progressState.value = JsProgressState(
             isVisible = true,
             title = title,
             message = message,
             progress = 0,
             isIndeterminate = isIndeterminate,
-            showCancel = showCancel
+            showCancel = showCancel,
+            isCancelled = false
         )
     }
 
-    /** 关闭进度弹窗 */
+    /** 注册进度取消回调（由 JS 的 options.onCancel 提供） */
+    fun setProgressCancelHandler(handler: (suspend () -> Unit)?) {
+        progressCancelHandler = handler
+    }
+
+    /** 关闭进度弹窗（不影响取消标记，供正常完成使用） */
     fun closeProgress() {
         _progressState.value = _progressState.value.copy(isVisible = false)
+    }
+
+    /** 是否已取消（供 JS 轮询 controller.isCancelled()） */
+    fun isProgressCancelled(): Boolean = _progressState.value.isCancelled
+
+    /**
+     * 触发取消：标记已取消、隐藏弹窗，并执行 JS 注册的 onCancel 回调。
+     * 由进度弹窗的“取消”按钮调用。
+     */
+    suspend fun cancelProgress() {
+        if (_progressState.value.isCancelled) return
+        _progressState.value = _progressState.value.copy(isCancelled = true, isVisible = false)
+        runCatching { progressCancelHandler?.invoke() }
+        progressCancelHandler = null
     }
 
     /** 更新进度弹窗 */
@@ -466,26 +503,31 @@ fun JsPromptDialog() {
             }
 
             // 输入框
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .background(
-                        Brush.verticalGradient(colors = listOf(Color(0xFFFFFFFF), Color(0xFFF5F5F5))),
-                        RoundedCornerShape(6.dp)
-                    )
-                    .border(2.dp, Color(0xFF8ED229), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            PvzSimpleCardBrown(
+                modifier = Modifier.fillMaxWidth().padding(10.dp),
+                borderColor = PvzCollapsiblePanelTheme.GREEN.sliderInactiveColor,
+                backgroundColor = PvzCollapsiblePanelTheme.GREEN.sliderInactiveColor
             ) {
                 BasicTextField(
                     value = inputValue,
-                    onValueChange = { inputValue = it },
-                    textStyle = TextStyle(
-                        color = Color(0xFF423F00),
-                        fontSize = 14.sp
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    onValueChange = { newValue -> inputValue = newValue },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    textStyle = LocalTextStyle.current.copy(color = Color.White,fontSize = 14.sp),
+                    decorationBox = { innerTextField ->
+                        Box {
+                            if (inputValue.isEmpty()) {
+                                PvzRichText(
+                                    text = state.placeholder.ifEmpty { "请输入..." },
+                                    fontSize = 14.sp,
+                                    defaultStyle = PvzTextStyle(Color(0xCCFFFFFF)),
+                                )
+                            }
+                            innerTextField()
+                        }
+                    },
+                    singleLine = false
                 )
             }
         }
@@ -505,6 +547,7 @@ fun JsProgressDialog() {
 
     if (state.isVisible) {
         val progress = (state.progress / 100f).coerceIn(0f, 1f)
+        val scope = rememberCoroutineScope()
         PvzStyledDialog(
             isVisible = true,
             titleText = state.title,
@@ -532,7 +575,15 @@ fun JsProgressDialog() {
                     label = if (progress >= 1) "完成" else if (state.showCancel) "取消" else null,
                     modifier = Modifier.fillMaxWidth(),
                     onLabelClick = {
-                        JsUiManager.closeProgress()
+                        if (progress >= 1) {
+                            // 已完成：点击“完成”直接关闭
+                            JsUiManager.closeProgress()
+                        } else if (state.showCancel) {
+                            // 进行中：点击“取消”触发取消（隐藏弹窗 + 执行 onCancel 回调）
+                            scope.launch {
+                                JsUiManager.cancelProgress()
+                            }
+                        }
                     }
                 )
 

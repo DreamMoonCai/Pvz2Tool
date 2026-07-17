@@ -1827,10 +1827,7 @@ private fun DynamicSectionComponent(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(12.dp),
-                                        textStyle = TextStyle(
-                                            color = Color.White, // 深色背景上使用白色文字
-                                            fontSize = 14.sp
-                                        ),
+                                        textStyle = LocalTextStyle.current.copy(color = Color.White,fontSize = 14.sp),
                                         decorationBox = { innerTextField ->
                                             Box {
                                                 if (currentValue.isEmpty()) {
@@ -1843,7 +1840,7 @@ private fun DynamicSectionComponent(
                                                 innerTextField()
                                             }
                                         },
-                                        singleLine = true
+                                        singleLine = false
                                     )
                                 }
                             }
@@ -2397,25 +2394,30 @@ private fun EditUserNameDialog(
         )
 
         // 输入框
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .background(
-                    Brush.verticalGradient(colors = listOf(Color(0xFFFFFFFF), Color(0xFFF5F5F5))),
-                    RoundedCornerShape(6.dp)
-                )
-                .border(2.dp, Color(0xFF8ED229), RoundedCornerShape(6.dp))
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+        PvzSimpleCardBrown(
+            modifier = Modifier.fillMaxWidth().padding(10.dp),
+            borderColor = PvzCollapsiblePanelTheme.GREEN.sliderInactiveColor,
+            backgroundColor = PvzCollapsiblePanelTheme.GREEN.sliderInactiveColor
         ) {
             BasicTextField(
                 value = inputValue,
-                onValueChange = { inputValue = it },
-                textStyle = TextStyle(
-                    color = Color(0xFF423F00),
-                    fontSize = 14.sp
-                ),
-                modifier = Modifier.fillMaxWidth(),
+                onValueChange = { newValue -> inputValue = newValue },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                textStyle = LocalTextStyle.current.copy(color = Color.White,fontSize = 14.sp),
+                decorationBox = { innerTextField ->
+                    Box {
+                        if (inputValue.isEmpty()) {
+                            PvzRichText(
+                                text = "请输入用户名...",
+                                fontSize = 14.sp,
+                                defaultStyle = PvzTextStyle(Color(0xCCFFFFFF)),
+                            )
+                        }
+                        innerTextField()
+                    }
+                },
                 singleLine = true
             )
         }

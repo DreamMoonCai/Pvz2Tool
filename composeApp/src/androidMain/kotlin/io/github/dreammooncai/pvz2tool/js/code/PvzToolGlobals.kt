@@ -3,6 +3,7 @@ package io.github.dreammooncai.pvz2tool.js.code
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.js.FunctionParam
+import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.JsProperty
@@ -61,24 +62,27 @@ object PvzToolGlobals {
             JsUiManager.showConfirm(title, message).await().js
         }
 
-        // 输入弹窗：ui.prompt(title, message, defaultValue?) -> string|null
+        // 输入弹窗：ui.prompt(title, message, defaultValue?, placeholder?) -> string|null
         listOf("prompt".js, "输入".js).func(
             FunctionParam("title"),
             FunctionParam("message"),
-            FunctionParam("defaultValue")
+            FunctionParam("defaultValue"),
+            FunctionParam("placeholder")
         ) { args ->
             val title = toString(args[0])
             val message = toString(args[1])
             val defaultValue = args.getOrNull(2)?.let { toString(it) } ?: ""
-            JsUiManager.showPrompt(title, message, defaultValue).await()?.js
+            val placeholder = args.getOrNull(3)?.let { toString(it) } ?: ""
+            JsUiManager.showPrompt(title, message, defaultValue, placeholder).await()?.js
         }
 
         // 进度弹窗：ui.progress(title, options?) -> progressController
-        // options: { message?, indeterminate?, showCancel? }
+        // options: { message?, indeterminate?, showCancel?, onCancel? }
         listOf("progress".js, "进度".js).func(
             FunctionParam("title"),
             FunctionParam("options")
         ) { args ->
+            val runtime = this
             val title = toString(args[0])
             val options = args[1].orNull
 
@@ -86,11 +90,18 @@ object PvzToolGlobals {
             val message = options?.get("message".js, this)?.orNull?.let { toString(it) } ?: ""
             val indeterminate = options?.get("indeterminate".js, this)?.let { it.toKotlin(this) as? Boolean } ?: false
             val showCancel = options?.get("showCancel".js, this)?.let { it.toKotlin(this) as? Boolean } ?: true
+            // 取消回调：用户点击“取消”时触发（供 JS 中断耗时任务）
+            val onCancelJs = options?.get("onCancel".js, this)?.orNull as? JSFunction
 
             // 先显示进度弹窗
             JsUiManager.showProgress(title, message, indeterminate, showCancel)
+            if (onCancelJs != null) {
+                JsUiManager.setProgressCancelHandler {
+                    runCatching { onCancelJs.invoke(emptyList(), runtime) }
+                }
+            }
 
-            // 返回一个 JS 对象，包含 update 和 close 方法
+            // 返回一个 JS 对象，包含 update / close / cancel / isCancelled 方法
             Object("controller") {
                 // 更新进度：update(message?, progress?)
                 // progress 是 0.0-1.0 的 Float
@@ -104,10 +115,21 @@ object PvzToolGlobals {
                     Undefined
                 }
 
-                // 关闭进度弹窗
+                // 关闭进度弹窗（正常完成）
                 listOf("close".js, "关闭".js).func { _ ->
                     JsUiManager.closeProgress()
                     Undefined
+                }
+
+                // 主动取消进度（效果同点击“取消”按钮）：隐藏弹窗并触发 onCancel
+                listOf("cancel".js, "取消".js).func { _ ->
+                    JsUiManager.cancelProgress()
+                    Undefined
+                }
+
+                // 是否已取消（供 JS 循环轮询，及时中断耗时任务）
+                listOf("isCancelled".js, "是否已取消".js).func { _ ->
+                    JsUiManager.isProgressCancelled().js
                 }
             }
         }
@@ -340,7 +362,7 @@ object PvzToolGlobals {
             runtime.set(key, JsClipboard.js, VariableType.Global)
         }
         listOf("device".js, "设备".js).forEach { key ->
-            runtime.set(key, JsDevice.js, VariableType.Global)
+            runtime.set(key, JsProperty { JsDevice.js }, VariableType.Global)
         }
         runtime.get("Number".js)?.get("prototype".js, runtime)?.let { it as? JsObject }?.let { prototype ->
             listOf("encrypt".js, "加密".js).forEach { key ->
