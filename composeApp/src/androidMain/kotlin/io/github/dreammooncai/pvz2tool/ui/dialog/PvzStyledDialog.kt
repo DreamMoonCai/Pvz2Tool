@@ -191,8 +191,7 @@ fun PvzLoadingDialog(
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             dismissOnClickOutside = dismissible,
-            decorFitsSystemWindows = false,
-            securePolicy = SecureFlagPolicy.SecureOn
+            decorFitsSystemWindows = false
         )
     ) {
         // 使背景真正铺满整屏（含异形屏区域）。
@@ -284,8 +283,7 @@ fun PvzProgressDialog(
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             dismissOnClickOutside = dismissible,
-            decorFitsSystemWindows = false,
-            securePolicy = SecureFlagPolicy.SecureOn
+            decorFitsSystemWindows = false
         )
     ) {
         // 外层：全屏半透明遮罩（decorFitsSystemWindows=false 让窗口铺到刘海/小白条之下）
@@ -318,7 +316,6 @@ fun PvzProgressDialog(
                                 modifier = Modifier.size(154.dp),
                                 contentDescription = null
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
                         }
                         if (title.isNotEmpty()) {
                             PvzRichText(

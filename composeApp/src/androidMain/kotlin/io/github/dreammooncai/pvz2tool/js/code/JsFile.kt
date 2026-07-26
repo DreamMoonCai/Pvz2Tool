@@ -12,6 +12,7 @@ import io.github.dreammooncai.pvz2tool.js.JsFileAccess
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
 import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
+import io.github.dreammooncai.pvz2tool.js.orNull
 
 /**
  * 文件操作对象，支持占位符路径解析和读写操作（同步，不需要 await）。
@@ -64,7 +65,7 @@ class JsFile(
         listOf("writeBytes".js, "写字节".js).func("placeholderPath", "bytes") { args ->
             val placeholderPath = toString(args[0])
             val bytes =
-                args.getOrNull(1)?.toKotlin(this@func) as? List<*> ?: throw IllegalArgumentException("需要传入字节数组")
+                args.getOrNull(1).orNull?.toKotlin(this@func) as? List<*> ?: throw IllegalArgumentException("需要传入字节数组")
             val ctx = InitializePvz2.context
             val outputHandle = access.resolveOutputOrThrow(placeholderPath, ctx)
             try {
@@ -366,7 +367,7 @@ class JsFile(
         listOf("writeBytes".js, "写字节".js).func("bytes") { args ->
             val outputHandle = access.resolveOutputOrThrow(resolvedPath, context)
             try {
-                val bytes = args.getOrNull(0)?.toKotlin(this@func) as? List<*>
+                val bytes = args.getOrNull(0).orNull?.toKotlin(this@func) as? List<*>
                     ?: throw IllegalArgumentException("需要传入字节数组")
                 outputHandle.targetFile.writeBytes(bytes.map { (it as? Number)?.toByte() ?: 0 }.toByteArray())
                 outputHandle.commit()

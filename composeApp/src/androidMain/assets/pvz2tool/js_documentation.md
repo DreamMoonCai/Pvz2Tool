@@ -259,6 +259,7 @@
 | `file` | 文件 | 通用文件读写操作 | 局部 |
 | `picker` | 选择器 | 系统文件/目录选择器（SAF），返回文件对象 | 全局 |
 | `clipboard` | 剪切板 | 系统剪切板读写（复制文本 / 读取文本 / 清空） | 全局 |
+| `browser` | 浏览器 | 调用系统浏览器打开链接 | 全局 |
 | `device` | 设备 | 当前安卓设备信息（系统 / 屏幕 / 内存 / 存储 / 电池 / 网络 / 应用 / CPU / Root） | 全局 |
 | `rton` | RTON | RTON 文件编解码 | 局部 |
 | `rsb` | RSB | RSB 资源包解包/打包 | 局部 |
@@ -3098,6 +3099,39 @@ if (device.isRooted()) {
 
 ---
 
+## 14. browser - 在浏览器中打开
+
+调用系统浏览器（或具备 `ACTION_VIEW` 处理能力的其它应用）打开指定链接。内部使用 `Intent.ACTION_VIEW` + `FLAG_ACTIVITY_NEW_TASK` 启动，与复合文本普通链接的跳转行为一致。
+
+> **说明**：若设备上没有可处理该协议的应用（例如孤立的 `tel:` 在无电话能力的设备），启动会静默失败——不抛异常、不影响后续脚本执行。未携带协议（不含 `://`）的地址会自动补全 `https://`。
+
+### 14.1 browser.open / browser.打开 / browser.打开链接 / browser.openLink
+
+在系统浏览器中打开目标链接。
+
+**参数**：`url` (string) — 目标地址；支持完整协议（`http` / `https` / `ftp` / `mailto` / `tel` / `file` 等），未带协议时自动补全 `https://`；为空 / 空白时不执行任何操作
+
+**返回**：`undefined`
+
+```javascript
+// 用系统浏览器打开网页
+browser.open("https://github.com");
+browser.打开("https://www.bing.com");
+
+// 未带协议时自动补全 https://
+browser.open("github.com");
+
+// 别名
+browser.打开链接("https://example.com");
+browser.openLink("https://example.com");
+
+// 配合其它 API：打开接口返回的跳转地址
+let resp = http.get("https://api.example.com/redirect");
+if (resp && resp.url) browser.open(resp.url);
+```
+
+---
+
 *文档版本: 2.1*
 *最后更新: 2026-07-17*
 *新增：ui 系列弹窗通用可定制化——所有弹窗（alert/confirm/prompt/select/multiSelect/actionSheet/slider/loading）新增按钮文字（confirmText/cancelText）、按钮背景色（confirmColor/cancelColor，支持命名色与 #RRGGBB/#AARRGGBB 十六进制）、可关闭性（dismissible/可关闭，alert/confirm/prompt/slider/loading 用此名；select/multiSelect/actionSheet 沿用 cancelable），以及事件回调（onConfirm/onCancel/onSelect/onChange/onDismiss，均为 function(value) 形式、异步触发且不阻塞 await）。slider 另增 decimals（小数位）/showValue（是否显示大字体数值）与实时 onChange 回调；loading 另增 update()/更新() 实时刷新文字。详见各弹窗小节与开头「通用选项与回调」*
@@ -3114,6 +3148,7 @@ if (device.isRooted()) {
 *修正：http.json()/response.解析JSON() 返回已解析的 JS 对象（解析失败返回 null），非 JSON 字符串*
 *新增：picker 文件选择器（directory/file/files，返回文件对象，支持多选与 copy 到 SAF 树内新建文件）*
 *新增：clipboard 剪切板对象（copy/复制、read/读取/粘贴、clear/清空，基于系统 ClipboardManager）*
+*新增：browser 浏览器对象（open/打开/打开链接/openLink，调用系统浏览器打开链接；未带协议自动补全 https://，基于 Intent.ACTION_VIEW）*
 *修正：pvz.<type>.all 返回 Array（数据对象数组），单个条目仍可由父对象按 code/name 访问*
 *修正：file.copy/file.复制 当 toPath 带扩展名时按目标文件处理并重命名，否则视为目标目录*
 *修正：file.list 路径无效时返回空数组 []（非 null）*

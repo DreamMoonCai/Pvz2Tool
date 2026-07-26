@@ -423,6 +423,9 @@ object InitializePvz2 {
 
     var isBgMusicOn by mutableStateOf(false)
 
+    /** 应用是否处于前台（Activity 处于 RESUMED 状态）。用于禁止后台播放音乐/视频。 */
+    var isAppForeground by mutableStateOf(true)
+
     fun initBgMusicOn() {
         if (::config.isInitialized)
             isBgMusicOn = settings["isBgMusicOn",config.ui.assets.isPlayBackgroundMusic]

@@ -11,6 +11,7 @@ import io.github.dreammooncai.pvz2tool.js.JsSmfDataManager
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
+import io.github.dreammooncai.pvz2tool.js.orNull
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import java.io.File
@@ -149,7 +150,7 @@ class JsSmfDataBuilder(
             // 写入字节数组
             listOf("writeBytes".js, "写字节".js).func("bytes") { args ->
                 modifiedFile.parentFile?.mkdirs()
-                val bytes = args.getOrNull(0)?.toKotlin(this@func) as? List<*> ?: throw IllegalArgumentException("需要传入字节数组")
+                val bytes = args.getOrNull(0).orNull?.toKotlin(this@func) as? List<*> ?: throw IllegalArgumentException("需要传入字节数组")
                 modifiedFile.writeBytes(bytes.map { (it as? Number)?.toByte() ?: 0 }.toByteArray())
                 Undefined
             }
@@ -211,7 +212,7 @@ class JsSmfDataBuilder(
             // 写入字节数组
             listOf("writeBytes".js, "写字节".js).func("bytes") { args ->
                 modifiedFile.parentFile?.mkdirs()
-                val bytes = args.getOrNull(0)?.toKotlin(this@func) as? List<*> ?: throw IllegalArgumentException("需要传入字节数组")
+                val bytes = args.getOrNull(0).orNull?.toKotlin(this@func) as? List<*> ?: throw IllegalArgumentException("需要传入字节数组")
                 modifiedFile.writeBytes(bytes.map { (it as? Number)?.toByte() ?: 0 }.toByteArray())
                 Undefined
             }
@@ -227,7 +228,7 @@ class JsSmfDataBuilder(
             // 写入文本（UTF-8）
             listOf("writeText".js, "写文本".js).func("text") { args ->
                 modifiedFile.parentFile?.mkdirs()
-                val text = args.getOrNull(0)?.let { toString(it) } ?: throw IllegalArgumentException("需要传入字节数组")
+                val text = args.getOrNull(0).orNull?.let { toString(it) } ?: throw IllegalArgumentException("需要传入字节数组")
                 modifiedFile.writeText(text)
                 Undefined
             }

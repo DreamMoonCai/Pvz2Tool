@@ -38,9 +38,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -193,6 +196,31 @@ private fun ExoPlayerDelegate(
         }
     }
 
+    // 进入后台（onPause）时暂停播放，回到前台（onResume）时继续，避免后台继续播放 CG 音视频
+    var exoWasPlaying by remember { mutableStateOf(false) }
+    val lifecycle = LocalLifecycleOwner.current
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    if (exoPlayer.isPlaying) {
+                        exoWasPlaying = true
+                        exoPlayer.playWhenReady = false
+                    }
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    if (exoWasPlaying) {
+                        exoPlayer.playWhenReady = true
+                        exoWasPlaying = false
+                    }
+                }
+                else -> {}
+            }
+        }
+        lifecycle.lifecycle.addObserver(observer)
+        onDispose { lifecycle.lifecycle.removeObserver(observer) }
+    }
+
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
@@ -258,6 +286,31 @@ private fun MediaPlayerDelegate(
     var isReady by remember { mutableStateOf(false) }
     var showSkipButton by remember { mutableStateOf(false) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var mpWasPlaying by remember { mutableStateOf(false) }
+
+    // 进入后台（onPause）时暂停播放，回到前台（onResume）时继续，避免后台继续播放 CG 音视频
+    val lifecycle = LocalLifecycleOwner.current
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    if (mediaPlayer?.isPlaying == true) {
+                        mpWasPlaying = true
+                        mediaPlayer?.pause()
+                    }
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    if (mpWasPlaying) {
+                        mediaPlayer?.start()
+                        mpWasPlaying = false
+                    }
+                }
+                else -> {}
+            }
+        }
+        lifecycle.lifecycle.addObserver(observer)
+        onDispose { lifecycle.lifecycle.removeObserver(observer) }
+    }
 
     Box(modifier.clickable(
         interactionSource = remember { MutableInteractionSource() },
@@ -291,6 +344,7 @@ private fun MediaPlayerDelegate(
                                 mp.setOnPreparedListener {
                                     isReady = true
                                     onReady() // 触发父组件回调
+                                    mpWasPlaying = true
                                     it.start()
                                 }
                                 mp.setOnCompletionListener { onEnd() }

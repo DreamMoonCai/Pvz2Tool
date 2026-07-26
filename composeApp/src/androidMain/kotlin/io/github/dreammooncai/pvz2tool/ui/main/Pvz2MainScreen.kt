@@ -554,7 +554,11 @@ private fun LocalSaveRadioItem(
             imageVectorPress = Pvz2Icon.DeletePress,
             contentDescription = InitializePvz2.config.ui.dialog.deleteSaveDesc,
             modifier = Modifier.size(32.dp),
-            onClick = onDelete
+            onClick = onDelete,
+            // 【新增】传入按下的音效
+            pressSound = InitializePvz2.config.ui.sounds.buttonSettingsPress,
+            // 【新增】传入释放的音效
+            releaseSound = InitializePvz2.config.ui.sounds.buttonSettingsRelease
         )
     }
 }

@@ -175,8 +175,8 @@ class Pvz2InitializeActivity : ComponentActivity() {
                     PvzToolGlobals.bgMusicState = bgMusicState
                 }
 
-                LaunchedEffect(InitializePvz2.isBgMusicOn) {
-                    if (InitializePvz2.isBgMusicOn) {
+                LaunchedEffect(InitializePvz2.isBgMusicOn, InitializePvz2.isAppForeground) {
+                    if (InitializePvz2.isBgMusicOn && InitializePvz2.isAppForeground) {
                         bgMusicState.resumeWithFadeIn(fadeDuration = 1500)
                     } else {
                         bgMusicState.pauseWithFadeOut(fadeDuration = 1500)
@@ -477,11 +477,13 @@ class Pvz2InitializeActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+        InitializePvz2.isAppForeground = false
         InitializePvz2.isBgMusicOn = false
     }
 
     override fun onResume() {
         super.onResume()
+        InitializePvz2.isAppForeground = true
         InitializePvz2.initBgMusicOn()
     }
 }

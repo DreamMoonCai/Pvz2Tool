@@ -16,6 +16,7 @@ import io.github.dreammooncai.pvz2tool.controller.SoundController
 import io.github.dreammooncai.pvz2tool.js.JsConsole
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.js.code.JsDevice
+import io.github.dreammooncai.pvz2tool.js.code.JsBrowser
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
@@ -99,8 +100,8 @@ object PvzToolGlobals {
             val runtime = this
             val title = toString(args[0])
             val message = toString(args[1])
-            val defaultValue = args.getOrNull(2)?.let { toString(it) } ?: ""
-            val placeholder = args.getOrNull(3)?.let { toString(it) } ?: ""
+            val defaultValue = args.getOrNull(2).orNull?.let { toString(it) } ?: ""
+            val placeholder = args.getOrNull(3).orNull?.let { toString(it) } ?: ""
             val options = args[4].orNull as? JsObject
             val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
             val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
@@ -143,8 +144,8 @@ object PvzToolGlobals {
                 listOf("update".js, "更新".js).func(
                     FunctionParam("message"), FunctionParam("progress")
                 ) { updateArgs ->
-                    val msg = updateArgs.getOrNull(0)?.let { toString(it) }
-                    val progress = updateArgs.getOrNull(1)?.let { toNumber(it).toFloat() }
+                    val msg = updateArgs.getOrNull(0).orNull?.let { toString(it) }
+                    val progress = updateArgs.getOrNull(1).orNull?.let { toNumber(it).toFloat() }
                     JsUiManager.updateProgress(msg, progress)
                     Undefined
                 }
@@ -171,7 +172,7 @@ object PvzToolGlobals {
         listOf("extract".js, "解压".js).func(
             FunctionParam("sourcePaths"), FunctionParam("targetDir"), FunctionParam("sectionName")
         ) { args ->
-            val sourcePaths = args[0]?.toKotlin(this) as? List<*> ?: emptyList<Any>()
+            val sourcePaths = args.getOrNull(0).orNull?.toKotlin(this) as? List<*> ?: emptyList<Any>()
             val targetDir = toString(args[1])
             val sectionName = args.getOrNull(2).orNull?.let { toString(it) } ?: ""
             JsUiManager.extract(
@@ -190,7 +191,7 @@ object PvzToolGlobals {
         ) { args ->
             val runtime = this
             val title = toString(args[0])
-            val itemsRaw = args[1]?.toKotlin(this) as? List<*> ?: emptyList<Any>()
+            val itemsRaw = args.getOrNull(1).orNull?.toKotlin(this) as? List<*> ?: emptyList<Any>()
             val options = args[2].orNull as? JsObject
             val items = parseChoiceItems(itemsRaw)
             val columns = (options?.get("columns".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 4).coerceIn(2, 6)
@@ -213,7 +214,7 @@ object PvzToolGlobals {
         ) { args ->
             val runtime = this
             val title = toString(args[0])
-            val itemsRaw = args[1]?.toKotlin(this) as? List<*> ?: emptyList<Any>()
+            val itemsRaw = args.getOrNull(1).orNull?.toKotlin(this) as? List<*> ?: emptyList<Any>()
             val options = args[2].orNull as? JsObject
             val items = parseChoiceItems(itemsRaw)
             val defaultValues = options?.get("defaultValues".js, this)?.let { it.toKotlin(this) as? List<*> }
@@ -239,7 +240,7 @@ object PvzToolGlobals {
         ) { args ->
             val runtime = this
             val title = toString(args[0])
-            val itemsRaw = args[1]?.toKotlin(this) as? List<*> ?: emptyList<Any>()
+            val itemsRaw = args.getOrNull(1).orNull?.toKotlin(this) as? List<*> ?: emptyList<Any>()
             val options = args[2].orNull as? JsObject
             val items = parseActionItems(itemsRaw)
             val cancelable = options?.get("cancelable".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: true
@@ -298,7 +299,7 @@ object PvzToolGlobals {
                     Undefined
                 }
                 listOf("update".js, "更新".js).func(FunctionParam("message")) { updateArgs ->
-                    val msg = updateArgs.getOrNull(0)?.let { toString(it) } ?: ""
+                    val msg = updateArgs.getOrNull(0).orNull?.let { toString(it) } ?: ""
                     JsUiManager.updateLoading(msg)
                     Undefined
                 }
@@ -518,6 +519,9 @@ object PvzToolGlobals {
         }
         listOf("device".js, "设备".js).forEach { key ->
             runtime.set(key, JsProperty { JsDevice.js }, VariableType.Global)
+        }
+        listOf("browser".js, "浏览器".js).forEach { key ->
+            runtime.set(key, JsBrowser.js, VariableType.Global)
         }
         runtime.get("Number".js)?.get("prototype".js, runtime)?.let { it as? JsObject }?.let { prototype ->
             listOf("encrypt".js, "加密".js).forEach { key ->

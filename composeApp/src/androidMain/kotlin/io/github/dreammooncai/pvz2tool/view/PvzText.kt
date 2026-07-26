@@ -9,8 +9,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -33,7 +35,17 @@ import io.github.dreammooncai.pvz2tool.VersionDef
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.ui.main.DynamicSectionState
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.text.LinkInteractionListener
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // JS 执行上下文：携带当前渲染环境信息，使 {{js:...}} 可访问 this.当前
 data class JsExecutionContext(
@@ -118,6 +130,125 @@ private suspend fun executeJsExprNoContext(expr: String): String {
         result.ifBlank { "{{js:$expr}}" }
     } catch (e: Exception) {
         "{{js:$expr}}"
+    }
+}
+
+// --------------- 复合文本链接点击：执行 JS / 跳转浏览器 ---------------
+
+/**
+ * 链接目标分类
+ * - [JS]：需要作为 JS 直接执行（内联代码，或以 .js 结尾的文件）
+ * - [BROWSER]：普通链接，使用浏览器打开
+ */
+private enum class LinkTarget { JS, BROWSER }
+
+/**
+ * 判断链接目标类型：
+ * 1. 以 .js 结尾（忽略 ?查询 / #片段）→ 视为 JS 文件（网络 / 绝对本地 / 工具箱相对路径）
+ * 2. 带有明确协议（http/https/ftp/mailto/tel/file/...）→ 浏览器打开
+ * 3. 其余（无协议、又非 .js 文件）→ 视为内联 JS 代码
+ */
+private fun classifyLink(url: String): LinkTarget {
+    val trimmed = url.trim()
+    val pathOnly = trimmed.substringBefore('?').substringBefore('#')
+    if (pathOnly.endsWith(".js", ignoreCase = true)) return LinkTarget.JS
+    if (hasUrlScheme(trimmed)) return LinkTarget.BROWSER
+    return LinkTarget.JS
+}
+
+private fun hasUrlScheme(s: String): Boolean {
+    val lower = s.lowercase()
+    return lower.startsWith("http://") || lower.startsWith("https://") ||
+            lower.startsWith("ftp://") || lower.startsWith("ftps://") ||
+            lower.startsWith("mailto:") || lower.startsWith("tel:") ||
+            lower.startsWith("file://") || s.contains("://")
+}
+
+/**
+ * 加载 .js 文件内容，支持三种来源：
+ * - 网络链接（http/https）：下载后读取
+ * - 绝对本地路径（以 / 开头）：直接读取文件
+ * - 工具箱相对路径（其余）：从 js/ 目录读取（与 {{js:...}} 行为一致）
+ * 读取失败时返回 null。
+ */
+private suspend fun loadJsFileContent(url: String): String? = withContext(Dispatchers.IO) {
+    val trimmed = url.trim()
+    runCatching {
+        when {
+            trimmed.startsWith("http://", ignoreCase = true) ||
+                    trimmed.startsWith("https://", ignoreCase = true) -> {
+                val conn = URL(trimmed).openConnection() as HttpURLConnection
+                conn.connectTimeout = 10_000
+                conn.readTimeout = 10_000
+                conn.inputStream.bufferedReader().readText()
+            }
+            trimmed.startsWith("/") -> {
+                File(trimmed).inputStream().bufferedReader().readText()
+            }
+            else -> {
+                // 工具箱相对路径：从 js/ 目录读取
+                AssetExtractorHolder.openInputStream("js/$trimmed")?.bufferedReader()?.readText()
+            }
+        }
+    }.getOrNull()
+}
+
+/**
+ * 执行链接点击：JS 目标直接执行（内联代码 / .js 文件），否则打开浏览器。
+ */
+private fun handleLinkClick(
+    context: Context,
+    url: String,
+    jsContext: JsExecutionContext?,
+    scope: CoroutineScope
+) {
+    if (classifyLink(url) == LinkTarget.BROWSER) {
+        openBrowser(context, url)
+    } else {
+        scope.launch {
+            runCatching { executeJsFromLink(url, jsContext) }
+        }
+    }
+}
+
+/**
+ * 按照链接规则执行 JS：
+ * - 以 .js 结尾 → 加载文件内容后执行
+ * - 否则 → 作为内联 JS 代码直接执行
+ */
+private suspend fun executeJsFromLink(url: String, jsContext: JsExecutionContext?) {
+    val trimmed = url.trim()
+    val isJsFile = trimmed.substringBefore('?').substringBefore('#')
+        .endsWith(".js", ignoreCase = true)
+    val code = if (isJsFile) {
+        loadJsFileContent(trimmed) ?: return
+    } else {
+        trimmed
+    }
+    if (jsContext != null) {
+        PvzToolJsEngine.executeScript(
+            script = code,
+            section = jsContext.section,
+            item = jsContext.item,
+            version = jsContext.version,
+            sectionStates = jsContext.sectionStates,
+            isRichText = true,
+            updateSectionState = jsContext.updateSectionState
+        )
+    } else {
+        PvzToolJsEngine.executeScript(code)
+    }
+}
+
+/**
+ * 使用系统浏览器打开普通链接
+ */
+private fun openBrowser(context: Context, url: String) {
+    runCatching {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
     }
 }
 
@@ -338,6 +469,14 @@ fun PvzRichText(
     // 合并显式参数和 CompositionLocal 中的上下文
     val effectiveContext = jsContext ?: LocalJsExecutionContext.current
 
+    // 链接点击处理：JS 目标执行 JS，普通链接打开浏览器
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val linkListener: LinkInteractionListener = linkListener@ { annotation ->
+        val linkUrl = (annotation as? LinkAnnotation.Url)?.url ?: return@linkListener
+        handleLinkClick(context, linkUrl, effectiveContext, scope)
+    }
+
     // 1. 从 text 中找出所有 {{js:...}} 表达式
     val jsExpressions = remember(text) {
         "\\{\\{js:([^}]+)\\}\\}".toRegex().findAll(text).map { it.groupValues[1] }.toList()
@@ -407,7 +546,7 @@ fun PvzRichText(
         )
 
         pushStyle(defaultSpanStyle)
-        parseRichText(this, text, jsCache, allIconTags, fixedOffset, blurRadius, defaultStyle)
+        parseRichText(this, text, jsCache, allIconTags, fixedOffset, blurRadius, defaultStyle, linkListener)
         pop()
     }
 
@@ -433,7 +572,8 @@ private fun parseRichText(
     allIconTags: List<IconTag>,
     fixedOffset: Offset,
     blurRadius: Float,
-    defaultStyle: PvzTextStyle
+    defaultStyle: PvzTextStyle,
+    linkListener: LinkInteractionListener
 ) {
     var currentIndex = 0
     while (currentIndex < src.length) {
@@ -462,7 +602,7 @@ private fun parseRichText(
                 val styleSuffix = tagName.removePrefix("link-")
                 val targetStyle = DefaultPvzTagStyles[styleSuffix] ?: PvzTextStyle(Color(0xFF64B5F6), Color.Black)
 
-                builder.pushLink(LinkAnnotation.Url(url))
+                builder.pushLink(LinkAnnotation.Url(url, linkInteractionListener = linkListener))
                 builder.withStyle(SpanStyle(
                     color = targetStyle.color,
                     textDecoration = TextDecoration.Underline,
@@ -490,7 +630,7 @@ private fun parseRichText(
                 val result = jsCache[displayContent]
                 if (result != null) {
                     // 递归解析，对 JS 返回结果不使用缓存（避免无限递归）
-                    parseRichText(builder, result, emptyMap(), allIconTags, fixedOffset, blurRadius, defaultStyle)
+                    parseRichText(builder, result, emptyMap(), allIconTags, fixedOffset, blurRadius, defaultStyle, linkListener)
                 } else {
                     builder.append("{{$inner}}")
                 }

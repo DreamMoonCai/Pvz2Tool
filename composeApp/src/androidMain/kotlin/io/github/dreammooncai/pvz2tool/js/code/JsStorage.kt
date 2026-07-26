@@ -11,6 +11,7 @@ import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.func
+import io.github.dreammooncai.pvz2tool.js.orNull
 
 /**
  * JS 持久化存储 API，封装 SharedPreferences。
@@ -121,7 +122,7 @@ private fun JsStorage.buildStorageContext(): JsObject {
         // set(key, value) - 设置值
         listOf("set".js, "设置".js).func("key", "value") { args ->
             val key = toString(args[0])
-            val value = args.getOrNull(1)
+            val value = args.getOrNull(1).orNull
             set(key, value)
             Undefined
         }

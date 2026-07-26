@@ -95,9 +95,9 @@ fun rememberBackgroundMusicState(
     // 记录上一次播放状态（用于循环判断）
     var lastPlayerState by remember { mutableStateOf<GadulkaPlayerState?>(null) }
 
-    // 1. 初始播放音乐
+    // 1. 初始播放音乐（前台才播放，避免后台无声启动）
     LaunchedEffect(player) {
-        if (bgMusicState.isEnabled) {
+        if (bgMusicState.isEnabled && InitializePvz2.isAppForeground) {
             player.play(audioUrl)
             player.setVolume(initialVolume)
         }

@@ -9,6 +9,7 @@ import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.js.func
+import io.github.dreammooncai.pvz2tool.js.orNull
 
 /**
  * 剪切板操作全局对象：`clipboard`。
@@ -49,7 +50,7 @@ object JsClipboard {
         listOf("copy".js, "复制".js, "写入".js).func(
             FunctionParam("text")
         ) { args ->
-            val text = args.getOrNull(0)?.let { toString(it) } ?: ""
+            val text = args.getOrNull(0).orNull?.let { toString(it) } ?: ""
             clipboardManager()?.setPrimaryClip(ClipData.newPlainText("pvz2tool", text))
             Undefined
         }

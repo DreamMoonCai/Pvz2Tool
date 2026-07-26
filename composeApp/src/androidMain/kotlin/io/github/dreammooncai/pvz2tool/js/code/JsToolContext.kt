@@ -17,6 +17,7 @@ import io.github.dreammooncai.pvz2tool.VersionDef
 import io.github.dreammooncai.pvz2tool.js.JsConsole
 import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
+import io.github.dreammooncai.pvz2tool.js.orNull
 import io.github.dreammooncai.pvz2tool.ui.main.DynamicSectionState
 import io.github.dreammooncai.pvz2tool.ui.main.PvzLocalSaveManager
 import kotlin.collections.iterator
@@ -251,7 +252,7 @@ class JsToolContext(
             SectionType.CHECKBOX -> listOf("checked".js, "选中".js,"勾选".js) eq JsPropertyAccessor.BackedField(
                 getter = Callable { state.checkedItemIds.contains(item.id).js },
                 setter = Callable { args ->
-                    val jsValue = args.getOrNull(0) ?: return@Callable Undefined
+                    val jsValue = args.getOrNull(0).orNull ?: return@Callable Undefined
                     val newChecked = jsValue.toKotlin(this) as Boolean
                     onStateChange?.invoke(section, item, newChecked)
                     Undefined
@@ -262,7 +263,7 @@ class JsToolContext(
                 listOf("selected".js,"checked".js, "选中".js) eq JsPropertyAccessor.BackedField(
                     getter = Callable { (state.selectedPresetItemIds[item.groupId] == item.id).js },
                     setter = Callable { args ->
-                        val jsValue = args.getOrNull(0) ?: return@Callable Undefined
+                        val jsValue = args.getOrNull(0).orNull ?: return@Callable Undefined
                         val newValue = toNumber(jsValue).toFloat()
                         onStateChange?.invoke(section, item, newValue)
                         Undefined
@@ -274,7 +275,7 @@ class JsToolContext(
                 listOf("value".js, "值".js) eq JsPropertyAccessor.BackedField(
                     getter = Callable { (state.sliderValues[item.id] ?: (item.defaultValue ?: item.minValue)).js },
                     setter = Callable { args ->
-                        val jsValue = args.getOrNull(0) ?: return@Callable Undefined
+                        val jsValue = args.getOrNull(0).orNull ?: return@Callable Undefined
                         val newValue = toNumber(jsValue).toFloat()
                         onStateChange?.invoke(section, item, newValue)
                         Undefined
@@ -290,7 +291,7 @@ class JsToolContext(
                 listOf("value".js, "值".js) eq JsPropertyAccessor.BackedField(
                     getter = Callable { (state.inputValues[item.id] ?: item.inputDefault ?: "").js },
                     setter = Callable { args ->
-                        val jsValue = args.getOrNull(0) ?: return@Callable Undefined
+                        val jsValue = args.getOrNull(0).orNull ?: return@Callable Undefined
                         val newValue = toString(jsValue)
                         onStateChange?.invoke(section, item, newValue)
                         Undefined
@@ -304,7 +305,7 @@ class JsToolContext(
                 listOf("value".js, "值".js) eq JsPropertyAccessor.BackedField(
                     getter = Callable { (state.infoValues[item.id] ?: item.infoValue ?: "-").js },
                     setter = Callable { args ->
-                        val jsValue = args.getOrNull(0) ?: return@Callable Undefined
+                        val jsValue = args.getOrNull(0).orNull ?: return@Callable Undefined
                         val newValue = toString(jsValue)
                         onStateChange?.invoke(section, item, newValue)
                         Undefined
@@ -316,7 +317,7 @@ class JsToolContext(
                 listOf("value".js, "值".js) eq JsPropertyAccessor.BackedField(
                     getter = Callable { (state.descriptionValues[item.id] ?: item.desc.orEmpty().ifEmpty { item.name } ?: "-").js },
                     setter = Callable { args ->
-                        val jsValue = args.getOrNull(0) ?: return@Callable Undefined
+                        val jsValue = args.getOrNull(0).orNull ?: return@Callable Undefined
                         val newValue = toString(jsValue)
                         onStateChange?.invoke(section, item, newValue)
                         Undefined

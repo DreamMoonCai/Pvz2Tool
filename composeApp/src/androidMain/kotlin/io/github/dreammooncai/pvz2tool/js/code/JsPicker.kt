@@ -54,21 +54,21 @@ object JsPicker {
         listOf("directory".js, "选择目录".js, "选择文件夹".js).func(
             FunctionParam("options")
         ) { args ->
-            pickSingle(FilePickerManager.PickerMode.DIRECTORY, args.getOrNull(0))
+            pickSingle(FilePickerManager.PickerMode.DIRECTORY, args.getOrNull(0).orNull)
         }
 
         // 选择单个文件：picker.file(options?) -> 文件对象 | undefined（取消时）
         listOf("file".js, "选择文件".js).func(
             FunctionParam("options")
         ) { args ->
-            pickSingle(FilePickerManager.PickerMode.FILE, args.getOrNull(0))
+            pickSingle(FilePickerManager.PickerMode.FILE, args.getOrNull(0).orNull)
         }
 
         // 选择多个文件：picker.files(options?) -> 文件对象数组（取消时为空数组）
         listOf("files".js, "选择多个文件".js).func(
             FunctionParam("options")
         ) { args ->
-            pickMultiple(args.getOrNull(0))
+            pickMultiple(args.getOrNull(0).orNull)
         }
     }
 
@@ -173,7 +173,7 @@ object JsPicker {
                 }
 
                 listOf("writeBytes".js, "写字节".js).func("bytes") { args ->
-                    val bytes = args.getOrNull(0)?.toKotlin(this) as? List<*>
+                    val bytes = args.getOrNull(0).orNull?.toKotlin(this) as? List<*>
                         ?: throw IllegalArgumentException("需要传入字节数组")
                     JsFileResolver.writeToDocumentFile(
                         docFile,
