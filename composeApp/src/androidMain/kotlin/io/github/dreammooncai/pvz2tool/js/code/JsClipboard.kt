@@ -5,7 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import io.github.alexzhirkevich.keight.js.FunctionParam
 import io.github.alexzhirkevich.keight.js.Object
-import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.js.func
@@ -52,7 +51,7 @@ object JsClipboard {
         ) { args ->
             val text = args.getOrNull(0).orNull?.let { toString(it) } ?: ""
             clipboardManager()?.setPrimaryClip(ClipData.newPlainText("pvz2tool", text))
-            Undefined
+            null
         }
 
         // 读取剪切板当前文本：clipboard.read() -> string | undefined（无内容/失败时）
@@ -65,13 +64,13 @@ object JsClipboard {
                     }
                 }.getOrNull()
             }
-            text?.js ?: Undefined
+            text?.js
         }
 
         // 清空剪切板：clipboard.clear() -> void
         listOf("clear".js, "清空".js).func {
             clipboardManager()?.setPrimaryClip(ClipData.newPlainText("", ""))
-            Undefined
+            null
         }
     }
 }

@@ -17,6 +17,7 @@ import io.github.dreammooncai.pvz2tool.js.JsConsole
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.js.code.JsDevice
 import io.github.dreammooncai.pvz2tool.js.code.JsBrowser
+import io.github.dreammooncai.pvz2tool.js.code.JsThread
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
@@ -67,7 +68,7 @@ object PvzToolGlobals {
                 ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val onConfirm = bindJsCallback(options, "onConfirm", runtime)
             JsUiManager.showAlert(title, message, confirmText, confirmColor, dismissible, onConfirm).await()
-            Undefined
+            null
         }
 
         // 确认弹窗：ui.confirm(title, message, options?) -> boolean
@@ -147,19 +148,19 @@ object PvzToolGlobals {
                     val msg = updateArgs.getOrNull(0).orNull?.let { toString(it) }
                     val progress = updateArgs.getOrNull(1).orNull?.let { toNumber(it).toFloat() }
                     JsUiManager.updateProgress(msg, progress)
-                    Undefined
+                    null
                 }
 
                 // 关闭进度弹窗（正常完成）
                 listOf("close".js, "关闭".js).func { _ ->
                     JsUiManager.closeProgress()
-                    Undefined
+                    null
                 }
 
                 // 主动取消进度（效果同点击“取消”按钮）：隐藏弹窗并触发 onCancel
                 listOf("cancel".js, "取消".js).func { _ ->
                     JsUiManager.cancelProgress()
-                    Undefined
+                    null
                 }
 
                 // 是否已取消（供 JS 循环轮询，及时中断耗时任务）
@@ -180,7 +181,7 @@ object PvzToolGlobals {
                 targetDir = targetDir,
                 sectionName = sectionName
             ).await()
-            Undefined
+            null
         }
 
         // 单项选择弹窗：ui.select(title, items, options?) -> string|null
@@ -296,12 +297,12 @@ object PvzToolGlobals {
             Object("controller") {
                 listOf("close".js, "关闭".js).func { _ ->
                     JsUiManager.hideLoading()
-                    Undefined
+                    null
                 }
                 listOf("update".js, "更新".js).func(FunctionParam("message")) { updateArgs ->
                     val msg = updateArgs.getOrNull(0).orNull?.let { toString(it) } ?: ""
                     JsUiManager.updateLoading(msg)
-                    Undefined
+                    null
                 }
             }
         }
@@ -378,10 +379,10 @@ object PvzToolGlobals {
             val path = toString(args[0])
             val uri = AssetExtractorHolder.open(path)
             if (uri == null) {
-                Undefined
+                null
             } else {
                 val inputStream = InitializePvz2.context.openUriInputStreamOrAssetNull(uri)
-                inputStream?.bufferedReader()?.use { it.readText() }?.js ?: Undefined
+                inputStream?.bufferedReader()?.use { it.readText() }?.js ?: null
             }
         }
 
@@ -390,11 +391,11 @@ object PvzToolGlobals {
             val path = toString(args[0])
             val uri = AssetExtractorHolder.open(path)
             if (uri == null) {
-                Undefined
+                null
             } else {
                 val inputStream = InitializePvz2.context.openUriInputStreamOrAssetNull(uri)
                 if (inputStream == null) {
-                    Undefined
+                    null
                 } else {
                     val bytes = inputStream.readBytes()
                     inputStream.close()
@@ -408,11 +409,11 @@ object PvzToolGlobals {
             val path = toString(args[0])
             val uri = AssetExtractorHolder.open(path)
             if (uri == null) {
-                Undefined
+                null
             } else {
                 val inputStream = InitializePvz2.context.openUriInputStreamOrAssetNull(uri)
                 if (inputStream == null) {
-                    Undefined
+                    null
                 } else {
                     val bytes = inputStream.readBytes()
                     inputStream.close()
@@ -426,11 +427,11 @@ object PvzToolGlobals {
             val path = toString(args[0])
             val uri = AssetExtractorHolder.open(path)
             if (uri == null) {
-                Undefined
+                null
             } else {
                 val inputStream = InitializePvz2.context.openUriInputStreamOrAssetNull(uri)
                 if (inputStream == null) {
-                    Undefined
+                    null
                 } else {
                     val bytes = inputStream.readBytes()
                     inputStream.close()
@@ -457,7 +458,7 @@ object PvzToolGlobals {
             val volume = toNumber(args[0]).toFloat().coerceIn(0f, 1f)
             withContext(Dispatchers.Main) {
                 bgMusicState?.setVolume(volume)
-                Undefined
+                null
             }
         }
 
@@ -472,7 +473,7 @@ object PvzToolGlobals {
             val volume = toNumber(args[0]).toFloat().coerceIn(0f, 1f)
             withContext(Dispatchers.Main) {
                 SoundController.globalSfxVolume = volume
-                Undefined
+                null
             }
         }
     }
@@ -522,6 +523,9 @@ object PvzToolGlobals {
         }
         listOf("browser".js, "浏览器".js).forEach { key ->
             runtime.set(key, JsBrowser.js, VariableType.Global)
+        }
+        listOf("thread".js, "协程".js, "线程".js).forEach { key ->
+            runtime.set(key, JsThread.js, VariableType.Global)
         }
         runtime.get("Number".js)?.get("prototype".js, runtime)?.let { it as? JsObject }?.let { prototype ->
             listOf("encrypt".js, "加密".js).forEach { key ->

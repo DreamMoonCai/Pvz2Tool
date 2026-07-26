@@ -9,7 +9,6 @@ import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.JsProperty
 import io.github.alexzhirkevich.keight.js.Object
-import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.js.JsConsole
@@ -73,17 +72,17 @@ object JsPicker {
     }
 
     /**
-     * 选择单个目标（目录或文件），返回单个文件对象；取消时返回 [Undefined]。
+     * 选择单个目标（目录或文件），返回单个文件对象；取消时返回 [null]。
      */
     private suspend fun ScriptRuntime.pickSingle(
         mode: FilePickerManager.PickerMode,
         options: JsAny?
     ): JsAny? {
         val mimeType = parseMimeType(options)
-        val fpm = InitializePvz2.filePickerManager ?: return Undefined
+        val fpm = InitializePvz2.filePickerManager ?: return null
         val docs = fpm.pick(mode, mimeType).await()
         val doc = docs.firstOrNull()
-        return if (doc != null) buildPickedFile(doc) else Undefined
+        return if (doc != null) buildPickedFile(doc) else null
     }
 
     /**
@@ -158,7 +157,7 @@ object JsPicker {
                         JsFileResolver.readFromDocumentFile(docFile, context).js
                     } catch (e: Exception) {
                         JsConsole.error("picker.readBytes 失败:", e)
-                        Undefined
+                        null
                     }
                 }
 
@@ -168,7 +167,7 @@ object JsPicker {
                         String(bytes, Charsets.UTF_8).js
                     } catch (e: Exception) {
                         JsConsole.error("picker.readText 失败:", e)
-                        Undefined
+                        null
                     }
                 }
 
@@ -180,7 +179,7 @@ object JsPicker {
                         bytes.map { (it as? Number)?.toByte() ?: 0 }.toByteArray(),
                         context
                     )
-                    Undefined
+                    null
                 }
 
                 listOf("writeText".js, "写文本".js).func("text") { args ->
@@ -190,7 +189,7 @@ object JsPicker {
                         text.toByteArray(Charsets.UTF_8),
                         context
                     )
-                    Undefined
+                    null
                 }
 
                 listOf("appendText".js, "追加文本".js).func("text") { args ->
@@ -202,7 +201,7 @@ object JsPicker {
                     }
                     val merged = existing + text.toByteArray(Charsets.UTF_8)
                     JsFileResolver.writeToDocumentFile(docFile, merged, context)
-                    Undefined
+                    null
                 }
             }
 
@@ -222,7 +221,7 @@ object JsPicker {
                     outputHandle.cancel()
                     throw e
                 }
-                Undefined
+                null
             }
         }
     }

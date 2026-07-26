@@ -7,7 +7,6 @@ import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.JsPropertyAccessor
 import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.ObjectScope
-import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.DynamicSection
 import io.github.dreammooncai.pvz2tool.InitializePvz2
@@ -73,7 +72,7 @@ class JsToolContext(
             val itemId = toString(args[0])
             val value = args[1]
             setItemValue(itemId, value)
-            Undefined
+            null
         }
 
         // 调用另一个栏目项的 JS 效果（类似于点击按钮）
@@ -85,7 +84,7 @@ class JsToolContext(
         // 刷新界面
         listOf("refresh".js, "刷新".js).func {
             InitializePvz2.mPvz2MainScreenReloadKey++
-            Undefined
+            null
         }
     }
     
@@ -252,10 +251,10 @@ class JsToolContext(
             SectionType.CHECKBOX -> listOf("checked".js, "选中".js,"勾选".js) eq JsPropertyAccessor.BackedField(
                 getter = Callable { state.checkedItemIds.contains(item.id).js },
                 setter = Callable { args ->
-                    val jsValue = args.getOrNull(0).orNull ?: return@Callable Undefined
+                    val jsValue = args.getOrNull(0).orNull ?: return@Callable null
                     val newChecked = jsValue.toKotlin(this) as Boolean
                     onStateChange?.invoke(section, item, newChecked)
-                    Undefined
+                    null
                 }
             )
 
@@ -263,10 +262,10 @@ class JsToolContext(
                 listOf("selected".js,"checked".js, "选中".js) eq JsPropertyAccessor.BackedField(
                     getter = Callable { (state.selectedPresetItemIds[item.groupId] == item.id).js },
                     setter = Callable { args ->
-                        val jsValue = args.getOrNull(0).orNull ?: return@Callable Undefined
+                        val jsValue = args.getOrNull(0).orNull ?: return@Callable null
                         val newValue = toNumber(jsValue).toFloat()
                         onStateChange?.invoke(section, item, newValue)
-                        Undefined
+                    null
                     }
                 )
             }
@@ -275,10 +274,10 @@ class JsToolContext(
                 listOf("value".js, "值".js) eq JsPropertyAccessor.BackedField(
                     getter = Callable { (state.sliderValues[item.id] ?: (item.defaultValue ?: item.minValue)).js },
                     setter = Callable { args ->
-                        val jsValue = args.getOrNull(0).orNull ?: return@Callable Undefined
+                        val jsValue = args.getOrNull(0).orNull ?: return@Callable null
                         val newValue = toNumber(jsValue).toFloat()
                         onStateChange?.invoke(section, item, newValue)
-                        Undefined
+                    null
                     }
                 )
                 listOf("minValue".js, "最小值".js) eq item.minValue.js
@@ -291,10 +290,10 @@ class JsToolContext(
                 listOf("value".js, "值".js) eq JsPropertyAccessor.BackedField(
                     getter = Callable { (state.inputValues[item.id] ?: item.inputDefault ?: "").js },
                     setter = Callable { args ->
-                        val jsValue = args.getOrNull(0).orNull ?: return@Callable Undefined
+                        val jsValue = args.getOrNull(0).orNull ?: return@Callable null
                         val newValue = toString(jsValue)
                         onStateChange?.invoke(section, item, newValue)
-                        Undefined
+                    null
                     }
                 )
                 listOf("inputDefault".js, "默认输入".js) eq (item.inputDefault ?: "").js
@@ -305,10 +304,10 @@ class JsToolContext(
                 listOf("value".js, "值".js) eq JsPropertyAccessor.BackedField(
                     getter = Callable { (state.infoValues[item.id] ?: item.infoValue ?: "-").js },
                     setter = Callable { args ->
-                        val jsValue = args.getOrNull(0).orNull ?: return@Callable Undefined
+                        val jsValue = args.getOrNull(0).orNull ?: return@Callable null
                         val newValue = toString(jsValue)
                         onStateChange?.invoke(section, item, newValue)
-                        Undefined
+                        null
                     }
                 )
             }
@@ -317,10 +316,10 @@ class JsToolContext(
                 listOf("value".js, "值".js) eq JsPropertyAccessor.BackedField(
                     getter = Callable { (state.descriptionValues[item.id] ?: item.desc.orEmpty().ifEmpty { item.name } ?: "-").js },
                     setter = Callable { args ->
-                        val jsValue = args.getOrNull(0).orNull ?: return@Callable Undefined
+                        val jsValue = args.getOrNull(0).orNull ?: return@Callable null
                         val newValue = toString(jsValue)
                         onStateChange?.invoke(section, item, newValue)
-                        Undefined
+                    null
                     }
                 )
             }

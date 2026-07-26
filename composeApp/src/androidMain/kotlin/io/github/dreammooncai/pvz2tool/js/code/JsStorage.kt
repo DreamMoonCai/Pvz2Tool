@@ -6,7 +6,6 @@ import com.russhwolf.settings.contains
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.Object
-import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
@@ -124,27 +123,27 @@ private fun JsStorage.buildStorageContext(): JsObject {
             val key = toString(args[0])
             val value = args.getOrNull(1).orNull
             set(key, value)
-            Undefined
+            null
         }
 
         // delete(key) - 删除值
         listOf("delete".js, "删除".js).func("key") { args ->
             val key = toString(args[0])
             delete(key)
-            Undefined
+            null
         }
 
         // has(key) - 检查 key 是否存在
         listOf("has".js, "有".js).func("key") { args ->
             val key = toString(args[0])
             has(key).js
-            Undefined
+            null
         }
 
         // clear() - 清空所有数据
         listOf("clear".js, "清空".js).func { _ ->
             clear()
-            Undefined
+            null
         }
 
         // keys() - 获取所有 key

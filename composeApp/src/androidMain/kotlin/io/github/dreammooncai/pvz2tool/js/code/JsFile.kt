@@ -4,7 +4,6 @@ import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.JsProperty
 import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.ObjectScope
-import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.js.JsConsole
@@ -75,7 +74,7 @@ class JsFile(
                 JsConsole.error("file.writeBytes 失败:",e)
                 throw e
             }
-            Undefined
+            null
         }
 
         // file.writeText(placeholderPath, text) - 简写方式
@@ -91,7 +90,7 @@ class JsFile(
                 JsConsole.error("file.writeText 失败:",e)
                 throw e
             }
-            Undefined
+            null
         }
 
         // file.copy(fromPath, toPath) - 复制文件（使用 extract 解压管线）
@@ -124,7 +123,7 @@ class JsFile(
                     targetDir.resolve(fileName).renameTo(targetFile)
                 }
             }
-            Undefined
+            null
         }
 
         // file.delete(path) - 删除文件
@@ -234,7 +233,7 @@ class JsFile(
             val outputHandle = access.resolveOutputOrThrow(placeholderPath, ctx)
             outputHandle.targetFile.appendText(text)
             outputHandle.commit()
-            Undefined
+            null
         }
     }
 
@@ -375,7 +374,7 @@ class JsFile(
                 JsConsole.error("file.writeBytes 失败:", e)
                 throw e
             }
-            Undefined
+            null
         }
 
         listOf("writeText".js, "写文本".js).func("text") { args ->
@@ -388,7 +387,7 @@ class JsFile(
                 JsConsole.error("file.writeText 失败:", e)
                 throw e
             }
-            Undefined
+            null
         }
 
         // fileObj.copy(toPath) - 复制当前文件（使用 extract 解压管线）
@@ -419,7 +418,7 @@ class JsFile(
                     targetDir.resolve(fileName).renameTo(targetFile)
                 }
             }
-            Undefined
+            null
         }
 
         // fileObj.appendText(text) - 追加文本
@@ -428,7 +427,7 @@ class JsFile(
             val outputHandle = access.resolveOutputOrThrow(resolvedPath, context)
             outputHandle.targetFile.appendText(text)
             outputHandle.commit()
-            Undefined
+            null
         }
     }
 

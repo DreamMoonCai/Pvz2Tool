@@ -28,6 +28,13 @@ object JsConsole: Console {
         JsLogger.appendLog(JsLogLevel.ERROR, "✖ $msg")
     }
 
+    fun warn(message: Any?,err: Throwable) {
+        if (err is SyntaxError)
+            warn("$message $err${if (err.cause != null) "\n${err.cause}" else ""} \n${err.stackTraceToString()}")
+        else
+            warn("$message $err${if (err.cause != null) "\n${err.cause}" else ""}")
+    }
+
     fun error(message: Any?,err: Throwable) {
         if (err is SyntaxError)
             error("$message $err${if (err.cause != null) "\n${err.cause}" else ""} \n${err.stackTraceToString()}")

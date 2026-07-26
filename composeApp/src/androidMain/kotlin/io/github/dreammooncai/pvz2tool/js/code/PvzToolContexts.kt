@@ -119,7 +119,7 @@ class PvzToolContexts(
             RTON.encryptionKey.js
         },Callable { args ->
             RTON.encryptionKey = toString(args[0])
-            Undefined
+            null
         })
 
         listOf("decode".js, "解码".js).func(
@@ -135,7 +135,7 @@ class PvzToolContexts(
                 RTON.decodeAuto(inputFile.file.absolutePath, outputHandle.targetFile.absolutePath)
                 outputHandle.commit()
             }
-            Undefined
+            null
         }
 
         listOf("encode".js, "编码".js).func(
@@ -151,7 +151,7 @@ class PvzToolContexts(
                 RTON.encodeAuto(inputFile.file.absolutePath, outputHandle.targetFile.absolutePath)
                 outputHandle.commit()
             }
-            Undefined
+            null
         }
 
         listOf("load".js, "加载".js).func(FunctionParam("inputPath"),FunctionParam("outputPath")) { args ->
@@ -234,7 +234,7 @@ class PvzToolContexts(
                 }
                 outputHandle.commit()
             }
-            Undefined
+            null
         }
 
         listOf("pack".js, "打包".js).func(
@@ -259,7 +259,7 @@ class PvzToolContexts(
                 }
                 outputHandle.commit()
             }
-            Undefined
+            null
         }
     }
 
@@ -270,25 +270,25 @@ class PvzToolContexts(
             Ptx.PtxABGR8888Mode.js
         },Callable { args ->
             Ptx.PtxABGR8888Mode = args[0].toBoolean()
-            Undefined
+            null
         })
         listOf("PtxARGB8888PaddingMode".js, "像素ARGB8888填充模式".js) eq JsPropertyAccessor.BackedField(Callable {
             Ptx.PtxARGB8888PaddingMode.js
         },Callable { args ->
             Ptx.PtxARGB8888PaddingMode = args[0].toBoolean()
-            Undefined
+            null
         })
         listOf("RsbPtxABGR8888Mode".js, "资源像素ABGR8888模式".js) eq JsPropertyAccessor.BackedField(Callable {
             Ptx.RsbPtxABGR8888Mode.js
         },Callable { args ->
             Ptx.RsbPtxABGR8888Mode = args[0].toBoolean()
-            Undefined
+            null
         })
         listOf("RsbPtxARGB8888PaddingMode".js, "资源像素ARGB8888填充模式".js) eq JsPropertyAccessor.BackedField(Callable {
             Ptx.RsbPtxARGB8888PaddingMode.js
         },Callable { args ->
             Ptx.RsbPtxARGB8888PaddingMode = args[0].toBoolean()
-            Undefined
+            null
         })
 
         // ptx.format.ARGB8888 等
@@ -311,7 +311,7 @@ class PvzToolContexts(
                 Ptx.decode(inputFile.file, outputHandle.targetFile, true)
                 outputHandle.commit()
             }
-            Undefined
+            null
         }
 
         listOf("encode".js, "编码".js).func(
@@ -329,7 +329,7 @@ class PvzToolContexts(
                 Ptx.encode(inputFile.file, outputHandle.targetFile, PtxFormat.valueOf(fmtName))
                 outputHandle.commit()
             }
-            Undefined
+            null
         }
     }
 
@@ -347,7 +347,7 @@ class PvzToolContexts(
                 Zlib.unpack(inputFile.file,outputHandle.targetFile)
                 outputHandle.commit()
             }
-            Undefined
+            null
         }
 
         listOf("pack".js, "打包".js).func(
@@ -367,7 +367,7 @@ class PvzToolContexts(
                 Zlib.pack(inFolder.file,outputHandle.targetFile, CompressionLevel.valueOf(levelName),isChineseMode)
                 outputHandle.commit()
             }
-            Undefined
+            null
         }
     }
 

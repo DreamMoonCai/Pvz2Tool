@@ -403,12 +403,16 @@ object JsDevice {
             listOf("internalAvailable".js, "内部存储可用".js).func { runCatching {
                 StatFs(context.filesDir.absolutePath).availableBytes
             }.getOrDefault(-1L).js }
-            listOf("externalTotal".js, "外部存储总量".js).func { runCatching {
-                context.getExternalFilesDir(null)?.absolutePath?.let { StatFs(it).totalBytes }
-            }.getOrNull()?.js ?: Undefined }
-            listOf("externalAvailable".js, "外部存储可用".js).func { runCatching {
-                context.getExternalFilesDir(null)?.absolutePath?.let { StatFs(it).availableBytes }
-            }.getOrNull()?.js ?: Undefined }
+            listOf("externalTotal".js, "外部存储总量".js).func {
+                runCatching {
+                    context.getExternalFilesDir(null)?.absolutePath?.let { StatFs(it).totalBytes }
+                }.getOrNull()?.js
+            }
+            listOf("externalAvailable".js, "外部存储可用".js).func {
+                runCatching {
+                    context.getExternalFilesDir(null)?.absolutePath?.let { StatFs(it).availableBytes }
+                }.getOrNull()?.js
+            }
         }
 
         val battery = Object("battery") {

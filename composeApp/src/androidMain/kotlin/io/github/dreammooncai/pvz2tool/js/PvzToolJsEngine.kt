@@ -7,7 +7,6 @@ import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.VariableType
 import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JsAny
-import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.DynamicSection
 import io.github.dreammooncai.pvz2tool.SectionItem
@@ -145,7 +144,7 @@ object PvzToolJsEngine {
                 }
                 throw err.cause ?: err
             }
-            Undefined
+            null
         }
         val resultStr = result?.toString() ?: ""
         if (resultStr.isNotBlank() && resultStr != "null" && resultStr != "undefined") {

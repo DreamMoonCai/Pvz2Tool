@@ -5,7 +5,6 @@ import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsObject
 import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.ObjectScope
-import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.js.JsSmfDataManager
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
@@ -152,7 +151,7 @@ class JsSmfDataBuilder(
                 modifiedFile.parentFile?.mkdirs()
                 val bytes = args.getOrNull(0).orNull?.toKotlin(this@func) as? List<*> ?: throw IllegalArgumentException("需要传入字节数组")
                 modifiedFile.writeBytes(bytes.map { (it as? Number)?.toByte() ?: 0 }.toByteArray())
-                Undefined
+                null
             }
         }
     }
@@ -214,7 +213,7 @@ class JsSmfDataBuilder(
                 modifiedFile.parentFile?.mkdirs()
                 val bytes = args.getOrNull(0).orNull?.toKotlin(this@func) as? List<*> ?: throw IllegalArgumentException("需要传入字节数组")
                 modifiedFile.writeBytes(bytes.map { (it as? Number)?.toByte() ?: 0 }.toByteArray())
-                Undefined
+                null
             }
 
             // 读取文本（UTF-8）
@@ -230,7 +229,7 @@ class JsSmfDataBuilder(
                 modifiedFile.parentFile?.mkdirs()
                 val text = args.getOrNull(0).orNull?.let { toString(it) } ?: throw IllegalArgumentException("需要传入字节数组")
                 modifiedFile.writeText(text)
-                Undefined
+                null
             }
         }
     }

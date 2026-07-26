@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import io.github.alexzhirkevich.keight.js.FunctionParam
 import io.github.alexzhirkevich.keight.js.Object
-import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.js.func
@@ -54,7 +53,7 @@ object JsBrowser {
      *
      * @param url 目标地址；支持完整协议（http/https/ftp/mailto/tel/file 等），
      *            未带协议时自动补全 `https://`
-     * @return `undefined`
+     * @return 无返回值（返回 `null`）
      */
     private fun launchBrowser(url: String) {
         runCatching {
@@ -74,7 +73,7 @@ object JsBrowser {
             if (url.isNotBlank()) {
                 launchBrowser(url)
             }
-            Undefined
+            null
         }
     }
 }

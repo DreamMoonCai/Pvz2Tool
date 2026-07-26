@@ -260,6 +260,7 @@
 | `picker` | 选择器 | 系统文件/目录选择器（SAF），返回文件对象 | 全局 |
 | `clipboard` | 剪切板 | 系统剪切板读写（复制文本 / 读取文本 / 清空） | 全局 |
 | `browser` | 浏览器 | 调用系统浏览器打开链接 | 全局 |
+| `thread` | 协程 | 异步/协程执行（run/all/launch/sleep/race/timeout/retry/map/interval/setTimeout，返回 Promise，支持并发与后台任务）；并支持协程上下文（context/withContext/local）定义作用域、调度器与局部状态 | 全局 |
 | `device` | 设备 | 当前安卓设备信息（系统 / 屏幕 / 内存 / 存储 / 电池 / 网络 / 应用 / CPU / Root） | 全局 |
 | `rton` | RTON | RTON 文件编解码 | 局部 |
 | `rsb` | RSB | RSB 资源包解包/打包 | 局部 |
@@ -3132,6 +3133,281 @@ if (resp && resp.url) browser.open(resp.url);
 
 ---
 
+## 15. thread - 异步 / 协程
+
+面向 JS 脚本的异步与协程原语。基于 keight 引擎能力（`ScriptRuntime` 本身即 `CoroutineScope`，且引擎可将 Kotlin 协程桥接为 JS `Promise`），提供「后台执行、并发、即发即忘、非阻塞等待」四类能力。所有 JS 回调均在引擎线程上执行，线程安全。
+
+> **关于并行**：JS 运行时（QuickJS）本身是单线程的，纯 JS CPU 密集循环无法真正并行；但异步原语让 `await` 切出点、网络 / 文件等挂起调用、以及多个任务之间的挂起点能够交错执行，从而把「重任务」放到后台协程、避免阻塞当前脚本的后续流程。
+
+### 15.1 thread.run / thread.运行 / thread.执行
+
+在后台协程中执行 `task`，返回一个 **Promise**，resolve 为 `task` 的返回值（即「异步执行结果」）。
+
+**参数**：
+- `task` (function) — 要执行的函数（必填；非函数则无操作，返回 `undefined`）
+- `arg` (any, 可选) — 传给 `task` 的唯一参数
+
+**返回**：`Promise` — resolve 为 `task` 的返回值
+
+```javascript
+// 异步执行并拿到结果
+let r = await thread.run(() => { return 1 + 2; });
+console.log(r); // 3
+
+// 带参数
+let r2 = await thread.run((x) => x * 2, 21); // 42
+```
+
+### 15.2 thread.all / thread.全部 / thread.并行
+
+并发执行多个 task（类似 `Promise.all`），返回一个 **Promise**，resolve 为结果数组，**顺序与入参一致**；任一 task 抛错则该 Promise 以首个错误 reject。
+
+**参数**：`tasks` (array) — 函数数组（过滤掉非函数项；为空数组时 resolve 为空数组）
+
+**返回**：`Promise<array>`
+
+```javascript
+let [a, b] = await thread.all([
+    () => heavyWorkA(),
+    () => heavyWorkB()
+]);
+console.log(a, b);
+
+// 也可配合现有异步 API 并发请求
+let [r1, r2] = await thread.all([
+    () => http.get("https://a.com"),
+    () => http.get("https://b.com")
+]);
+```
+
+### 15.3 thread.launch / thread.启动 / thread.后台
+
+「即发即忘」地在后台执行 `task`，**返回 Promise**。任务异常会被记录到日志（`JsConsole.error`），不影响后续脚本执行。
+
+**参数**：
+- `task` (function) — 要执行的函数（必填；非函数则无操作，返回 `undefined`）
+- `arg` (any, 可选) — 传给 `task` 的唯一参数
+
+**返回**：`Promise<Undefined>`
+
+```javascript
+thread.launch(() => { console.log("后台任务跑完了"); });
+console.log("这句会立刻执行，不等待上面的后台任务");
+```
+
+### 15.4 thread.sleep / thread.睡眠 / thread.等待
+
+非阻塞等待 `ms` 毫秒，返回一个 **Promise**（底层使用 `delay`，不占用 JS 主线程），可用于轮询 / 节流 / 定时。
+
+**参数**：`ms` (number) — 等待毫秒数（小于 0 按 0 处理）
+
+**返回**：`Promise` — `ms` 毫秒后 resolve
+
+```javascript
+console.log("开始");
+await thread.sleep(1000); // 非阻塞等待 1 秒
+console.log("1 秒后");
+```
+
+### 15.5 thread.race / thread.竞争 / thread.竞速
+
+并发执行多个 task（类似 `Promise.race`），返回一个 **Promise**，resolve 为**最先完成**的那个结果；其余未完成的 task 会在外层 Promise 完成后被取消。
+
+**参数**：`tasks` (array) — 函数数组（过滤掉非函数项；为空数组时返回 `undefined`）
+
+**返回**：`Promise` — resolve 为最先完成的结果
+
+```javascript
+// 谁先返回用谁
+let first = await thread.race([
+    () => fastRequest(),
+    () => slowRequest()
+]);
+console.log("最快的结果:", first);
+```
+
+### 15.6 thread.timeout / thread.超时
+
+限时执行 `task`：在 `ms` 毫秒内完成任务则正常 resolve 其结果；**超时则以异常 reject Promise**（可通过 `try/catch` 捕获，类似超时控制）。
+
+**参数**：
+- `ms` (number) — 超时毫秒数（小于 0 按 0 处理）
+- `task` (function) — 要执行的函数（必填；非函数则无操作，返回 `undefined`）
+- `args` (any, 可选，可变参) — 传给 `task` 的参数（数组形式）
+
+**返回**：`Promise` — 正常完成 resolve 结果；超时 reject
+
+```javascript
+try {
+    let r = await thread.timeout(2000, () => heavyWork());
+    console.log("在 2 秒内完成:", r);
+} catch (e) {
+    console.log("超时或执行失败:", e);
+}
+```
+
+### 15.7 thread.retry / thread.重试
+
+失败自动重试执行 `task`，最多 `count` 次；任意一次成功即 resolve 其结果并停止重试；**全部失败则 reject Promise**（异常为最后一次的错误）。
+
+**参数**：
+- `count` (number) — 最大尝试次数（小于 1 按 1 处理）
+- `task` (function) — 要执行的函数（必填；非函数则无操作，返回 `undefined`）
+- `args` (any, 可选，可变参) — 传给 `task` 的参数（数组形式）
+
+**返回**：`Promise` — 成功 resolve 结果；全部失败 reject
+
+```javascript
+// 最多重试 3 次（含首次），适合网络抖动等偶发失败场景
+let data = await thread.retry(3, () => http.get("https://api.example.com/data"));
+```
+
+### 15.8 thread.map / thread.映射 / thread.并行映射
+
+将 `fn` **并发**作用于数组每个元素，返回一个 **Promise**，resolve 为结果数组，**顺序与入参一致**。可选 `concurrency` 限制最大并发数（缺省为全部并发，适合大数组限流）。
+
+**参数**：
+- `items` (array) — 待处理元素数组（必填；非数组返回 `undefined`）
+- `fn` (function) — 处理函数，签名为 `fn(item, index)`（必填；非函数返回 `undefined`）
+- `concurrency` (number, 可选) — 最大并发数（缺省为 `items` 长度，即全并发）
+
+**返回**：`Promise<array>`
+
+```javascript
+// 并发把每个数乘 10
+let results = await thread.map([1, 2, 3], (x, i) => x * 10);
+console.log(results); // [10, 20, 30]
+
+// 限流为最多 2 个并发（适合大量网络请求）
+let pages = await thread.map(urls, (url) => http.get(url), 2);
+```
+
+### 15.9 thread.interval / thread.定时 / thread.定时器 / thread.setInterval
+
+每 `ms` 毫秒在后台**重复**执行 `task`，返回一个**定时器句柄对象**（不阻塞 `await`）。句柄方法：
+- `stop()` / `停止()` / `取消()` —— 停止定时器
+- `isActive()` / `是否在运行()` —— 是否仍在运行（boolean）
+
+**参数**：
+- `ms` (number) — 间隔毫秒数（小于 0 按 0 处理）
+- `task` (function) — 要执行的函数（必填；非函数则无操作，返回 `undefined`）
+- `args` (any, 可选，可变参) — 传给 `task` 的参数（数组形式）
+
+**返回**：定时器句柄对象（含 `stop` / `isActive` 等方法）
+
+```javascript
+let timer = thread.interval(1000, () => console.log("每秒一次"));
+console.log(timer.isActive()); // true
+thread.setTimeout(5000, () => {
+    timer.stop(); // 5 秒后停止
+    console.log("已停止:", !timer.isActive());
+});
+```
+
+### 15.10 thread.setTimeout / thread.延时执行 / thread.延迟执行
+
+延时 `ms` 毫秒后在后台**单次**执行 `task`，返回一个**可取消的句柄对象**（不阻塞 `await`）。句柄方法：
+- `cancel()` / `取消()` / `停止()` —— 取消尚未执行的任务
+- `isActive()` / `是否在运行()` —— 是否仍在等待执行（boolean）
+
+**参数**：
+- `ms` (number) — 延时毫秒数（小于 0 按 0 处理）
+- `task` (function) — 要执行的函数（必填；非函数则无操作，返回 `undefined`）
+- `args` (any, 可选，可变参) — 传给 `task` 的参数（数组形式）
+
+**返回**：定时器句柄对象（含 `cancel` / `isActive` 等方法）
+
+```javascript
+let job = thread.setTimeout(3000, () => console.log("3 秒后执行一次"));
+// 若想取消：job.cancel();
+```
+
+---
+
+## 16. thread 协程上下文
+
+协程上下文用于「定义一段异步任务运行的环境」——包括**作用域（可整体取消）、调度器（运行在哪个线程池）、局部状态（上下文内共享变量）**三个维度。引擎本身基于 `ScriptRuntime`（即 `CoroutineScope`），所有 JS 回调仍在引擎线程上执行以保证单线程安全；上下文的 value 在于把一组任务归并到同一个可管理的生命周期、并按需切到 IO/Main 等调度器做挂起调用。
+
+### 16.1 thread.context / thread.协程上下文 / thread.创建上下文 / thread.createContext
+
+创建一个**协程上下文作用域对象**，返回一个上下文句柄。该句柄自带一套与 `thread` 平行的异步方法，并额外提供 `local` / `cancel` / `isActive` / `name`。
+
+**参数**：`options` (object, 可选) —— 上下文配置：
+- `name` / `名称` (string) —— 上下文名称（用于日志标识，缺省 `"context"`）
+- `dispatcher` / `调度器` (string) —— 该上下文任务的默认调度器，可选 `main`/`ui`、`io`、`default`/`computation`/`cpu`、`unconfined`（缺省为引擎线程，即与全局 `thread` 一致）
+- `onError` / `错误处理` (function) —— **暂未实现**，上下文任务异常统一由 `JsConsole.error` 记录（见末尾说明）
+
+**返回**：上下文对象（含下列方法）
+
+**上下文对象方法**：
+- `run(task, args?)` / `运行` / `执行` —— 在上下文中异步执行，返回 Promise；**任务首个参数为上下文对象自身**，便于在任务内读取 `local`
+- `launch(task, args?)` / `启动` / `后台` —— 在上下文中即发即忘
+- `all([t1, t2, ...])` / `全部` / `并行` —— 在上下文中并发执行多个 task
+- `withContext(dispatcher, task, args?)` / `切换上下文` / `切换调度器` —— 在本次调用内临时切换调度器
+- `local(key, value?)` / `变量` —— 上下文局部变量读写（**仅本上下文可见**，与全局 `thread.local` 互不影响）
+- `cancel()` / `取消` / `停止` —— 整体取消该上下文下的所有任务
+- `isActive()` / `是否在运行` —— 上下文作用域是否仍在运行（boolean）
+- `name` / `名称` —— 上下文名称
+
+```javascript
+// 创建一个运行在 IO 调度器的 worker 上下文
+let ctx = thread.context({ name: "worker", dispatcher: "io" });
+
+// 上下文局部变量（仅本上下文可见）
+ctx.local("token", "abc123");
+
+// 任务首个参数即上下文自身，可读取其 local
+let r = await ctx.run((c) => { return c.local("token"); });
+console.log(r); // "abc123"
+
+// 并发跑多个任务，结果保序
+let [a, b] = await ctx.all([ () => heavyA(), () => heavyB() ]);
+
+// 即发即忘 + 随时整体取消
+ctx.launch(() => { console.log("后台"); });
+console.log(ctx.isActive()); // true
+ctx.cancel();                // 取消该上下文下的所有任务
+console.log(ctx.isActive()); // false
+```
+
+### 16.2 thread.withContext / thread.切换上下文 / thread.切换调度器
+
+在**指定调度器**上运行 `task`，返回一个 **Promise**，resolve 为 `task` 的返回值。适用于把阻塞型 / 挂起型 Kotlin 操作（如文件 IO、网络）放到 `io` 线程、或把需要主线程的调用放到 `main`。
+
+> **线程安全**：JS 运行时（QuickJS）是单线程的，所有 JS 函数调用都会被**调度回引擎线程**执行；`withContext` 仅影响任务内 Kotlin 挂起调用的调度器归属，不会把 JS 调用放到其他线程，因此始终是安全的。
+
+**参数**：
+- `dispatcher` (string) —— 调度器名称：`main`/`ui`、`io`、`default`/`computation`/`cpu`、`unconfined`
+- `task` (function) —— 要执行的函数（必填；非函数返回 `undefined`）
+- `args` (any, 可选，可变参) —— 传给 `task` 的参数（数组形式）
+
+**返回**：`Promise` —— resolve 为 `task` 的返回值
+
+```javascript
+// 在 IO 线程跑重 IO 任务（JS 调用仍回引擎线程，安全）
+let data = await thread.withContext("io", () => readHugeFile());
+```
+
+### 16.3 thread.local / thread.变量 / thread.上下文变量
+
+引擎级**共享变量**读写（协程上下文的「状态」维度）。写入后跨脚本调用持久存在，适合在多个脚本 / 多次执行之间传递状态。
+
+**参数**：
+- `key` (string) —— 变量名（必填）
+- `value` (any, 可选) —— 若提供则执行**赋值**并返回该值；若不提供则执行**取值**，不存在时返回 `undefined`
+
+**返回**：取值时返回变量值（或 `undefined`）；赋值时返回被赋的值
+
+```javascript
+// 写入 / 读取 引擎级共享变量
+thread.local("lastUser", "dreammoon");
+console.log(thread.local("lastUser")); // "dreammoon"
+
+// 与上下文局部变量区分：thread.local 是全局共享，ctx.local 仅本上下文可见
+```
+
+---
+
 *文档版本: 2.1*
 *最后更新: 2026-07-17*
 *新增：ui 系列弹窗通用可定制化——所有弹窗（alert/confirm/prompt/select/multiSelect/actionSheet/slider/loading）新增按钮文字（confirmText/cancelText）、按钮背景色（confirmColor/cancelColor，支持命名色与 #RRGGBB/#AARRGGBB 十六进制）、可关闭性（dismissible/可关闭，alert/confirm/prompt/slider/loading 用此名；select/multiSelect/actionSheet 沿用 cancelable），以及事件回调（onConfirm/onCancel/onSelect/onChange/onDismiss，均为 function(value) 形式、异步触发且不阻塞 await）。slider 另增 decimals（小数位）/showValue（是否显示大字体数值）与实时 onChange 回调；loading 另增 update()/更新() 实时刷新文字。详见各弹窗小节与开头「通用选项与回调」*
@@ -3149,6 +3425,8 @@ if (resp && resp.url) browser.open(resp.url);
 *新增：picker 文件选择器（directory/file/files，返回文件对象，支持多选与 copy 到 SAF 树内新建文件）*
 *新增：clipboard 剪切板对象（copy/复制、read/读取/粘贴、clear/清空，基于系统 ClipboardManager）*
 *新增：browser 浏览器对象（open/打开/打开链接/openLink，调用系统浏览器打开链接；未带协议自动补全 https://，基于 Intent.ACTION_VIEW）*
+*新增：thread 协程/异步对象（run/运行/执行 返回 Promise 的异步执行结果；all/全部/并行 并发执行多任务返回结果数组，类似 Promise.all；launch/启动/后台 即发即忘后台执行、异常记日志；sleep/睡眠/等待 非阻塞 delay 返回 Promise）。基于 ScriptRuntime 即 CoroutineScope 与 keight 的协程↔Promise 桥接（JSFunction(isAsync=true) 返回 Promise），回调均在引擎线程执行保证线程安全*
+*扩展：thread 异步原语新增 race/竞争/竞速（并发竞速取最快结果，类似 Promise.race）、timeout/超时（限时执行，超时 reject）、retry/重试（失败自动重试最多 count 次）、map/映射/并行映射（并发映射数组，可选 concurrency 限流）、interval/定时/定时器/setInterval（重复定时，返回可取消句柄）、setTimeout/延时执行/延迟执行（延时单次，返回可取消句柄）；均沿用 run/all 的 async{}.js Promise 风格与 args 可变参约定*
 *修正：pvz.<type>.all 返回 Array（数据对象数组），单个条目仍可由父对象按 code/name 访问*
 *修正：file.copy/file.复制 当 toPath 带扩展名时按目标文件处理并重命名，否则视为目标目录*
 *修正：file.list 路径无效时返回空数组 []（非 null）*
@@ -3158,3 +3436,4 @@ if (resp && resp.url) browser.open(resp.url);
 *补充：section 对象新增 descriptionValues/描述值；RADIO 项同时支持 checked/选中 别名*
 *补充：rton.load 支持直接加载 .json 文件；path.toInternalPath 相对路径自动按 $WORK_DIR 处理*
 *新增：picker 文件选择器对象（directory/file/files 及中文别名），支持选择目录/单文件/多文件并返回文件对象（基于 SAF DocumentFile）*
+*新增：thread 协程上下文（context/协程上下文/创建上下文/createContext 创建可定义 name/dispatcher、可整体 cancel、可共享 local 局部变量的作用域对象；上下文自带 run/launch/all/withContext/local/cancel/isActive/name；任务首个参数为上下文自身便于读取 local）；thread.withContext/切换上下文/切换调度器（在 main/io/default/computation/unconfined 指定调度器上运行 task，JS 调用仍调度回引擎线程保证单线程安全）；thread.local/变量/上下文变量（引擎级全局共享变量，跨脚本持久）。参见新增第 16 节*
