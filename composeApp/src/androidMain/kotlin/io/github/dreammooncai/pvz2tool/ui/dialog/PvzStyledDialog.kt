@@ -62,6 +62,7 @@ fun PvzStyledDialog(
     modifier: Modifier = Modifier,
     verticalArrangement: Arrangement.Vertical = Arrangement.Top,
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    forceMaxForm: Boolean = false,
     bottomContent: @Composable (ColumnScope.() -> Unit) = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -111,6 +112,7 @@ fun PvzStyledDialog(
                     PerfectAdaptiveLayout(
                         height = 0.dp,
                         heightRange = 0.dp .. 250.dp,
+                        forceMaxForm = forceMaxForm,
                         // 探测层：无滚动、无fillMaxHeight，测量真实内容高度
                         probeContent = {
                             Column(
@@ -121,17 +123,32 @@ fun PvzStyledDialog(
                                 content()
                             }
                         },
-                        // 显示层：带固定高度 + verticalScroll 真正滚动
+                        // 显示层
                         displayContent = {
-                            val scrollState = rememberScrollState()
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .verticalScroll(scrollState),
-                                verticalArrangement = verticalArrangement,
-                                horizontalAlignment = horizontalAlignment
-                            ) {
-                                content()
+                            if (forceMaxForm) {
+                                // 最高形态：内容区固定上限高度，滚动交由内部 Lazy 容器自身处理，
+                                // 外层不再包 verticalScroll（否则 verticalScroll 会把无限高度约束传给
+                                // Lazy 容器，导致其退化成全量测量，失去懒加载意义）。
+                                // 仍 fillMaxHeight 以便内部 Lazy 容器拿到固定视口高度（250dp），正常懒加载+滚动。
+                                Column(
+                                    modifier = Modifier.fillMaxHeight(),
+                                    verticalArrangement = verticalArrangement,
+                                    horizontalAlignment = horizontalAlignment
+                                ) {
+                                    content()
+                                }
+                            } else {
+                                // 自适应模式：固定高度 + verticalScroll 真正滚动
+                                val scrollState = rememberScrollState()
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .verticalScroll(scrollState),
+                                    verticalArrangement = verticalArrangement,
+                                    horizontalAlignment = horizontalAlignment
+                                ) {
+                                    content()
+                                }
                             }
                         },
                         // 底部固定栏

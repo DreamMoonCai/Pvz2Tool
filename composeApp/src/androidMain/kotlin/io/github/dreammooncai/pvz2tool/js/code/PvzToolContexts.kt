@@ -27,11 +27,8 @@ import io.github.dreammooncai.pvz2tool.pop.core.rsb.RsbPackConfig
 import io.github.dreammooncai.pvz2tool.pop.core.rsb.RsbUnpackConfig
 import io.github.dreammooncai.pvz2tool.pop.core.rsb.model.compress.CompressionLevel
 import io.github.dreammooncai.pvz2tool.pop.core.rsb.util.Zlib
-import io.github.dreammooncai.pvz2tool.pop.core.rsb.util.decompressZLib
-import io.github.dreammooncai.pvz2tool.pop.core.rsb.util.isZlib
 import io.github.dreammooncai.pvz2tool.pop.image.ptx.Ptx
 import io.github.dreammooncai.pvz2tool.pop.image.ptx.PtxFormat
-import io.github.dreammooncai.pvz2tool.pop.plugin.io.CoroutineBinaryStream
 import io.github.dreammooncai.pvz2tool.pop.rton.RTON
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import java.io.File
@@ -110,7 +107,7 @@ class PvzToolContexts(
         // 将 $SMF/xxx 等占位符路径转换为 pvz2tool/xxx 格式的 internalPath。
         listOf("toInternalPath".js, "转换为内部路径".js).func("placeholderPath") { args ->
             val p = toString(args[0])
-            (access.resolver.resolveToInternalPath(p, InitializePvz2.context) ?: "").js
+            (access.resolver.resolveToInternalPath(p) ?: "").js
         }
     }
 

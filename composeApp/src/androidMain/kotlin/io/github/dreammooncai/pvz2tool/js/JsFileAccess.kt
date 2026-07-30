@@ -7,6 +7,7 @@ import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.SectionItem
 import io.github.dreammooncai.pvz2tool.VersionDef
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver.ActiveJsContext
+import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
@@ -109,6 +110,7 @@ open class JsFileAccess(
                 for (child in children) {
                     val childAssetPath = "$assetDirPath/$child"
                     val target = File(cacheDirFile, child)
+                    AssetExtractorHolder.listResources(childAssetPath)
                     // 子目录：创建空目录占位
                     if (context.assets.list(childAssetPath) != null) {
                         target.mkdirs()
@@ -335,8 +337,7 @@ open class JsFileAccess(
      * 从 asset 列出目录子项名，遵循与 [resolveFromAsset] 相同的降级规则。
      */
     private fun listAssetDirectory(placeholderPath: String, context: Context): List<String>? {
-        val activeCtx = resolver.jsContext ?: return null
-        val version = activeCtx.version
+        val activeCtx = resolver.jsContext
 
         val basePlaceholder = when {
             placeholderPath.startsWith(JsFileResolver.JS_DIR) -> JsFileResolver.JS_DIR
@@ -347,7 +348,9 @@ open class JsFileAccess(
         }
 
         val (primaryPath, fallbackPath, fallbackRootPath) = when {
+            activeCtx == null -> Triple("", null, null)
             placeholderPath.startsWith(JsFileResolver.JS_DIR) -> {
+                val version = activeCtx.version
                 val section = activeCtx.section
                 val item = activeCtx.item
                 if (section != null && item != null) {
@@ -367,6 +370,7 @@ open class JsFileAccess(
                 }
             }
             placeholderPath.startsWith(JsFileResolver.ITEM) -> {
+                val version = activeCtx.version
                 val section = activeCtx.section
                 val item = activeCtx.item
                 if (section != null && item != null) {
@@ -380,6 +384,7 @@ open class JsFileAccess(
                 }
             }
             placeholderPath.startsWith(JsFileResolver.SMF) -> {
+                val version = activeCtx.version
                 Triple(version.resolveAssetPath(), version.baseAssetPath, null)
             }
             placeholderPath.startsWith(JsFileResolver.WORK_DIR) -> {
@@ -434,8 +439,7 @@ open class JsFileAccess(
      * 2. 若不存在，降级到 $SMF（版本目录）
      */
     private fun resolveFromAsset(placeholderPath: String, context: Context): InputFile? {
-        val activeCtx = resolver.jsContext ?: return null
-        val version = activeCtx.version
+        val activeCtx = resolver.jsContext
 
         val basePlaceholder = when {
             placeholderPath.startsWith(JsFileResolver.JS_DIR) -> JsFileResolver.JS_DIR
@@ -447,8 +451,10 @@ open class JsFileAccess(
 
         // 判断是 $ITEM 还是 $SMF，并获取基础路径
         val (primaryPath, fallbackPath, fallbackRootPath) = when {
+            activeCtx == null -> Triple("",null,null)
             placeholderPath.startsWith(JsFileResolver.JS_DIR) -> {
                 // $ITEM：优先 item assetPath，降级到 version assetPath
+                val version = activeCtx.version
                 val section = activeCtx.section
                 val item = activeCtx.item
                 if (section != null && item != null) {
@@ -462,6 +468,7 @@ open class JsFileAccess(
             }
             placeholderPath.startsWith(JsFileResolver.ITEM) -> {
                 // $ITEM：优先 item assetPath，降级到 version assetPath
+                val version = activeCtx.version
                 val section = activeCtx.section
                 val item = activeCtx.item
                 if (section != null && item != null) {
@@ -473,6 +480,7 @@ open class JsFileAccess(
                 }
             }
             placeholderPath.startsWith(JsFileResolver.SMF) -> {
+                val version = activeCtx.version
                 Triple(version.resolveAssetPath(), version.baseAssetPath,null)
             }
             placeholderPath.startsWith(JsFileResolver.WORK_DIR) -> {

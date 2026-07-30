@@ -1483,6 +1483,9 @@ file.resolve("$WORK_DIR/old.txt").renameTo("$WORK_DIR/new.txt");
   - 对 alert / loading：点外部即关闭（alert 触发 `onConfirm`，loading 触发 `onDismiss`）。
 - 注：`select` / `multiSelect` / `actionSheet` 使用 `cancelable` 控制同一行为（是否显示底部「取消」并允许点外部关闭）。
 
+**性能开关（适用于内容可能很多的弹窗：select / multiSelect / actionSheet）**
+- `forceMaxForm` / `最高形态` (boolean, 默认 `false`): 开启后弹窗**必定以最高形态展示**——内容区直接固定为上限高度（默认 250dp），**跳过 `maxIntrinsicHeight` 探测重测**，在键盘升降 / 窗口 resize 等可用高度连续小幅变化时不触发任何探测计算。适合选项很多、内容必然超出可视区的场景；屏幕不足时仍自动挤压贴合，不会溢出。普通内容少、需要自适应高度的场景保持默认 `false` 即可。
+
 **事件回调**
 所有回调均为 `function(value) { ... }` 形式，在对应交互发生时异步触发；回调返回值被忽略，不会阻塞 `await()`。
 
@@ -3516,13 +3519,17 @@ app.退出();
 
 ### dex.load / dex.加载 / dex.loadDex
 
-从文件系统路径加载 DEX。
+统一加载入口，**路径规则与项目其余文件 API 完全一致**（基于 `JsFileAccess`）：
+
+- **绝对路径**（`/` 开头）→ 直接作为本地文件加载；
+- **相对路径 / `$WORK_DIR` 等占位符** → 走 `JsFileAccess.resolveInput`：**工作目录优先，无则回退 `assets/pvz2tool/`**；
+- **`http(s)://` URL** → 先下载到缓存再加载。
 
 **参数**：
-- `path`（string，必填）：`.dex` / `.apk` / `.jar` 文件的绝对或工作目录相对路径。
+- `path`（string，必填）：`.dex` / `.apk` / `.jar` 文件的绝对路径、工作目录相对路径、`$WORK_DIR` 占位符，或 `http(s)://` URL。
 - `parent`（可选）：父类加载器句柄（即另一个 `dex` 对象），用于让新加载的类能引用父加载器中的类；省略则使用应用自身类加载器。
 
-**返回**：类加载器句柄对象（含 `path`、以及 `findClass(name)` 方法，句柄本身携带原始 `ClassLoader`，无需 id），失败返回 `null`。
+**返回**：类加载器句柄对象（含 `path`、以及 `findClass(name)` 方法，句柄本身携带原始 `ClassLoader`，无需 id），失败（路径不存在 / 解析失败）返回 `null`。
 
 ### dex.loadFromAsset / dex.从资源加载
 
@@ -3596,6 +3603,15 @@ inst.call("doSomething", 1, "x");       // 在实例上调用方法
 - `get(fieldName)` / `读字段`：读字段。
 - `set(fieldName, value)` / `写字段`：写字段。
 - `getId()` / `取ID`、`getClass()` / `取类`、`toString()`。
+- `value()` / `原值()` / `js()`：零参方法，返回被包装对象的 keight 原生 JS 值（String→原生字符串、List→JS 数组、数组→JS 数组、映射→JS 对象……）；需要把实例当原生值使用时调用。
+
+> ⚠️ **返回值类型说明**：`findClass` 返回 Class 句柄，`constructor`/`method`/`field` 返回对应句柄；而 `newInstance`/`call`/`invoke`/`get` 的**返回值**按极简、统一的规则包装：
+> - 返回 `Class` → Class 句柄（可继续 `.method`/`.field`）；
+> - 返回 **`Number` / `Boolean`**（基础类型、装箱数字）→ keight 原生值（`JsNumberWrapper`/`JSBooleanWrapper` 等），**没有** `.call`，但数值比较 `===` **按值可用**（keight 对 `JsNumberWrapper` 做严格值比较），断言直接写 `x === 5`，**无需** `x.toString()`；
+> - **其余一切引用类型**（含 `String`、`List`/`Map`/`Set`、数组、`Regex`、`Throwable`、自定义类、`StringBuffer` 等）→ **一律**包装为 `JsInstanceWrapper`，**持有** `.call`/`.get`/`.set`，可继续反射（例如 `reflect.findClass("java.lang.String").newInstance("Hi").call("length")` 现在合法，`String` 同样可 `.call`）。
+> - 若要把某个实例句柄转成 keight 原生 JS 值（如把 `String` 当原生字符串拼接、把 `List` 当 JS 数组遍历），调用它的 **`value()` / `原值()` / `js()`** 零参方法即可拿到原生值（内部严格对齐 keight 官方 `Mapping.kt`：CharSequence→原生字符串、`List`/`Set`/`Map`/数组→JS 数组/集合/对象、数字/Boolean→原生、`Regex`/`Throwable`→`JsRegexWrapper`/`JSError`，兜底 `toString()`）。
+>
+> 因此：除数字/Boolean/Class 外，所有反射结果都是「可继续 `.call` 的实例句柄」，规则简单且无遗漏类型；需要原生 JS 值时再调 `.value()`。
 
 **示例**：
 ```javascript

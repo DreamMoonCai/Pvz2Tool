@@ -5,6 +5,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.draw.clip
@@ -173,6 +179,7 @@ data class JsSelectState(
     val defaultIndices: List<Int> = emptyList(),
     val showIndex: Boolean = false, // 是否在图标上居中叠加序号（1 开始）
     val showIndexColor: String = "black", // 序号颜色：外层统一控制，"black" | "white"
+    val forceMaxForm: Boolean = false, // 开启后以最高形态展示（内容区固定上限高度，跳过探测重测）
     val onCancel: (suspend (JsAny?) -> Unit)? = null,
     val onSelect: (suspend (JsAny?) -> Unit)? = null, // 单选：选中某项(value)即触发；多选：选中集合(values)变化时触发
     val deferredSingle: CompletableDeferred<String?>? = null,
@@ -194,6 +201,7 @@ data class JsActionSheetState(
     val cancelable: Boolean = true,
     val cancelText: String = "取消",
     val cancelColor: String = "",
+    val forceMaxForm: Boolean = false, // 开启后以最高形态展示（内容区固定上限高度，跳过探测重测）
     val onCancel: (suspend (JsAny?) -> Unit)? = null,
     val onSelect: (suspend (JsAny?) -> Unit)? = null, // 点击某项(value)即触发
     val deferred: CompletableDeferred<String?>? = null
@@ -347,6 +355,7 @@ object JsUiManager {
         cancelText: String = "取消",
         confirmColor: String = "",
         cancelColor: String = "",
+        forceMaxForm: Boolean = false,
         onCancel: (suspend (JsAny?) -> Unit)? = null,
         onSelect: (suspend (JsAny?) -> Unit)? = null
     ): CompletableDeferred<String?> {
@@ -364,6 +373,7 @@ object JsUiManager {
             cancelText = cancelText,
             confirmColor = confirmColor,
             cancelColor = cancelColor,
+            forceMaxForm = forceMaxForm,
             onCancel = onCancel,
             onSelect = onSelect,
             deferredSingle = deferred
@@ -387,6 +397,7 @@ object JsUiManager {
         cancelText: String = "取消",
         confirmColor: String = "",
         cancelColor: String = "",
+        forceMaxForm: Boolean = false,
         onCancel: (suspend (JsAny?) -> Unit)? = null,
         onSelect: (suspend (JsAny?) -> Unit)? = null
     ): CompletableDeferred<List<String>> {
@@ -409,6 +420,7 @@ object JsUiManager {
             cancelText = cancelText,
             confirmColor = confirmColor,
             cancelColor = cancelColor,
+            forceMaxForm = forceMaxForm,
             onCancel = onCancel,
             onSelect = onSelect,
             deferredMulti = deferred
@@ -469,13 +481,14 @@ object JsUiManager {
         cancelable: Boolean = true,
         cancelText: String = "取消",
         cancelColor: String = "",
+        forceMaxForm: Boolean = false,
         onCancel: (suspend (JsAny?) -> Unit)? = null,
         onSelect: (suspend (JsAny?) -> Unit)? = null
     ): CompletableDeferred<String?> {
         val deferred = CompletableDeferred<String?>()
         _actionSheetState.value = JsActionSheetState(
             isVisible = true, title = title, items = items, cancelable = cancelable,
-            cancelText = cancelText, cancelColor = cancelColor,
+            cancelText = cancelText, cancelColor = cancelColor, forceMaxForm = forceMaxForm,
             onCancel = onCancel, onSelect = onSelect, deferred = deferred
         )
         return deferred
@@ -993,6 +1006,7 @@ fun JsItemChoiceDialog() {
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            forceMaxForm = state.forceMaxForm,
             bottomContent = {
                 Spacer(modifier = Modifier.height(16.dp))
                 if (state.mode == "multi") {
@@ -1035,44 +1049,89 @@ fun JsItemChoiceDialog() {
             }) {
             if (isGrid) {
                 val columns = state.columns.coerceIn(2, 6)
-                val indexed = state.items.mapIndexed { i, item -> i to item }
-                val rows = indexed.chunked(columns)
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()
-                ) {
-                    rows.forEach { row ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            row.forEach { (i, item) ->
-                                GridChoiceCell(
-                                    item = item,
-                                    index = i,
-                                    selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
-                                    isMulti = state.mode == "multi",
-                                    showIndex = state.showIndex,
-                                    showIndexColor = state.showIndexColor,
-                                    onSelect = onSelect
-                                )
+                if (state.forceMaxForm) {
+                    // 最高形态：选项可能极多，用 LazyVerticalGrid 懒加载（仅组合可见项）
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(columns),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        itemsIndexed(state.items) { i, item ->
+                            GridChoiceCell(
+                                modifier = Modifier.fillMaxWidth(),
+                                item = item,
+                                index = i,
+                                selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
+                                isMulti = state.mode == "multi",
+                                showIndex = state.showIndex,
+                                showIndexColor = state.showIndexColor,
+                                onSelect = onSelect
+                            )
+                        }
+                    }
+                } else {
+                    val indexed = state.items.mapIndexed { i, item -> i to item }
+                    val rows = indexed.chunked(columns)
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()
+                    ) {
+                        rows.forEach { row ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                row.forEach { (i, item) ->
+                                    GridChoiceCell(
+                                        modifier = Modifier.weight(1f),
+                                        item = item,
+                                        index = i,
+                                        selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
+                                        isMulti = state.mode == "multi",
+                                        showIndex = state.showIndex,
+                                        showIndexColor = state.showIndexColor,
+                                        onSelect = onSelect
+                                    )
+                                }
                             }
                         }
                     }
                 }
             } else {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()
-                ) {
-                    state.items.forEachIndexed { i, item ->
-                        ListChoiceRow(
-                            item = item,
-                            index = i,
-                            hasAnyIcon = hasAnyIcon,
-                            selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
-                            isMulti = state.mode == "multi",
-                            showIndex = state.showIndex,
-                            showIndexColor = state.showIndexColor,
-                            onSelect = onSelect
-                        )
+                if (state.forceMaxForm) {
+                    // 最高形态：选项可能极多，用 LazyColumn 懒加载
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        itemsIndexed(state.items) { i, item ->
+                            ListChoiceRow(
+                                item = item,
+                                index = i,
+                                hasAnyIcon = hasAnyIcon,
+                                selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
+                                isMulti = state.mode == "multi",
+                                showIndex = state.showIndex,
+                                showIndexColor = state.showIndexColor,
+                                onSelect = onSelect
+                            )
+                        }
+                    }
+                } else {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()
+                    ) {
+                        state.items.forEachIndexed { i, item ->
+                            ListChoiceRow(
+                                item = item,
+                                index = i,
+                                hasAnyIcon = hasAnyIcon,
+                                selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
+                                isMulti = state.mode == "multi",
+                                showIndex = state.showIndex,
+                                showIndexColor = state.showIndexColor,
+                                onSelect = onSelect
+                            )
+                        }
                     }
                 }
             }
@@ -1082,15 +1141,15 @@ fun JsItemChoiceDialog() {
 
 /** 网格单元格：图标(或占位矩形)在上，文字在下，整体居中 */
 @Composable
-private fun RowScope.GridChoiceCell(
+private fun GridChoiceCell(
+    modifier: Modifier = Modifier,
     item: JsChoiceItem, index: Int, selected: Boolean, isMulti: Boolean, showIndex: Boolean, showIndexColor: String, onSelect: (Int) -> Unit
 ) {
     val interaction = rememberSoundInteractionSource(
         InitializePvz2.config.ui.sounds.switchClickPress, InitializePvz2.config.ui.sounds.switchClickRelease
     )
     Column(
-        modifier = Modifier
-            .weight(1f)
+        modifier = modifier
             .clickable(interactionSource = interaction, indication = null) {
                 SoundController.playSoundFromAssets(InitializePvz2.config.ui.sounds.switchClick)
                 onSelect(index)
@@ -1292,6 +1351,7 @@ fun JsActionSheetDialog() {
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            forceMaxForm = state.forceMaxForm,
             bottomContent = {
                 Spacer(modifier = Modifier.height(16.dp))
                 if (state.cancelable) {
@@ -1309,34 +1369,69 @@ fun JsActionSheetDialog() {
                 }
             }
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                state.items.forEach { item ->
-                    val value = item.value.ifEmpty { item.name }
-                    if (item.danger) {
-                        PvzRedButton(
-                            text = item.name,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            onClick = {
-                                scope.launch { state.onSelect?.invoke(value.js) }
-                                state.deferred?.complete(value)
-                            }
-                        )
-                    } else {
-                        PvzGreenButton(
-                            text = item.name,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            onClick = {
-                                scope.launch { state.onSelect?.invoke(value.js) }
-                                state.deferred?.complete(value)
-                            }
-                        )
+            if (state.forceMaxForm) {
+                // 最高形态：操作项可能很多，用 LazyColumn 懒加载
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(state.items) { item ->
+                        val value = item.value.ifEmpty { item.name }
+                        if (item.danger) {
+                            PvzRedButton(
+                                text = item.name,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                onClick = {
+                                    scope.launch { state.onSelect?.invoke(value.js) }
+                                    state.deferred?.complete(value)
+                                }
+                            )
+                        } else {
+                            PvzGreenButton(
+                                text = item.name,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                onClick = {
+                                    scope.launch { state.onSelect?.invoke(value.js) }
+                                    state.deferred?.complete(value)
+                                }
+                            )
+                        }
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    state.items.forEach { item ->
+                        val value = item.value.ifEmpty { item.name }
+                        if (item.danger) {
+                            PvzRedButton(
+                                text = item.name,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                onClick = {
+                                    scope.launch { state.onSelect?.invoke(value.js) }
+                                    state.deferred?.complete(value)
+                                }
+                            )
+                        } else {
+                            PvzGreenButton(
+                                text = item.name,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                onClick = {
+                                    scope.launch { state.onSelect?.invoke(value.js) }
+                                    state.deferred?.complete(value)
+                                }
+                            )
+                        }
                     }
                 }
             }

@@ -275,14 +275,13 @@ open class JsFileResolver(
      *
      * @return internalPath（不含 `pvz2tool/` 前缀），若无法转换（如 `$WORK_DIR`）则返回 null。
      */
-    fun resolveToInternalPath(placeholderPath: String, context: Context): String? {
+    fun resolveToInternalPath(placeholderPath: String): String? {
         // 规范化：裸相对路径（不以 / 或 $ 开头）自动补充 $WORK_DIR/ 前缀
         val path = if (placeholderPath.startsWith("/") || placeholderPath.startsWith("$")) {
             placeholderPath
         } else {
             "$WORK_DIR/$placeholderPath"
         }
-        val activeCtx = jsContext ?: return null
 
         val basePlaceholder = when {
             path.startsWith(WORK_DIR) -> WORK_DIR
@@ -302,6 +301,7 @@ open class JsFileResolver(
             return subPath.ifEmpty { "" }
         }
 
+        val activeCtx = jsContext ?: return null
         val version = activeCtx.version
 
         // 计算 primaryPath / fallbackPath / fallbackRootPath（与 resolveSmfDocumentFile 一致）
@@ -639,8 +639,6 @@ open class JsFileResolver(
      * 配置热加载：每次直接读取 InitializePvz2.config。
      */
     private fun resolveSmfDocumentFile(placeholderPath: String, context: Context): DocumentFile? {
-        val activeCtx = jsContext ?: return null
-        val version = activeCtx.version
 
         // $WORK_DIR 直接映射到 SAF 工作目录树（仅查找，不创建）
         if (placeholderPath.startsWith(WORK_DIR)) {
@@ -649,6 +647,9 @@ open class JsFileResolver(
             return if (subPath.isEmpty()) workDir
             else buildDocumentFilePath(workDir, subPath, createIntermediate = false)
         }
+
+        val activeCtx = jsContext ?: return null
+        val version = activeCtx.version
 
         val basePlaceholder = when {
             placeholderPath.startsWith(JS_DIR) -> JS_DIR

@@ -190,7 +190,8 @@ object PvzToolGlobals {
 
         // 单项选择弹窗：ui.select(title, items, options?) -> string|null
         // items: 字符串数组 或 对象数组 [{name, icon?, value?, showIndex?, showIndexColor?}]
-        // options: { columns?, cancelable?, showIndex?, showIndexColor?, confirmText?, cancelText?, confirmColor?, cancelColor?, onCancel?, onSelect? }
+        // options: { columns?, cancelable?, showIndex?, showIndexColor?, confirmText?, cancelText?, confirmColor?, cancelColor?, forceMaxForm?, onCancel?, onSelect? }
+        //   forceMaxForm: true 时以最高形态展示（内容区固定上限高度，跳过探测重测，适合内容很多的场景）
         listOf("select".js, "选择".js).func(
             FunctionParam("title"), FunctionParam("items"), FunctionParam("options")
         ) { args ->
@@ -207,13 +208,16 @@ object PvzToolGlobals {
             val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
             val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
             val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val forceMaxForm = options?.get("forceMaxForm".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
+                ?: options?.get("最高形态".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onSelect = bindJsCallback(options, "onSelect", runtime)
-            JsUiManager.showSelect(title, items, columns, cancelable, showIndex, showIndexColor, confirmText, cancelText, confirmColor, cancelColor, onCancel, onSelect).await()?.js
+            JsUiManager.showSelect(title, items, columns, cancelable, showIndex, showIndexColor, confirmText, cancelText, confirmColor, cancelColor, forceMaxForm, onCancel, onSelect).await()?.js
         }
 
         // 多项选择弹窗：ui.multiSelect(title, items, options?) -> string[]
-        // options: { defaultValues?, columns?, cancelable?, showIndex?, showIndexColor?, confirmText?, cancelText?, confirmColor?, cancelColor?, onCancel?, onSelect? }
+        // options: { defaultValues?, columns?, cancelable?, showIndex?, showIndexColor?, confirmText?, cancelText?, confirmColor?, cancelColor?, forceMaxForm?, onCancel?, onSelect? }
+        //   forceMaxForm: true 时以最高形态展示（内容区固定上限高度，跳过探测重测，适合内容很多的场景）
         listOf("multiSelect".js, "多选".js).func(
             FunctionParam("title"), FunctionParam("items"), FunctionParam("options")
         ) { args ->
@@ -232,14 +236,17 @@ object PvzToolGlobals {
             val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
             val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
             val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val forceMaxForm = options?.get("forceMaxForm".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
+                ?: options?.get("最高形态".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onSelect = bindJsCallback(options, "onSelect", runtime)
-            JsUiManager.showMultiSelect(title, items, defaultValues, columns, cancelable, showIndex, showIndexColor, confirmText, cancelText, confirmColor, cancelColor, onCancel, onSelect).await().map { it.js }.js
+            JsUiManager.showMultiSelect(title, items, defaultValues, columns, cancelable, showIndex, showIndexColor, confirmText, cancelText, confirmColor, cancelColor, forceMaxForm, onCancel, onSelect).await().map { it.js }.js
         }
 
         // 操作菜单弹窗：ui.actionSheet(title, actions, options?) -> string|null
         // actions: 字符串数组 或 对象数组 [{name, value?, danger?}]
-        // options: { cancelable?, cancelText?, cancelColor?, onCancel?, onSelect? }  点击某项返回其 value（或 name）；取消/点外部返回 null
+        // options: { cancelable?, cancelText?, cancelColor?, forceMaxForm?, onCancel?, onSelect? }  点击某项返回其 value（或 name）；取消/点外部返回 null
+        //   forceMaxForm: true 时以最高形态展示（内容区固定上限高度，跳过探测重测，适合内容很多的场景）
         listOf("actionSheet".js, "操作菜单".js).func(
             FunctionParam("title"), FunctionParam("actions"), FunctionParam("options")
         ) { args ->
@@ -251,9 +258,11 @@ object PvzToolGlobals {
             val cancelable = options?.get("cancelable".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: true
             val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
             val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val forceMaxForm = options?.get("forceMaxForm".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
+                ?: options?.get("最高形态".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onSelect = bindJsCallback(options, "onSelect", runtime)
-            JsUiManager.showActionSheet(title, items, cancelable, cancelText, cancelColor, onCancel, onSelect).await()?.js
+            JsUiManager.showActionSheet(title, items, cancelable, cancelText, cancelColor, forceMaxForm, onCancel, onSelect).await()?.js
         }
 
         // 数值滑块弹窗：ui.slider(title, options?) -> number|null

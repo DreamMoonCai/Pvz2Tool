@@ -100,7 +100,7 @@ class JsFile(
             val ctx = InitializePvz2.context
 
             // 源路径 → internalPath（支持降级）
-            val internalPath = access.resolver.resolveToInternalPath(fromPath, ctx)
+            val internalPath = access.resolver.resolveToInternalPath(fromPath)
                 ?: throw IllegalArgumentException("无法将源路径转换为内部路径: $fromPath")
 
             // 目标路径 → 解析并获取目录
@@ -284,7 +284,7 @@ class JsFile(
         listOf("normalizePath".js, "规范路径".js) eq resolvedPath.js
         listOf("extension".js, "扩展名".js) eq fileExtension.js
         listOf("path".js, "路径".js) eq displayPath.js
-        listOf("internalPath".js, "内部路径".js) eq (access.resolver.resolveToInternalPath(resolvedPath, InitializePvz2.context) ?: "").js
+        listOf("internalPath".js, "内部路径".js) eq (access.resolver.resolveToInternalPath(resolvedPath) ?: "").js
         listOf("size".js, "大小".js) eq JsProperty { file.length().toDouble().js }
         listOf("isDirectory".js, "是目录".js) eq true.js
         listOf("isFile".js, "是文件".js) eq false.js
@@ -336,7 +336,7 @@ class JsFile(
         listOf("normalizePath".js, "规范路径".js) eq resolvedPath.js
         listOf("extension".js, "扩展名".js) eq fileExtension.js
         listOf("path".js, "路径".js) eq displayPath.js
-        listOf("internalPath".js, "内部路径".js) eq (access.resolver.resolveToInternalPath(resolvedPath, InitializePvz2.context) ?: "").js
+        listOf("internalPath".js, "内部路径".js) eq (access.resolver.resolveToInternalPath(resolvedPath) ?: "").js
         listOf("size".js, "大小".js) eq JsProperty { file.length().toDouble().js }
         listOf("isDirectory".js, "是目录".js) eq false.js
         listOf("isFile".js, "是文件".js) eq true.js
@@ -395,7 +395,7 @@ class JsFile(
             val toPath = toString(args[0])
 
             // 当前文件路径 → internalPath（支持降级）
-            val internalPath = access.resolver.resolveToInternalPath(resolvedPath, InitializePvz2.context)
+            val internalPath = access.resolver.resolveToInternalPath(resolvedPath)
                 ?: throw IllegalArgumentException("无法将路径转换为内部路径: $resolvedPath")
 
             // 目标路径 → 解析并获取目录

@@ -65,6 +65,7 @@ fun PvzPopupContent(
     onClose: () -> Unit = {},
     bottomContent: @Composable (ColumnScope.() -> Unit) = {},
     isInternalCard: Boolean = true,
+    forceMaxForm: Boolean = false,
     content: @Composable (ColumnScope.() -> Unit)
 ) {
     Box(modifier = modifier.padding(25.dp)) {
@@ -86,6 +87,7 @@ fun PvzPopupContent(
 
             PerfectAdaptiveLayout(
                 modifier = Modifier.padding(10.dp, 0.dp),
+                forceMaxForm = forceMaxForm,
                 // 探测版 Content：不带 fillMaxHeight，用来查真实高度
                 probeContent = {
                     val scrollState = rememberScrollState()

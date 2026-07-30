@@ -1213,6 +1213,216 @@ sections:
           "配置汇总完成"
 
   # ==========================================
+  # 栏目: Toast 轻提示测试
+  # 测试新增的 toast(吐司) 对象 API
+  # ==========================================
+  - id: "toast_demo"
+    title: "Toast 轻提示测试"
+    theme: "TEAL"
+
+    items:
+      # ----- 测试1：默认短提示 -----
+      - id: "toast_short"
+        name: "默认短提示"
+        desc: "测试 toast.show() 显示短提示（切主线程）"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: |-
+          toast.show("这是一条短提示");
+          "已显示短提示"
+
+      # ----- 测试2：长提示 -----
+      - id: "toast_long"
+        name: "长提示"
+        desc: "测试 toast.long() / show(..., 'long')"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: |-
+          toast.long("这是一条长提示，停留更久");
+          "已显示长提示"
+
+      # ----- 测试3：中文别名 -----
+      - id: "toast_cn"
+        name: "中文别名测试"
+        desc: "测试 吐司/显示/提示 等中文别名"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: |-
+          toast.吐司("中文别名 吐司 调用成功");
+          toast.提示("中文别名 提示 调用成功");
+          "中文别名调用完成"
+
+      # ----- 测试4：数字时长参数 -----
+      - id: "toast_num"
+        name: "数字时长参数"
+        desc: "测试 toast.show(msg, 1) 表示长提示"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: |-
+          toast.show("数字 1 = 长提示", 1);
+          "已用数字时长参数显示"
+
+  # ==========================================
+  # 栏目: DEX 加载测试
+  # 测试新增的 dex 对象（load/加载/loadDex、loadFromAsset/从资源加载、loadFromUrl/从网络加载 及句柄 findClass）
+  # ==========================================
+  - id: "dex_demo"
+    title: "DEX 加载测试"
+    theme: "PURPLE"
+
+    items:
+      # ----- 测试1：缺失文件优雅返回 null -----
+      - id: "dex_missing_graceful"
+        name: "缺失文件优雅返回 null"
+        desc: "测试 dex.load 对不存在文件返回 null 而不崩溃"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: |-
+          var loader = dex.load("/sdcard/nonexistent_xyz_123.dex");
+          (loader === null || loader === undefined) ? "缺失文件返回 null ✓（优雅处理）" : ("意外返回: " + loader)
+
+      # ----- 测试2：从工作目录加载（若已放置待测 DEX） -----
+      - id: "dex_load_from_workdir"
+        name: "从工作目录加载(若已放置)"
+        desc: "若 $WORK_DIR/test.dex 存在则加载并反射其中类，否则提示放置文件"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: |-
+          var dexPath = path.resolve("$WORK_DIR/test.dex");
+          var loader = dex.load(dexPath);
+          if (loader) console.log("DEX 加载成功: " + loader.path);
+          loader ? ("DEX 加载成功，句柄路径: " + loader.path + "\n可用 loader.findClass('包名.类名') 反射") : ("未找到 " + dexPath + "\n请将待测 .dex 放到工作目录后重试");
+
+      # ----- 测试3：从 assets 加载（若已内置） -----
+      - id: "dex_loadfromasset"
+        name: "从资源加载(若已内置)"
+        desc: "测试 dex.loadFromAsset 从 assets 提取并加载 DEX"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: |-
+          var loader = dex.loadFromAsset("test.dex");
+          if (loader) console.log("资源 DEX 加载成功: " + loader.path);
+          loader ? ("资源 DEX 加载成功: " + loader.path) : "assets 中未找到 test.dex（可放置后重试，或忽略此测试）";
+
+      # ----- 测试4：加载内置 DEX 并反射其中类（端到端验证） -----
+      - id: "dex_reflect_via_loader"
+        name: "加载DEX并反射"
+        desc: "加载内置 test.dex（含 com.pvz2tool.dextest.Calculator），用 loader.findClass + 实例/静态调用验证；add/multiply 返回 int 走 keight 数字，=== 数值比较可用"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: |-
+          var loader = dex.load("test.dex");
+          loader ? (function() {
+            var Cls = loader.findClass("com.pvz2tool.dextest.Calculator");
+            var inst = Cls.constructor(["int"]).newInstance(7);   // Calculator(int seed)
+            var sum = inst.call("add", 3, 4);                     // 实例方法，返回 int → 数字
+            var mul = Cls.method("multiply", ["int", "int"]).invoke(6, 7);  // 静态方法，返回 int
+            var desc = inst.call("describe").value;             // 返回 String → 实例包装，.value() 取原生字符串
+            console.log("describe = " + desc);
+            return "DEX 反射: add(3,4)=" + sum + " multiply(6,7)=" + mul + (sum === 7 && mul === 42 ? " ✓ (len/mul 正确)" : " ✗ (异常)");
+          })() : "DEX 加载失败（assets 中未找到内置 test.dex）";
+
+  # ==========================================
+  # 栏目: 反射 API 测试
+  # 测试新增的 reflect 对象（findClass/方法/字段/构造器/实例 链式）
+  # 使用系统类做安全验证，无需额外 DEX
+  # ==========================================
+  - id: "reflect_demo"
+    title: "反射 API 测试"
+    theme: "GREEN"
+
+    items:
+      # ----- 测试1：查找系统类 -----
+      - id: "reflect_findclass"
+        name: "查找系统类"
+        desc: "测试 reflect.findClass 反射 java.lang.String"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: |-
+          var Cls = reflect.findClass("java.lang.String");
+          if (Cls) console.log("类名: " + Cls.name + " / 短名: " + Cls.simpleName);
+          Cls ? ("找到类: " + Cls.name) : "反射失败";
+
+      # ----- 测试2：构造 + 方法调用 -----
+      - id: "reflect_ctor_call"
+        name: "构造+方法调用"
+        desc: "StringBuffer 构造后通过 .call 调用 length() 验证返回值（StringBuffer 为非 String 引用类型，保留为 JsInstanceWrapper 持有 .call）；length() 返回 int 走 .js 原生值，=== 数值比较可用"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: |-
+          // newInstance 返回 StringBuffer（非 String 引用类型）→ 包装为 JsInstanceWrapper，可 .call 调实例方法；
+          // String 则走 .js 原生字符串（无 .call，这是正确的），故演示 .call 要用 StringBuffer 而非 String。
+          // length() 返回 int → keight 原生数字，=== 数值比较直接可用（无需 toString）。
+          var Cls = reflect.findClass("java.lang.StringBuffer");
+          var buf = Cls.constructor(["string"]).newInstance("Hello");
+          var len = buf.call("length");   // 反射调用 StringBuffer.length()
+          console.log("缓冲区长度: " + len);
+          (len === 5) ? "构造+length 调用正确 ✓ (len=5)" : ("长度异常: " + len)
+
+      # ----- 测试3：静态字段读取 -----
+      - id: "reflect_static_field"
+        name: "静态字段读取"
+        desc: "读取 android.content.Context.MODE_PRIVATE 静态字段"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: |-
+          var Ctx = reflect.findClass("android.content.Context");
+          var mode = Ctx.field("MODE_PRIVATE").get();
+          console.log("MODE_PRIVATE = " + mode);
+          "MODE_PRIVATE = " + mode
+
+      # ----- 测试4：静态调用 + 实例方法（含实例回传） -----
+      - id: "reflect_method_chain"
+        name: "方法链+实例回传"
+        desc: "Integer.valueOf 静态调用返回数字（=== 数值比较可用）+ StringBuffer 实例作为构造器实参回传"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: |-
+          // 1) valueOf 返回 Integer，convertResult 按 Int 处理成 JS 数字（JsNumberWrapper），=== 数值比较直接可用
+          var IntCls = reflect.findClass("java.lang.Integer");
+          var v = IntCls.method("valueOf", ["string"]).invoke("123");
+          // 2) 实例回传：把 StringBuffer 实例作为实参传给 new String(StringBuffer) 构造器
+          //    buf 是 JsInstanceWrapper，经 convertArg/toKotlin 还原为原始 StringBuffer 对象传入，演示「实例回传」
+          var BufCls = reflect.findClass("java.lang.StringBuffer");
+          var buf = BufCls.constructor(["string"]).newInstance("World");
+          var StrCls = reflect.findClass("java.lang.String");
+          var s = StrCls.constructor(["java.lang.StringBuffer"]).newInstance(buf);
+          console.log("Integer.valueOf(123) = " + v + " / 回传构造结果: " + s);
+          (v === 123 && s != null) ? "静态调用+实例回传正确 ✓ (v=123)" : ("异常: v=" + v + " s=" + s)
+
+      # ----- 测试5：父类与方法列表 -----
+      - id: "reflect_superclass"
+        name: "父类/方法列表"
+        desc: "测试 getSuperclass 与 getDeclaredMethods"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: |-
+          var Cls = reflect.findClass("java.lang.String");
+          var sup = Cls.getSuperclass();
+          var methods = Cls.getDeclaredMethods();
+          console.log("父类: " + (sup ? sup.name : "无"));
+          console.log("方法数: " + (methods ? methods.length : 0));
+          "父类: " + (sup ? sup.name : "无") + "\n方法数: " + (methods ? methods.length : 0)
+
+      # ----- 测试6：DEX 句柄接入反射（放置 test.dex 后生效） -----
+      - id: "reflect_with_dex"
+        name: "DEX 类反射(若已放置)"
+        desc: "dex.load 后把 loader 句柄传入 reflect.findClass 反射 DEX 内类"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: |-
+          var dexPath = path.resolve("$WORK_DIR/test.dex");
+          var loader = dex.load(dexPath);
+          if (!loader) console.log("未找到 " + dexPath + "，无法演示 DEX 内类反射");
+          loader ? (
+            (function(){
+              // 把 loader 句柄直接传给 reflect.findClass 的第二个参数
+              var Cls = reflect.findClass("com.example.Plugin", loader);
+              return Cls ? ("DEX 内类解析成功: " + Cls.name) : ("DEX 已加载，但 com.example.Plugin 不存在（请替换真实类名）");
+            })()
+          ) : ("未找到 " + dexPath + "，无法演示 DEX 内类反射");
+
+  # ==========================================
   # 栏目: 棕色主题 - BROWN（基础浅色主题）
   # 展示所有组件类型和变体
   # ==========================================
