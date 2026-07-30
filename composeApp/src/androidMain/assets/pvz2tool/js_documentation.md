@@ -261,6 +261,7 @@
 | `clipboard` | 剪切板 | 系统剪切板读写（复制文本 / 读取文本 / 清空） | 全局 |
 | `browser` | 浏览器 | 调用系统浏览器打开链接 | 全局 |
 | `thread` | 协程 | 异步/协程执行（run/all/launch/sleep/race/timeout/retry/map/interval/setTimeout，返回 Promise，支持并发与后台任务）；并支持协程上下文（context/withContext/local）定义作用域、调度器与局部状态 | 全局 |
+| `toast` | 吐司 | 系统轻提示（show/显示/提示/吐司，及 short/短、long/长 便捷方法；支持 short/long 时长与数字 0/1），切主线程显示 | 全局 |
 | `device` | 设备 | 当前安卓设备信息（系统 / 屏幕 / 内存 / 存储 / 电池 / 网络 / 应用 / CPU / Root） | 全局 |
 | `rton` | RTON | RTON 文件编解码 | 局部 |
 | `rsb` | RSB | RSB 资源包解包/打包 | 局部 |
@@ -333,18 +334,24 @@ console.日志("开始处理...");
 
 #### path.resolve / path.解析路径
 
-将占位符路径解析为绝对路径字符串。
+将占位符路径解析为绝对路径字符串。**占位符可作路径前缀拼接子路径，子路径不必已存在**（纯字符串展开，不要求目标文件/目录实际存在）。
 
 **参数**：
-- `placeholderPath` (string): 包含占位符的路径
+- `placeholderPath` (string): 包含占位符的路径，支持在占位符后拼接子路径
 
-**返回**：绝对路径字符串
+**返回**：绝对路径字符串；无法解析（如缺少上下文、根目录不可用）时返回 null/undefined
 
 **示例**：
 ```javascript
 var savePath = path.resolve("$GAME_SAVES/SeedChooserUserData.rton");
 // 中文写法
 var savePath = path.解析路径("$GAME_SAVES/SeedChooserUserData.rton");
+
+// 占位符拼接子路径（子路径不必已存在，常用于构造输出目标）
+var testPath = path.解析路径(path.android.files + "/test");
+// → /storage/emulated/0/Android/data/<pkg>/files/test
+var smfSub = path.解析路径(path.pvz2tool.smf + "/abc/def.txt");
+// → workDir/<version.assetPath>/abc/def.txt
 ```
 
 #### path.resolveUri / path.解析URI
@@ -2057,7 +2064,7 @@ console.log("SMF 目录文件:", files);
 
 #### assets.listAssets / assets.列表Assets
 
-列出 assets 目录下的所有文件（仅 APK 内置资源）。
+列出 assets 目录下的所有文件（仅 APK 内置资源，不含本地工作目录覆盖）。若需要「本地优先」的列举，请使用 `assets.list()`。
 
 **参数**：
 - `path` (string): assets 相对路径
@@ -2088,10 +2095,10 @@ if (assets.exists("pvz2tool/video/opening.mp4")) {
 
 #### assets.info / assets.信息
 
-获取资源详细信息。
+获取资源详细信息（**工作目录优先**：本地覆盖 > APK 内置资源，绝对路径直接查本地文件系统）。
 
 **参数**：
-- `path` (string): 资源相对路径
+- `path` (string): 资源相对路径（或 `/` 开头的绝对路径）
 
 **返回**：Object - 资源信息对象
 
@@ -3408,6 +3415,44 @@ console.log(thread.local("lastUser")); // "dreammoon"
 
 ---
 
+## 17. toast 轻提示
+
+全局对象 `toast`（中文别名 `吐司`），用于弹出 Android 系统 Toast 轻提示。因 JS 引擎运行于后台线程，所有 Toast 都会切回主线程后显示（避免非主线程调用崩溃），失败时静默忽略，不影响后续脚本。
+
+**方法一览**：
+
+| 方法 | 中文别名 | 说明 |
+| --- | --- | --- |
+| `toast.show(message, duration?)` | `显示` / `提示` / `吐司` | 显示一条提示；`duration` 可省略（默认短） |
+| `toast.short(message)` | `短` | 短提示（2 秒档） |
+| `toast.long(message)` | `长` | 长提示（3.5 秒档） |
+
+**时长参数 `duration`（仅 `show` 支持，可选）**：
+
+- 省略 → 短提示
+- 字符串：`"short"` / `"短"` → 短；`"long"` / `"长"` → 长
+- 数字：`0` → 短；其它（如 `1`） → 长
+
+> 注：原生 Toast 仅「短 / 长」两档，不支持任意毫秒；`duration` 仅决定这两档之一。
+
+**示例**：
+
+```javascript
+// 默认短提示
+toast.show("保存成功");
+toast.吐司("操作完成");
+
+// 长提示（字符串或数字指定）
+toast.show("正在加载资源...", "long");
+toast.show("即将完成", 1);
+toast.long("这条会停留久一点");
+
+// 短提示便捷写法
+toast.short("已复制");
+```
+
+---
+
 *文档版本: 2.1*
 *最后更新: 2026-07-17*
 *新增：ui 系列弹窗通用可定制化——所有弹窗（alert/confirm/prompt/select/multiSelect/actionSheet/slider/loading）新增按钮文字（confirmText/cancelText）、按钮背景色（confirmColor/cancelColor，支持命名色与 #RRGGBB/#AARRGGBB 十六进制）、可关闭性（dismissible/可关闭，alert/confirm/prompt/slider/loading 用此名；select/multiSelect/actionSheet 沿用 cancelable），以及事件回调（onConfirm/onCancel/onSelect/onChange/onDismiss，均为 function(value) 形式、异步触发且不阻塞 await）。slider 另增 decimals（小数位）/showValue（是否显示大字体数值）与实时 onChange 回调；loading 另增 update()/更新() 实时刷新文字。详见各弹窗小节与开头「通用选项与回调」*
@@ -3437,3 +3482,4 @@ console.log(thread.local("lastUser")); // "dreammoon"
 *补充：rton.load 支持直接加载 .json 文件；path.toInternalPath 相对路径自动按 $WORK_DIR 处理*
 *新增：picker 文件选择器对象（directory/file/files 及中文别名），支持选择目录/单文件/多文件并返回文件对象（基于 SAF DocumentFile）*
 *新增：thread 协程上下文（context/协程上下文/创建上下文/createContext 创建可定义 name/dispatcher、可整体 cancel、可共享 local 局部变量的作用域对象；上下文自带 run/launch/all/withContext/local/cancel/isActive/name；任务首个参数为上下文自身便于读取 local）；thread.withContext/切换上下文/切换调度器（在 main/io/default/computation/unconfined 指定调度器上运行 task，JS 调用仍调度回引擎线程保证单线程安全）；thread.local/变量/上下文变量（引擎级全局共享变量，跨脚本持久）。参见新增第 16 节*
+*新增：toast 轻提示对象（show/显示/提示/吐司，及 short/短、long/长 便捷方法；duration 支持 short/long 字符串或 0/1 数字，省略默认短），切主线程显示、失败静默忽略。参见新增第 17 节*

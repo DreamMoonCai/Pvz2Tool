@@ -875,6 +875,73 @@ class AssetExtractorHolder(
     val extractor: AssetResourceExtractor
 ) {
     companion object {
+        /**
+         * 资源元信息（工作目录优先）
+         */
+        data class ResourceInfo(
+            val exists: Boolean = false,
+            val isDirectory: Boolean = false,
+            val isFile: Boolean = false,
+            val size: Long = -1L,
+            val lastModified: Long = 0L
+        )
+
+        /**
+         * 获取资源元信息（工作目录优先）
+         * 优先级：绝对路径(/开头) > getLocalWorkDir (SAF/本地文件) > Assets
+         * 返回一个 [ResourceInfo]，包含 exists / isDirectory / isFile / size / lastModified
+         */
+        fun resourceInfo(path: String): ResourceInfo {
+            // 0. 绝对路径：使用本地文件系统
+            if (path.startsWith("/")) {
+                val file = File(path)
+                return ResourceInfo(
+                    exists = file.exists(),
+                    isDirectory = file.isDirectory,
+                    isFile = file.isFile,
+                    size = if (file.isFile) file.length() else -1L,
+                    lastModified = if (file.exists()) file.lastModified() else 0L
+                )
+            }
+
+            // 1. 本地工作目录（优先）
+            val localWorkDir = runCatching { InitializePvz2.config.getLocalWorkDir(InitializePvz2.context) }.getOrNull()
+            if (localWorkDir != null) {
+                val localDocument = buildDocumentFilePath(localWorkDir, removeThePrefix(path))
+                if (localDocument != null && localDocument.exists()) {
+                    return ResourceInfo(
+                        exists = true,
+                        isDirectory = localDocument.isDirectory,
+                        isFile = localDocument.isFile,
+                        size = if (localDocument.isFile) localDocument.length() else -1L,
+                        lastModified = localDocument.lastModified()
+                    )
+                }
+            }
+
+            // 2. APK Assets
+            val assetPath = complementThePrefix(path)
+            val isDir = InitializePvz2.context.isAssetDirExist(assetPath)
+            val isFile = InitializePvz2.context.isAssetFileExist(assetPath)
+            val size = if (isFile) {
+                try {
+                    InitializePvz2.context.assets.openFd(assetPath).use { it.length }
+                } catch (e: Exception) {
+                    -1L
+                }
+            } else -1L
+            val lastModified = if (isFile || isDir) {
+                InitializePvz2.context.getAssetLastModified(assetPath)
+            } else 0L
+            return ResourceInfo(
+                exists = isDir || isFile,
+                isDirectory = isDir,
+                isFile = isFile,
+                size = size,
+                lastModified = lastModified
+            )
+        }
+
         // ======================== 获取资源文件列表 ========================
         /**
          * 获取 assets 目录下所有文件的相对路径列表

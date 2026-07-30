@@ -205,6 +205,14 @@ open class JsFileAccess(
             return OutputHandle(context, file, null, isCache = false)
         }
 
+        // 绝对路径占位符（$APP_DATA / $ANDROID_FILES 等）：根目录是常规本地目录，可直接创建子路径写入
+        val absFile = resolver.resolveAbsolutePlaceholderFile(path, context)
+        if (absFile != null) {
+            // 确保父目录存在（纯占位符时 absFile 即根目录本身，已存在）
+            absFile.parentFile?.mkdirs()
+            return OutputHandle(context, absFile, null, isCache = false)
+        }
+
         // 1. 先尝试直接解析（目标文件/目录已存在）
         val docFile = resolver.resolve(path, context)
 

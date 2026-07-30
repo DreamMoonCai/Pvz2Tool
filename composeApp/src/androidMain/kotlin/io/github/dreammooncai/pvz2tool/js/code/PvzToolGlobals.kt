@@ -17,6 +17,7 @@ import io.github.dreammooncai.pvz2tool.js.JsConsole
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.js.code.JsDevice
 import io.github.dreammooncai.pvz2tool.js.code.JsBrowser
+import io.github.dreammooncai.pvz2tool.js.code.JsToast
 import io.github.dreammooncai.pvz2tool.js.code.JsThread
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.eq
@@ -336,41 +337,17 @@ object PvzToolGlobals {
             AssetExtractorHolder.exist(path).js
         }
 
-        // 获取资源信息：assets.info(path) -> { exists, size, lastModified, isDirectory }
+        // 获取资源信息：assets.info(path) -> { exists, isDirectory, isFile, size, lastModified }
+        // 工作目录优先：本地覆盖 > APK Assets（含绝对路径）
         listOf("info".js, "信息".js).func(FunctionParam("path")) { args ->
             val path = toString(args[0])
-
-            if (path.startsWith("/")) {
-                // 绝对路径：使用本地文件系统
-                val file = File(path)
-                Object("info") {
-                    "exists".js eq file.exists().js
-                    "isDirectory".js eq file.isDirectory.js
-                    "isFile".js eq file.isFile.js
-                    "size".js eq (if (file.isFile) file.length() else -1L).js
-                    "lastModified".js eq (if (file.exists()) file.lastModified() else 0L).js
-                }
-            } else {
-                val normalizedPath = if (path.startsWith("${Pvz2ToolConfig.PATH_NAME}/")) path else "${Pvz2ToolConfig.PATH_NAME}/$path"
-                val exists = AssetExtractorHolder.exist(path)
-                val isDir = InitializePvz2.context.isAssetDirExist(normalizedPath)
-                val isFile = InitializePvz2.context.isAssetFileExist(normalizedPath)
-
-                Object("info") {
-                    "exists".js eq exists.js
-                    "isDirectory".js eq isDir.js
-                    "isFile".js eq isFile.js
-                    "size".js eq (if (isFile) {
-                        try {
-                            InitializePvz2.context.assets.openFd(normalizedPath).use { it.length }
-                        } catch (e: Exception) {
-                            -1L
-                        }
-                    } else -1L).js
-                    "lastModified".js eq (if (isFile || isDir) {
-                        InitializePvz2.context.getAssetLastModified(normalizedPath)
-                    } else 0L).js
-                }
+            val info = AssetExtractorHolder.resourceInfo(path)
+            Object("info") {
+                "exists".js eq info.exists.js
+                "isDirectory".js eq info.isDirectory.js
+                "isFile".js eq info.isFile.js
+                "size".js eq info.size.js
+                "lastModified".js eq info.lastModified.js
             }
         }
 
@@ -523,6 +500,9 @@ object PvzToolGlobals {
         }
         listOf("browser".js, "浏览器".js).forEach { key ->
             runtime.set(key, JsBrowser.js, VariableType.Global)
+        }
+        listOf("toast".js, "吐司".js).forEach { key ->
+            runtime.set(key, JsToast.js, VariableType.Global)
         }
         listOf("thread".js, "协程".js, "线程".js).forEach { key ->
             runtime.set(key, JsThread.js, VariableType.Global)

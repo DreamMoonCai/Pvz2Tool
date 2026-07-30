@@ -9,6 +9,7 @@ import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.Pvz2ToolConfig
 import io.github.dreammooncai.pvz2tool.SectionItem
 import io.github.dreammooncai.pvz2tool.VersionDef
+import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import java.io.File
 import java.io.FileOutputStream
 
@@ -342,13 +343,8 @@ open class JsFileResolver(
                 assetRelativeBase
             else
                 "$assetRelativeBase/$subPath"
-            return try {
-                // 先尝试作为文件打开
-                context.assets.open(fullAssetPath).use { true }
-            } catch (_: Exception) {
-                // 不是文件，尝试作为目录
-                context.assets.list(fullAssetPath) != null
-            }
+
+            return AssetExtractorHolder.exist(fullAssetPath)
         }
 
         val chosenBase = listOfNotNull(primaryPath, fallbackPath, fallbackRootPath)
@@ -358,6 +354,67 @@ open class JsFileResolver(
 
         val result = if (subPath.isEmpty()) chosenBase else "$chosenBase/$subPath"
         return result.ifEmpty { null }
+    }
+
+    // ======================== 占位符 → 绝对路径字符串（不要求存在） ========================
+
+    /**
+     * 将占位符路径展开为绝对路径字符串，**不要求目标文件/目录已存在**。
+     *
+     * 与 [resolvePlaceholders]（companion，仅非上下文占位符）不同，本方法同时支持
+     * 需版本/栏目上下文的 `$SMF` / `$ITEM` / `$JS_DIR`。
+     *
+     * 适用于 `path.解析路径()` 这类「只想得到最终路径字符串、不需要实际读写文件」的场景。
+     * 占位符可当作路径前缀拼接子路径，例如：
+     * - `$ANDROID_FILES/test`              → `/storage/emulated/0/Android/data/<pkg>/files/test`
+     * - `$SMF/abc/def.txt`                → workDir/<version.assetPath>/abc/def.txt
+     *
+     * @param placeholderPath 含占位符的路径（支持拼接子路径，子路径不必存在）
+     * @return 展开后的绝对路径；无法解析（如缺少上下文、根目录不可用）时返回 null
+     */
+    fun resolveToAbsolutePath(placeholderPath: String, context: Context): String? {
+        val path = placeholderPath.trim()
+        // 绝对路径：原样返回
+        if (path.startsWith("/")) return path
+        // 裸相对路径（不以 $ 开头）：自动补 $WORK_DIR 前缀
+        if (!path.startsWith("$")) {
+            val workRoot = getWorkDir(context)?.let { documentFileToFile(it) }?.absolutePath ?: return null
+            return File(workRoot, path).absolutePath
+        }
+
+        // 绝对路径占位符（$APP_DATA / $ANDROID_FILES 等）：根目录 + 子路径，不检查存在性
+        val abs = resolveAbsolutePlaceholderPath(path, context)
+        if (abs != null) return abs
+
+        // $WORK_DIR / $GAME_SAVES / $GAME_SMF
+        val (prefix, rootDoc) = when {
+            path.startsWith(WORK_DIR) -> WORK_DIR to getWorkDir(context)
+            path.startsWith(GAME_SAVES) -> GAME_SAVES to getGameSaves()
+            path.startsWith(GAME_SMF) -> GAME_SMF to getGameSmf()
+            else -> null to null
+        }
+        if (prefix != null) {
+            val root = rootDoc ?: return null
+            val rootPath = documentFileToFile(root)?.absolutePath ?: return null
+            val sub = path.removePrefix(prefix).trimStart('/')
+            return if (sub.isEmpty()) rootPath else File(rootPath, sub).absolutePath
+        }
+
+        // $SMF / $ITEM / $JS_DIR（需上下文）：先解析根目录路径，再拼接子路径（不检查存在性）
+        val basePlaceholder = when {
+            path.startsWith(JS_DIR) -> JS_DIR
+            path.startsWith(ITEM) -> ITEM
+            path.startsWith(SMF) -> SMF
+            else -> null
+        }
+        if (basePlaceholder != null) {
+            val baseDoc = resolveSmfDocumentFile(basePlaceholder, context) ?: return null
+            val basePath = documentFileToFile(baseDoc)?.absolutePath ?: baseDoc.uri.path ?: return null
+            val sub = path.removePrefix(basePlaceholder).trimStart('/')
+            return if (sub.isEmpty()) basePath else File(basePath, sub).absolutePath
+        }
+
+        return null
     }
 
     // ======================== 公开 API ========================
@@ -498,6 +555,66 @@ open class JsFileResolver(
         val subPath = path.removePrefix(basePlaceholder).trimStart('/')
         val target = if (subPath.isEmpty()) rootFile else File(rootFile, subPath)
         return if (target.exists()) DocumentFile.fromFile(target) else null
+    }
+
+    /**
+     * 解析绝对路径占位符为路径字符串（不要求目标存在）。
+     * 仅用于 [resolveToAbsolutePath] 的字符串展开场景。
+     */
+    private fun resolveAbsolutePlaceholderPath(path: String, context: Context): String? {
+        val basePlaceholder = when {
+            path.startsWith(APP_DATA) -> APP_DATA
+            path.startsWith(APP_FILES) -> APP_FILES
+            path.startsWith(APP_CACHE) -> APP_CACHE
+            path.startsWith(ANDROID_DATA) -> ANDROID_DATA
+            path.startsWith(ANDROID_FILES) -> ANDROID_FILES
+            path.startsWith(ANDROID_CACHE) -> ANDROID_CACHE
+            else -> return null
+        }
+
+        val rootFile: File = when (basePlaceholder) {
+            APP_DATA -> context.dataDir
+            APP_FILES -> context.filesDir
+            APP_CACHE -> context.cacheDir
+            ANDROID_DATA -> context.getExternalFilesDir(null)?.parentFile ?: return null
+            ANDROID_FILES -> context.getExternalFilesDir(null) ?: return null
+            ANDROID_CACHE -> context.externalCacheDir ?: return null
+            else -> return null
+        }
+
+        val subPath = path.removePrefix(basePlaceholder).trimStart('/')
+        return if (subPath.isEmpty()) rootFile.absolutePath else File(rootFile, subPath).absolutePath
+    }
+
+    /**
+     * 解析绝对路径占位符为本地 [File]（不要求目标存在）。
+     * 仅处理 `$APP_DATA` / `$APP_FILES` / `$APP_CACHE` / `$ANDROID_DATA` / `$ANDROID_FILES` / `$ANDROID_CACHE`。
+     * 用于写入型解析（`resolveOutput`）：这些占位符的根目录是常规本地目录，可直接在子路径创建文件/目录。
+     * 非绝对占位符（如 `$WORK_DIR` / `$SMF`）返回 null，交由 SAF 树流程处理。
+     */
+    fun resolveAbsolutePlaceholderFile(placeholderPath: String, context: Context): File? {
+        val basePlaceholder = when {
+            placeholderPath.startsWith(APP_DATA) -> APP_DATA
+            placeholderPath.startsWith(APP_FILES) -> APP_FILES
+            placeholderPath.startsWith(APP_CACHE) -> APP_CACHE
+            placeholderPath.startsWith(ANDROID_DATA) -> ANDROID_DATA
+            placeholderPath.startsWith(ANDROID_FILES) -> ANDROID_FILES
+            placeholderPath.startsWith(ANDROID_CACHE) -> ANDROID_CACHE
+            else -> return null
+        }
+
+        val rootFile: File = when (basePlaceholder) {
+            APP_DATA -> context.dataDir
+            APP_FILES -> context.filesDir
+            APP_CACHE -> context.cacheDir
+            ANDROID_DATA -> context.getExternalFilesDir(null)?.parentFile ?: return null
+            ANDROID_FILES -> context.getExternalFilesDir(null) ?: return null
+            ANDROID_CACHE -> context.externalCacheDir ?: return null
+            else -> return null
+        }
+
+        val subPath = placeholderPath.removePrefix(basePlaceholder).trimStart('/')
+        return if (subPath.isEmpty()) rootFile else File(rootFile, subPath)
     }
 
     // ======================== $SMF 特殊解析 ========================

@@ -94,10 +94,10 @@ class PvzToolContexts(
             listOf("jsDir".js, "JS目录".js)   eq JsFileResolver.JS_DIR.js
         }
 
-        // path.resolve(placeholder) → 绝对路径字符串
+        // path.resolve(placeholder) → 绝对路径字符串（占位符可作前缀拼接，不要求目标存在）
         listOf("resolve".js, "解析路径".js).func("placeholderPath") { args ->
             val p = toString(args[0])
-            access.resolveInput(p, InitializePvz2.context)?.file?.absolutePath?.js
+            access.resolver.resolveToAbsolutePath(p, InitializePvz2.context)?.js
         }
 
         // path.resolveUri(placeholder) → URI 字符串
