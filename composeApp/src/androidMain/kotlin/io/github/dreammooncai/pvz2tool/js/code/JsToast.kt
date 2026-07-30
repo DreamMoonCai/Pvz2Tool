@@ -1,8 +1,6 @@
 package io.github.dreammooncai.pvz2tool.js.code
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.widget.Toast
 import io.github.alexzhirkevich.keight.js.FunctionParam
 import io.github.alexzhirkevich.keight.js.Object
@@ -17,7 +15,7 @@ import kotlinx.coroutines.withContext
  * 轻提示（Toast）全局对象：`toast`。
  *
  * 在脚本中弹出一个 Android 系统 Toast。因 JS 引擎运行于后台线程
- * （`Dispatchers.Default`），所有 Toast 都会切回主线程（`Looper.getMainLooper()`）
+ * （`Dispatchers.Default`），所有 Toast 都会切回主线程（`Dispatchers.Main`）
  * 后再显示，避免「非主线程调用 Toast」导致崩溃；失败时静默吞掉，不影响脚本。
  *
  * 用法：

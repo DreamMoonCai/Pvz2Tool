@@ -262,6 +262,7 @@
 | `browser` | 浏览器 | 调用系统浏览器打开链接 | 全局 |
 | `thread` | 协程 | 异步/协程执行（run/all/launch/sleep/race/timeout/retry/map/interval/setTimeout，返回 Promise，支持并发与后台任务）；并支持协程上下文（context/withContext/local）定义作用域、调度器与局部状态 | 全局 |
 | `toast` | 吐司 | 系统轻提示（show/显示/提示/吐司，及 short/短、long/长 便捷方法；支持 short/long 时长与数字 0/1），切主线程显示 | 全局 |
+| `app` | 应用 | 应用进程控制（restart/重启/重启应用、restartGame/重启游戏、exit/退出/退出应用/退出APP）；冷重启、退出进程、重启后自动进入游戏 | 全局 |
 | `device` | 设备 | 当前安卓设备信息（系统 / 屏幕 / 内存 / 存储 / 电池 / 网络 / 应用 / CPU / Root） | 全局 |
 | `rton` | RTON | RTON 文件编解码 | 局部 |
 | `rsb` | RSB | RSB 资源包解包/打包 | 局部 |
@@ -3453,6 +3454,58 @@ toast.short("已复制");
 
 ---
 
+## 18. app - 应用进程控制
+
+全局对象 `app`（中文别名 `应用`），提供三类进程级操作：重启应用、重启并自动进入游戏、退出应用。
+
+所有操作均在主线程（`Looper.getMainLooper()`）执行，对 Activity / 任务的变更（启动 Intent、结束任务栈、终止进程）均安全；异常静默忽略，不影响脚本后续执行。
+
+### app.restart / app.重启 / app.重启应用 / app.重启APP
+
+退出当前进程并以 LAUNCHER Intent 冷重启，重新打开主界面（**不会**自动进入游戏）。
+
+**参数**：无
+
+**返回**：无（返回 `null`）
+
+**示例**：
+```javascript
+app.restart();   // 重新打开工具主界面
+app.重启();
+```
+
+### app.restartGame / app.重启游戏
+
+退出当前进程并冷重启，重启后**自动触发「进入游戏」逻辑**（等价于点击主界面「进入游戏」按钮）。
+
+实现：重启的 LAUNCHER Intent 附带 `EXTRA_AUTO_ENTER_GAME`，入口 Activity 在初始化完成后自动调用进入游戏流程（跳过开场 CG 视频、直接启动游戏 Activity）。
+
+**参数**：无
+
+**返回**：无（返回 `null`）
+
+**示例**：
+```javascript
+app.restartGame();   // 重启并直接进游戏
+app.重启游戏();
+```
+
+### app.exit / app.退出 / app.退出应用 / app.退出APP
+
+结束当前 Activity 任务栈并终止进程（退出整个应用）。
+
+**参数**：无
+
+**返回**：无（返回 `null`）
+
+**示例**：
+```javascript
+app.exit();
+app.退出();
+```
+
+---
+
 *文档版本: 2.1*
 *最后更新: 2026-07-17*
 *新增：ui 系列弹窗通用可定制化——所有弹窗（alert/confirm/prompt/select/multiSelect/actionSheet/slider/loading）新增按钮文字（confirmText/cancelText）、按钮背景色（confirmColor/cancelColor，支持命名色与 #RRGGBB/#AARRGGBB 十六进制）、可关闭性（dismissible/可关闭，alert/confirm/prompt/slider/loading 用此名；select/multiSelect/actionSheet 沿用 cancelable），以及事件回调（onConfirm/onCancel/onSelect/onChange/onDismiss，均为 function(value) 形式、异步触发且不阻塞 await）。slider 另增 decimals（小数位）/showValue（是否显示大字体数值）与实时 onChange 回调；loading 另增 update()/更新() 实时刷新文字。详见各弹窗小节与开头「通用选项与回调」*
@@ -3483,3 +3536,4 @@ toast.short("已复制");
 *新增：picker 文件选择器对象（directory/file/files 及中文别名），支持选择目录/单文件/多文件并返回文件对象（基于 SAF DocumentFile）*
 *新增：thread 协程上下文（context/协程上下文/创建上下文/createContext 创建可定义 name/dispatcher、可整体 cancel、可共享 local 局部变量的作用域对象；上下文自带 run/launch/all/withContext/local/cancel/isActive/name；任务首个参数为上下文自身便于读取 local）；thread.withContext/切换上下文/切换调度器（在 main/io/default/computation/unconfined 指定调度器上运行 task，JS 调用仍调度回引擎线程保证单线程安全）；thread.local/变量/上下文变量（引擎级全局共享变量，跨脚本持久）。参见新增第 16 节*
 *新增：toast 轻提示对象（show/显示/提示/吐司，及 short/短、long/长 便捷方法；duration 支持 short/long 字符串或 0/1 数字，省略默认短），切主线程显示、失败静默忽略。参见新增第 17 节*
+*新增：app 应用进程控制对象（restart/重启/重启应用、restartGame/重启游戏、exit/退出/退出应用/退出APP；冷重启经 LAUNCHER Intent + NEW_TASK|CLEAR_TASK，重启游戏经 EXTRA_AUTO_ENTER_GAME 让入口 Activity 自动进入游戏，退出经 finishAffinity + killProcess）。参见新增第 18 节*

@@ -16,6 +16,7 @@ import io.github.dreammooncai.pvz2tool.controller.SoundController
 import io.github.dreammooncai.pvz2tool.js.JsConsole
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.js.code.JsDevice
+import io.github.dreammooncai.pvz2tool.js.code.JsApp
 import io.github.dreammooncai.pvz2tool.js.code.JsBrowser
 import io.github.dreammooncai.pvz2tool.js.code.JsToast
 import io.github.dreammooncai.pvz2tool.js.code.JsThread
@@ -506,6 +507,9 @@ object PvzToolGlobals {
         }
         listOf("thread".js, "协程".js, "线程".js).forEach { key ->
             runtime.set(key, JsThread.js, VariableType.Global)
+        }
+        listOf("app".js, "应用".js).forEach { key ->
+            runtime.set(key, JsApp.js, VariableType.Global)
         }
         runtime.get("Number".js)?.get("prototype".js, runtime)?.let { it as? JsObject }?.let { prototype ->
             listOf("encrypt".js, "加密".js).forEach { key ->

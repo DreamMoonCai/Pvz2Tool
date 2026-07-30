@@ -72,6 +72,14 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class Pvz2InitializeActivity : ComponentActivity() {
 
+    companion object {
+        /**
+         * 启动 Extra：若传入为 true，Activity 在初始化完成后自动触发「进入游戏」逻辑，
+         * 用于「重启并进入游戏」场景（JS `app.restartGame()`）。
+         */
+        const val EXTRA_AUTO_ENTER_GAME = "io.github.dreammooncai.pvz2tool.extra.AUTO_ENTER_GAME"
+    }
+
     // ======================== 修复：将所有初始化提前到类属性/onCreate最开始 ========================
 
     // 1. 权限申请 Launcher (类属性初始化，安全)
@@ -96,9 +104,16 @@ class Pvz2InitializeActivity : ComponentActivity() {
     private val importSaveInfoDialogState = PvzSaveInfoDialogState()
     private val importOperationState = PvzSaveOperationState()
 
+    // ======================== 重启后自动进入游戏标记 ========================
+    /** 由启动 Intent 的 [EXTRA_AUTO_ENTER_GAME] 决定；为 true 时初始化完成后自动进入游戏 */
+    private var autoEnterGame = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // 读取「重启后自动进入游戏」标记
+        autoEnterGame = intent?.getBooleanExtra(EXTRA_AUTO_ENTER_GAME, false) ?: false
 
         // ======================== 修复：不要在这里初始化 FilePickerManager ========================
 
@@ -144,6 +159,10 @@ class Pvz2InitializeActivity : ComponentActivity() {
                 }
 
                 if (showCgVideo) {
+                    // 重启后自动进入游戏：跳过开场 CG 视频
+                    if (autoEnterGame) {
+                        LaunchedEffect(Unit) { onCgSkip() }
+                    }
                     CgVideoPlayer(
                         videoPath = InitializePvz2.config.ui.assets.resolvedCgVideoPath,
                         onSkip = onCgSkip,
@@ -198,6 +217,10 @@ class Pvz2InitializeActivity : ComponentActivity() {
                         },
                         onStateChanged = {},
                     )
+                }
+                // 重启后自动进入游戏：主界面就绪即触发「进入游戏」逻辑
+                if (autoEnterGame) {
+                    LaunchedEffect(Unit) { onGotoGame() }
                 }
             }
         }
