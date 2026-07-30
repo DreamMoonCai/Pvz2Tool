@@ -263,6 +263,8 @@
 | `thread` | 协程 | 异步/协程执行（run/all/launch/sleep/race/timeout/retry/map/interval/setTimeout，返回 Promise，支持并发与后台任务）；并支持协程上下文（context/withContext/local）定义作用域、调度器与局部状态 | 全局 |
 | `toast` | 吐司 | 系统轻提示（show/显示/提示/吐司，及 short/短、long/长 便捷方法；支持 short/long 时长与数字 0/1），切主线程显示 | 全局 |
 | `app` | 应用 | 应用进程控制（restart/重启/重启应用、restartGame/重启游戏、exit/退出/退出应用/退出APP）；冷重启、退出进程、重启后自动进入游戏 | 全局 |
+| `dex` | dex加载 | DEX 加载（load/加载、loadFromAsset/从资源加载、loadFromUrl/从网络加载），把外部 .dex/.apk/.jar 加载到独立 DexClassLoader 并返回句柄 | 全局 |
+| `reflect` | 反射 | 反射（findClass/查找类 及 YukiReflection 风格的类/方法/字段/构造器/实例链式操作，活对象以 `Wrapper<T>` 子类句柄（携带原始对象）形式往返 JS） | 全局 |
 | `device` | 设备 | 当前安卓设备信息（系统 / 屏幕 / 内存 / 存储 / 电池 / 网络 / 应用 / CPU / Root） | 全局 |
 | `rton` | RTON | RTON 文件编解码 | 局部 |
 | `rsb` | RSB | RSB 资源包解包/打包 | 局部 |
@@ -3458,7 +3460,7 @@ toast.short("已复制");
 
 全局对象 `app`（中文别名 `应用`），提供三类进程级操作：重启应用、重启并自动进入游戏、退出应用。
 
-所有操作均在主线程（`Looper.getMainLooper()`）执行，对 Activity / 任务的变更（启动 Intent、结束任务栈、终止进程）均安全；异常静默忽略，不影响脚本后续执行。
+所有操作均在协程主线程上下文（`Dispatchers.Main`）执行，对 Activity / 任务的变更（启动 Intent、结束任务栈、终止进程）均安全；异常静默忽略，不影响脚本后续执行。
 
 ### app.restart / app.重启 / app.重启应用 / app.重启APP
 
@@ -3506,6 +3508,112 @@ app.退出();
 
 ---
 
+## 19. dex - DEX 加载
+
+全局对象 `dex`（中文别名 `dex加载`），用于把外部的 `.dex` / `.apk` / `.jar` 加载到独立的 [DexClassLoader]，从而反射其中的类。加载得到的「类加载器句柄」可传给 `reflect.findClass(name, loader)` 来反射 DEX 内的类。
+
+所有失败均静默返回 `null`，不影响脚本。
+
+### dex.load / dex.加载 / dex.loadDex
+
+从文件系统路径加载 DEX。
+
+**参数**：
+- `path`（string，必填）：`.dex` / `.apk` / `.jar` 文件的绝对或工作目录相对路径。
+- `parent`（可选）：父类加载器句柄（即另一个 `dex` 对象），用于让新加载的类能引用父加载器中的类；省略则使用应用自身类加载器。
+
+**返回**：类加载器句柄对象（含 `path`、以及 `findClass(name)` 方法，句柄本身携带原始 `ClassLoader`，无需 id），失败返回 `null`。
+
+### dex.loadFromAsset / dex.从资源加载
+
+从 APK assets 提取并加载 DEX。
+
+**参数**：`assetName`（string，assets 内相对路径）、可选 `parent`。
+
+### dex.loadFromUrl / dex.从网络加载
+
+从网络 URL 下载并加载 DEX。
+
+**参数**：`url`（string）、可选 `parent`。
+
+**示例**：
+```javascript
+// 加载外部 DEX 并反射其中类
+let loader = dex.load("/sdcard/plugins/my.dex");
+let Cls = loader.findClass("com.example.Plugin");
+let inst = Cls.newInstance();           // 无参构造
+inst.call("doSomething", 1, "x");       // 在实例上调用方法
+```
+
+---
+
+## 20. reflect - 反射
+
+全局对象 `reflect`（中文别名 `反射`），基于 [YukiReflection](https://github.com/HighCapable/YukiReflection) 的调用风格，提供类 / 方法 / 字段 / 构造器 / 实例的链式反射操作。
+
+**句柄互通**：keight 通过 `Wrapper<T>` 接口（每个句柄继承 `JsObjectImpl` 并实现 `Wrapper`，把原始 Java 对象（Class / 实例 / ClassLoader）藏在 `value` 中、并 override `toKotlin` 还原）实现任意 Java 对象的 JS 往返。**无需 id、无需注册表**——句柄本身即携带原始对象。把句柄作为实参回传时，`convertArg` 调用 `toKotlin` 直接还原成原始 Java 对象，因此可以「拿到实例再调其方法 / 读写其字段」，也可以「把实例作为另一个方法的参数」。
+
+所有失败均静默返回 `null`。
+
+### reflect.findClass / reflect.查找类 / reflect.反射
+
+按类名取得 `Class` 包装。
+
+**参数**：
+- `name`（string，必填）：完整类名，如 `"android.content.Context"`。
+- `loader`（可选）：`dex` 加载器句柄（即 `dex.load` 等返回的句柄对象），用于反射 DEX 内的类；省略则在应用类路径中查找。
+
+**返回**：Class 句柄，失败返回 `null`。
+
+### Class 句柄方法
+
+- `method(name, [paramTypes?])` / `方法`：取得方法句柄。`paramTypes` 为类型名数组（如 `["int","java.lang.String"]`），省略则按方法名匹配第一个。
+  - **类型匹配说明**：短类型名（`int`/`long`/`boolean`/...）一律解析为**基本类型**（`int.class` 等），其对应装箱类型请用全限定名（如 `java.lang.Integer`）。YukiReflection 的 `param` 按 `Class` 精确匹配、**不会**在基本/装箱间自动转换，因此框架中声明为 `int` 形参的方法用 `"int"` 即可命中；若签名是装箱 `Integer`，引擎会在首次匹配失败后自动用「基本↔装箱」对应类型重试一次，两种写法都能匹配到。
+- `field(name)` / `字段`：取得字段句柄。
+- `constructor([paramTypes?])` / `构造器` / `构造`：取得构造器句柄。
+- `newInstance(...args)` / `新建` / `实例化`：依次尝试无参 / 按实参类型推断的构造器创建实例。
+- `getSuperclass()` / `父类`：返回父类 Class 句柄。
+- `getDeclaredMethods()` / `方法列表`、`getDeclaredFields()` / `字段列表`：返回名称数组。
+- `name` / `simpleName`：类名与短名。
+
+### Method 句柄方法
+
+- `call(instance?, ...args)` / `调用`：在 `instance` 上调用（首参为实例，可 `null` 表示静态），其余为方法实参。
+- `invoke(...args)` / `执行`：静态调用（`instance = null`）。
+
+### Field 句柄方法
+
+- `get(instance?)` / `读取` / `获取`：读字段值（首参为实例，可省略/`null` 表示静态）。
+- `set(instance?, value)` / `写入` / `设置`：写字段值。
+
+### Constructor 句柄方法
+
+- `newInstance(...args)` / `新建` / `实例化`：创建实例。
+
+### Instance 句柄方法（活对象）
+
+- `call(methodName, ...args)` / `调用方法`：在自身上调用方法。
+- `get(fieldName)` / `读字段`：读字段。
+- `set(fieldName, value)` / `写字段`：写字段。
+- `getId()` / `取ID`、`getClass()` / `取类`、`toString()`。
+
+**示例**：
+```javascript
+// 反射系统类并调用静态方法
+let Ctx = reflect.findClass("android.content.Context");
+let MODE = Ctx.field("MODE_PRIVATE").get();   // 读静态字段
+
+// 构造实例 + 链式调用
+let Cls = reflect.findClass("com.popcap.SexyAppFramework.SomeClass");
+let inst = Cls.constructor(["int"]).newInstance(0);
+inst.call("init");
+let r = inst.call("compute", 1, 2);
+console.log(r);
+
+// 把实例作为另一个方法的参数
+otherInst.call("attach", inst);
+```
+
 *文档版本: 2.1*
 *最后更新: 2026-07-17*
 *新增：ui 系列弹窗通用可定制化——所有弹窗（alert/confirm/prompt/select/multiSelect/actionSheet/slider/loading）新增按钮文字（confirmText/cancelText）、按钮背景色（confirmColor/cancelColor，支持命名色与 #RRGGBB/#AARRGGBB 十六进制）、可关闭性（dismissible/可关闭，alert/confirm/prompt/slider/loading 用此名；select/multiSelect/actionSheet 沿用 cancelable），以及事件回调（onConfirm/onCancel/onSelect/onChange/onDismiss，均为 function(value) 形式、异步触发且不阻塞 await）。slider 另增 decimals（小数位）/showValue（是否显示大字体数值）与实时 onChange 回调；loading 另增 update()/更新() 实时刷新文字。详见各弹窗小节与开头「通用选项与回调」*
@@ -3537,3 +3645,7 @@ app.退出();
 *新增：thread 协程上下文（context/协程上下文/创建上下文/createContext 创建可定义 name/dispatcher、可整体 cancel、可共享 local 局部变量的作用域对象；上下文自带 run/launch/all/withContext/local/cancel/isActive/name；任务首个参数为上下文自身便于读取 local）；thread.withContext/切换上下文/切换调度器（在 main/io/default/computation/unconfined 指定调度器上运行 task，JS 调用仍调度回引擎线程保证单线程安全）；thread.local/变量/上下文变量（引擎级全局共享变量，跨脚本持久）。参见新增第 16 节*
 *新增：toast 轻提示对象（show/显示/提示/吐司，及 short/短、long/长 便捷方法；duration 支持 short/long 字符串或 0/1 数字，省略默认短），切主线程显示、失败静默忽略。参见新增第 17 节*
 *新增：app 应用进程控制对象（restart/重启/重启应用、restartGame/重启游戏、exit/退出/退出应用/退出APP；冷重启经 LAUNCHER Intent + NEW_TASK|CLEAR_TASK，重启游戏经 EXTRA_AUTO_ENTER_GAME 让入口 Activity 自动进入游戏，退出经 finishAffinity + killProcess）。参见新增第 18 节*
+*修正：app 第 18 节说明——主线程切换已由 Handler(Looper.getMainLooper()) 改为协程 Dispatchers.Main（与 JsToast/toast 一致）*
+*新增：dex DEX 加载对象（load/加载/loadDex、loadFromAsset/从资源加载、loadFromUrl/从网络加载；基于 DexClassLoader 加载 .dex/.apk/.jar 到独立类加载器并返回句柄，句柄可传给 reflect.findClass 反射 DEX 内类）。参见新增第 19 节*
+*新增：reflect 反射对象（findClass/查找类/反射 及 YukiReflection 风格的 Class/Method/Field/Constructor/Instance 链式操作；活对象以「`Wrapper<T>` 子类句柄」（JsClassWrapper/JsInstanceWrapper/JsLoaderWrapper，均实现 Wrapper 并 override toKotlin 还原原始对象）在 JS 间往返，支持实例方法调用、字段读写、实例作为方法参数，无需 id 注册表）。参见新增第 20 节*
+*修正：dex/reflect 句柄机制由「id 注册表 + 句柄」重构为 keight 原生 `Wrapper<T>` 子类（消除全局注册表与所有 `.id` 属性，`convertArg` 退化为 `arg.toKotlin(runtime)`）；并移除 `dex.of/取加载器` 与 `reflect.of/取类` 两个按 id 取回的方法（句柄本身即携带原始对象，无需按 id 找回）*
