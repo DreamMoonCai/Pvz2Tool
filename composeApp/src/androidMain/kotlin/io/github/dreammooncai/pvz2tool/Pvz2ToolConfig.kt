@@ -482,6 +482,8 @@ data class Pvz2ToolConfigUI(
     val sounds: Pvz2ToolConfigUISounds = Pvz2ToolConfigUISounds(),
     /** 悬浮窗面板内容配置（动态可配置按钮列表，与「栏目」BUTTON 项字段一致） */
     val floatingWindow: Pvz2ToolConfigUIFloatingWindow = Pvz2ToolConfigUIFloatingWindow(),
+    /** 顶栏（设置图标左侧）由 yml 配置的可点击图标组 */
+    val topBarIcons: Pvz2ToolConfigUITopBarIcons = Pvz2ToolConfigUITopBarIcons(),
 )
 
 @Serializable
@@ -872,3 +874,43 @@ data class FloatingWindowItem(
     /** 展示用文字：buttonText > name > id */
     val displayName get() = buttonText ?: name ?: id
 }
+
+/**
+ * 顶栏（设置图标左侧）由 yml 配置的可点击图标组。
+ * 每个图标的正常态 / 按下态资源均来自 [AssetExtractorHolder]，点击执行其配置的 JS 脚本。
+ */
+@Serializable
+data class Pvz2ToolConfigUITopBarIcons(
+    /** 图标列表，按数组顺序从左到右排列在「设置」图标左侧 */
+    val items: List<TopBarIconItem> = emptyList(),
+)
+
+/**
+ * 顶栏单个可点击图标。字段命名尽量对齐 [FloatingWindowItem]，降低学习成本。
+ *
+ * @param id          必填，唯一标识
+ * @param icon        正常态图标资源路径（[AssetExtractorHolder] 解析：相对工作目录 / 绝对路径 / URL / APK Assets）
+ * @param iconPress   按下态图标资源路径（同上）；为空则按下时复用 [icon]
+ * @param contentDescription 无障碍描述（可选）
+ * @param jsScript    点击执行的 JS 脚本（jsPath 为空时生效）
+ * @param jsPath      脚本文件路径（jsScript 为空时从本地工作目录 / APK 加载）
+ * @param isShowFromJs 可见性 JS 表达式：返回 true 才渲染；为空 = 始终显示。
+ *                     与悬浮窗按钮一致，会随复合文本一起自动重算，可实现运行时动态显隐。
+ * @param isShowFromJsPath 可见性脚本文件路径（isShowFromJs 为空时生效）。
+ *                     路径解析规则同 [jsPath]（占位符展开 + 绝对 / 工作目录 / APK 三级查找）；文件读不到时保守判定为隐藏。
+ * @param pressSound  按下音效文件名（相对 assets/pvz2tool/sound/）；为空默认用设置按钮音效
+ * @param releaseSound 释放音效文件名（相对 assets/pvz2tool/sound/）；为空默认用设置按钮音效
+ */
+@Serializable
+data class TopBarIconItem(
+    val id: String,
+    val icon: String,
+    val iconPress: String? = null,
+    val contentDescription: String? = null,
+    val jsScript: String? = null,
+    val jsPath: String? = null,
+    val isShowFromJs: String? = null,
+    val isShowFromJsPath: String? = null,
+    val pressSound: String? = null,
+    val releaseSound: String? = null,
+)

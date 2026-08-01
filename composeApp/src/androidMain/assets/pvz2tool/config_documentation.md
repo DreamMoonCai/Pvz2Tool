@@ -759,6 +759,45 @@ ui:
   | `vpn.isActive()` | 当前是否处于断网状态 |
   | `ui.isCustomGameDisplayEnabled()` | 设置中「自定义游戏画面」开关是否已开启 |
 
+**顶栏图标组（`ui.topBarIcons`，排在「设置」图标左侧）：**
+
+在主界面顶部应用栏、设置图标**左侧**，由 yml 动态渲染一组可点击图标。每个图标资源（正常态 / 按下态）来自 `AssetExtractorHolder`（相对工作目录 / 绝对路径 / URL / APK Assets 三级解析），点击执行其配置的 JS 脚本。支持配置多个图标，按顺序从左到右排列。字段与悬浮窗按钮保持一致：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `topBarIcons` | Object | 见下表 | 顶栏图标组配置（位于 `ui:` 下） |
+| `items` | List | `[]` | 图标列表，按数组顺序从左到右排列在「设置」图标左侧 |
+| `items[].id` | String | - | 必填，唯一标识 |
+| `items[].icon` | String | - | 正常态图标资源路径（`AssetExtractorHolder` 解析） |
+| `items[].iconPress` | String | - | 按下态图标资源路径（同上）；不填则按下时复用 `icon` |
+| `items[].contentDescription` | String | - | 无障碍描述 |
+| `items[].jsScript` | String | - | 点击执行的 JS 脚本（`jsPath` 为空时生效） |
+| `items[].jsPath` | String | - | JS 脚本文件路径（`jsScript` 为空时从本地工作目录 / APK 加载） |
+| `items[].isShowFromJs` | String | - | 可见性 JS 表达式：返回 `true` 才渲染该图标，不填 = 始终显示。会随复合文本一起自动重算，可实现运行时动态显隐 |
+| `items[].isShowFromJsPath` | String | - | 可见性脚本文件路径（`isShowFromJs` 为空时生效），路径规则同 `jsPath`；文件读不到时判定为隐藏 |
+| `items[].pressSound` | String | - | 按下音效文件名（相对 `assets/pvz2tool/sound/`）；不填默认用设置按钮音效 |
+| `items[].releaseSound` | String | - | 释放音效文件名（同上）；不填默认用设置按钮音效 |
+
+> **点击执行逻辑**：与悬浮窗按钮一致 —— `jsScript` 优先，为空时回退 `jsPath`（占位符展开 + 三级查找后读取文件内容执行）。脚本执行完毕后广播一次「复合文本重算」信号，使 `isShowFromJs` 等动态显隐即时更新。
+> **显隐重算时机**：与 `{{js:...}}` 文案完全一致，任意用户交互脚本执行后自动重算。
+> **示例**（见 `dream.yml` 的 `ui.topBarIcons`）：
+
+```yaml
+ui:
+  topBarIcons:
+    items:
+      - id: refresh_top
+        icon: "images/ic_refresh.png"
+        iconPress: "images/ic_refresh_press.png"
+        contentDescription: "刷新"
+        isShowFromJs: "ui.isCustomGameDisplayEnabled()"
+        jsScript: "ui.refreshAll();"
+      - id: help_top
+        icon: "images/ic_help.png"
+        contentDescription: "帮助"
+        jsPath: "topbar/help.js"
+```
+
 所有文本类配置均支持**复合颜色样式**，语法：
 
 - **颜色与阴影**：

@@ -92,17 +92,21 @@ import io.github.dreammooncai.pvz2tool.view.PvzOrangeButton
 import io.github.dreammooncai.pvz2tool.view.PvzPurpleButton
 import io.github.dreammooncai.pvz2tool.view.PvzRedButton
 import io.github.dreammooncai.pvz2tool.view.ImageSvgButton
+import io.github.dreammooncai.pvz2tool.view.ImageAssetButton
+import androidx.compose.ui.platform.LocalConfiguration
 import io.github.dreammooncai.pvz2tool.icon.Pvz2Icon
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import io.github.dreammooncai.manager.FilePickerManager
 import io.github.dreammooncai.pvz2tool.VersionDef
+import io.github.dreammooncai.pvz2tool.TopBarIconItem
 import io.github.dreammooncai.pvz2tool.controller.SoundController
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.z4kn4fein.semver.Version
 import io.github.dreammooncai.pvz2tool.js.rememberJsVisibility
+import io.github.dreammooncai.pvz2tool.js.JsRichTextRefresher
 import io.github.dreammooncai.pvz2tool.js.JsConsole
 import io.github.dreammooncai.pvz2tool.js.JsLogLevel
 import io.github.dreammooncai.pvz2tool.js.JsLogger
@@ -2771,12 +2775,21 @@ fun Pvz2MainScreen(
 
             Scaffold(
                 topBar = {
+                    // 顶栏高度按设备尺寸自适应：手机保持 56dp，平板（最小边 ≥600dp）放大到 64/72，避免大屏上顶栏显得矮
+                    val topBarHeightDp = run {
+                        val cfg = LocalConfiguration.current
+                        val smallest = minOf(cfg.screenWidthDp, cfg.screenHeightDp)
+                        when {
+                            smallest >= 840 -> 72
+                            smallest >= 600 -> 64
+                            else -> Pvz2Constants.Dimension.TOP_BAR_HEIGHT
+                        }.dp
+                    }
                     TopAppBar(
                         title = {
                             BoxWithConstraints(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(horizontal = 10.dp) // 建议只留左右padding，上下留给内容去居中
                             ) {
                                 // 1. 加大比例系数
                                 val availableHeight = maxHeight
@@ -2785,8 +2798,10 @@ fun Pvz2MainScreen(
 
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp), // 2. 图标之间增加固定间距
-                                    modifier = Modifier.fillMaxSize()
+                                    horizontalArrangement = Arrangement.spacedBy(availableHeight * 0.14f), // 2. 图标间距随顶栏高度缩放
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = availableHeight * 0.18f) // 左右留白随顶栏高度缩放
                                 ) {
                                     PvzRichText(
                                         config.ui.title.topAppBar,
@@ -2795,6 +2810,45 @@ fun Pvz2MainScreen(
                                         modifier = Modifier.weight(1f),
                                         defaultStyle = PvzTextWhiteStyle
                                     )
+
+                                    // ===== yml 配置的顶部图标组（排在「设置」图标左侧）=====
+                                    // 先按 isShowFromJs / isShowFromJsPath 收集可见项，再渲染（composable 调用不在条件分支里），
+                                    // 并用 key(item.id) 绑定各项内部 remember 状态，避免显隐切换时状态错位（同栏目功能项做法）。
+                                    val scope = rememberCoroutineScope()
+                                    val topBarIconItems = InitializePvz2.config.ui.topBarIcons.items
+                                    val visibleTopBarIcons = mutableListOf<TopBarIconItem>()
+                                    topBarIconItems.forEach { item ->
+                                        if (rememberJsVisibility(item.isShowFromJs, item.isShowFromJsPath)) {
+                                            visibleTopBarIcons += item
+                                        }
+                                    }
+                                    visibleTopBarIcons.forEach { item ->
+                                        key(item.id) {
+                                            ImageAssetButton(
+                                                normalPath = item.icon,
+                                                pressPath = item.iconPress,
+                                                contentDescription = item.contentDescription,
+                                                modifier = Modifier.size(imageSize),
+                                                pressSound = item.pressSound,
+                                                releaseSound = item.releaseSound
+                                            ) {
+                                                // 点击执行 JS：jsScript 优先，jsPath 兜底（与悬浮窗按钮一致）
+                                                val script = item.jsScript?.takeIf { it.isNotBlank() }
+                                                    ?: item.jsPath?.let { path ->
+                                                        AssetExtractorHolder.openInputStream(
+                                                            JsFileResolver.resolvePlaceholders(path)
+                                                        )?.use { it.bufferedReader().readText() }
+                                                    }
+                                                if (script != null) {
+                                                    scope.launch {
+                                                        runCatching { PvzToolJsEngine.executeScript(script) }
+                                                        // 通知所有 {{js:...}} 复合文本重算，使 UI 随本次脚本改变的状态即时更新
+                                                        JsRichTextRefresher.refresh()
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
 
                                     // 图标现在会更大，且中间有间隔
                                     ImageSvgButton(
@@ -2840,7 +2894,7 @@ fun Pvz2MainScreen(
                             titleContentColor = Color.White
                         ),
                         modifier = Modifier
-                            .height(Pvz2Constants.Dimension.TOP_BAR_HEIGHT.dp)
+                            .height(topBarHeightDp)
                             .drawBehind {
                                 drawRoundRect(
                                     brush = Brush.verticalGradient(colors = listOf(Color(0xff7BC400), Color(0xff4A9A00))),

@@ -2547,6 +2547,32 @@ ui:
         isShowFromJs: "ui.isCustomGameDisplayEnabled()"
         jsScript: "ui.showGameDisplay();"
 
+  # 顶栏图标组（排在「设置」图标左侧，由 yml 配置，支持多个；图标资源来自 AssetExtractorHolder）
+  # 字段说明：
+  #   id          必填，唯一标识
+  #   icon        正常态图标资源路径（相对工作目录 / 绝对路径 / URL / APK Assets，经 AssetExtractorHolder 解析）
+  #   iconPress   按下态图标资源路径（同上）；不填则按下时复用 icon
+  #   contentDescription 无障碍描述
+  #   jsScript    点击执行的 JS 脚本（jsPath 为空时生效）
+  #   jsPath      脚本文件路径（jsScript 为空时从本地工作目录 / APK 加载）
+  #   isShowFromJs 可见性 JS 表达式：返回 true 才显示，不填=始终显示（与悬浮窗按钮一致，每次脚本执行后自动重算）
+  #   isShowFromJsPath 可见性脚本文件路径（isShowFromJs 为空时生效）
+  #   pressSound / releaseSound 音效文件名（相对 assets/pvz2tool/sound/）；不填默认用设置按钮音效
+  topBarIcons:
+    items:
+      # 示例：一个「刷新」图标，点击执行 JS；仅在开启自定义画面时显示
+      - id: refresh_top
+        icon: "images/new_version_icon.png"
+        iconPress: "images/new_version_icon.png"
+        contentDescription: "刷新"
+        isShowFromJs: "ui.isCustomGameDisplayEnabled()"
+        jsScript: "ui.refreshAll();"
+      # 示例：一个「帮助」图标，点击执行 jsPath 指向的脚本文件
+      - id: help_top
+        icon: "images/new_version_icon.png"
+        contentDescription: "帮助"
+        jsPath: "topbar/help.js"
+
   # JS 日志面板配置
   log:
     panelTitle: "JS 日志"
