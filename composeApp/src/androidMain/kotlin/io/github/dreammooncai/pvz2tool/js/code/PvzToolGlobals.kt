@@ -342,7 +342,9 @@ object PvzToolGlobals {
         // 断开网络（开启 VPN 拦截）：vpn.disconnect() / vpn.断网() / vpn.断开网络()
         listOf("disconnect".js, "断网".js, "断开网络".js).func {
             withContext(Dispatchers.Main) {
-                runCatching { LocalVpnService.startVpn(InitializePvz2.context) }
+                runCatching { LocalVpnService.startVpn(InitializePvz2.context) }.onFailure {
+                    LocalVpnService.stopVpn(InitializePvz2.context)
+                }
             }
             null
         }
