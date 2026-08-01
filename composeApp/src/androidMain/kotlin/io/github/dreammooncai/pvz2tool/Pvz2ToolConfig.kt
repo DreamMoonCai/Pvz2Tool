@@ -348,7 +348,28 @@ data class SectionItem(
     /**
      * 仅对 INFO 类型生效：信息展示的当前值（通常由 JS 动态更新）。
      */
-    val infoValue: String? = null
+    val infoValue: String? = null,
+    // ========== 动态显隐（所有类型通用） ==========
+    /**
+     * 可见性判定 JS 表达式：返回真值才渲染该功能项；为空表示始终显示。
+     *
+     * 写法是**裸表达式**（不需要 `{{js:}}` 包裹），例如：
+     * - `vpn.isPrepared()` —— VPN 已授权才显示
+     * - `ui.isCustomGameDisplayEnabled()` —— 开启自定义画面才显示
+     * - `file.exists('$WORK_DIR/foo.rsb')` —— 文件存在才显示
+     *
+     * 求值时机与 `{{js:...}}` 动态文案完全一致：任意 BUTTON / CHECKBOX / SLIDER / INPUT
+     * 交互执行脚本后会自动重算，可实现运行时动态显隐。
+     *
+     * 求值异常、返回 `false` / `0` / `null` / `undefined` / 空串均判为隐藏（保守策略）。
+     */
+    val isShowFromJs: String? = null,
+    /**
+     * 可见性判定脚本文件路径；仅当 [isShowFromJs] 为空时生效。
+     * 路径解析规则同 [jsPath]（占位符展开 + 绝对路径/本地工作目录/APK Assets 三级查找）。
+     * 文件读不到时保守判定为隐藏。
+     */
+    val isShowFromJsPath: String? = null
 ) {
 
     val displayName get() = name ?: buttonText ?: desc ?: id
@@ -459,6 +480,8 @@ data class Pvz2ToolConfigUI(
     val assets: Pvz2ToolConfigUIAssets = Pvz2ToolConfigUIAssets(),
     /** 音效文件名映射（相对于 assets/pvz2tool/sound/） */
     val sounds: Pvz2ToolConfigUISounds = Pvz2ToolConfigUISounds(),
+    /** 悬浮窗面板内容配置（动态可配置按钮列表，与「栏目」BUTTON 项字段一致） */
+    val floatingWindow: Pvz2ToolConfigUIFloatingWindow = Pvz2ToolConfigUIFloatingWindow(),
 )
 
 @Serializable
@@ -799,3 +822,53 @@ data class Pvz2ToolConfigUISounds(
     /** 折叠面板标题 释放音效 */
     val collapsiblePanelRelease: String = "ui_collapsible_panel_click_release.wav",
 )
+
+/**
+ * 悬浮窗面板内容配置（动态可配置，与「栏目」BUTTON 项字段保持一致）
+ */
+@Serializable
+data class Pvz2ToolConfigUIFloatingWindow(
+    /** 悬浮窗面板内从上到下排列的功能按钮列表 */
+    val items: List<FloatingWindowItem> = emptyList(),
+    /** items 未配置时的占位提示 */
+    val emptyTip: String = "（悬浮窗暂无内容，请在 dream.yml 的 ui.floatingWindow.items 中配置）",
+    /** items 已配置但全部被 isShowFromJs 判定为隐藏时的占位提示 */
+    val allHiddenTip: String = "（当前没有可用的功能）",
+)
+
+/**
+ * 悬浮窗单个功能按钮项。
+ * 字段命名与 [SectionItem] 的 BUTTON 类型保持一致，降低学习成本。
+ *
+ * @param id          必填，唯一标识
+ * @param name        按钮文字（不填则回退 buttonText / id）
+ * @param desc        按钮下方的描述文字（可选，预留）
+ * @param icon        左侧图标资源名（相对于 assets/pvz2tool/images/，可选，预留）
+ * @param buttonText  按钮文字（可选，优先级高于 name）
+ * @param buttonColor 按钮颜色：blue(默认) | red | green | orange | purple
+ * @param jsScript    点击执行的 JS 脚本（支持 vpn.disconnect() / ui.showGameDisplay() 等全局 API）
+ * @param jsPath      脚本文件路径（当 jsScript 为空时，从本地工作目录/APK 加载）
+ * @param isShowFromJs 可见性判定 JS 表达式：返回 true 才渲染该按钮；为空表示始终显示。
+ *                     例如 `vpn.isPrepared()`（VPN 已授权才显示断网按钮）、
+ *                     `ui.isCustomGameDisplayEnabled()`（开启自定义画面才显示画面设置）。
+ *                     每次任意脚本执行后会随复合文本一起重算，可实现运行时动态显隐。
+ * @param isShowFromJsPath 可见性判定脚本文件路径；仅当 [isShowFromJs] 为空时生效。
+ *                     路径解析规则同 [jsPath]（占位符展开 + 绝对/工作目录/APK 三级查找）。
+ *                     文件读不到时保守判定为隐藏。
+ */
+@Serializable
+data class FloatingWindowItem(
+    val id: String,
+    val name: String? = null,
+    val desc: String? = null,
+    val icon: String? = null,
+    val buttonText: String? = null,
+    val buttonColor: String? = null,
+    val jsScript: String? = null,
+    val jsPath: String? = null,
+    val isShowFromJs: String? = null,
+    val isShowFromJsPath: String? = null,
+) {
+    /** 展示用文字：buttonText > name > id */
+    val displayName get() = buttonText ?: name ?: id
+}

@@ -22,6 +22,7 @@ import io.github.dreammooncai.pvz2tool.js.code.JsReflect
 import io.github.dreammooncai.pvz2tool.js.code.JsBrowser
 import io.github.dreammooncai.pvz2tool.js.code.JsToast
 import io.github.dreammooncai.pvz2tool.js.code.JsThread
+import io.github.dreammooncai.pvz2tool.js.JsRichTextRefresher
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
@@ -39,6 +40,7 @@ import io.github.dreammooncai.util.openUriInputStreamOrAssetNull
 import android.app.Activity
 import io.github.dreammooncai.pvz2tool.controller.GameDisplayFloatingController
 import io.github.dreammooncai.pvz2tool.service.LocalVpnService
+import io.github.dreammooncai.pvz2tool.ui.main.SettingsDialogState
 import io.github.dreammooncai.util.ContextUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -335,6 +337,23 @@ object PvzToolGlobals {
             }
             null
         }
+
+        // 「自定义游戏画面」开关是否已开启（决定画面设置功能可不可用）：
+        // ui.isCustomGameDisplayEnabled() / ui.是否启用自定义画面() / ui.画面设置是否可用()
+        // 常用于悬浮窗按钮的 isShowFromJs，未开启时自动隐藏「画面设置」按钮。
+        listOf("isCustomGameDisplayEnabled".js, "是否启用自定义画面".js, "画面设置是否可用".js).func {
+            runCatching { SettingsDialogState.isUseCustomGameDisplay }.getOrDefault(false).js
+        }
+
+        // 主动刷新所有复合文本（{{js:...}} 文本与 isShowFromJs 动态显隐）：
+        // ui.refreshAll() / ui.刷新所有() / ui.刷新复合文本()
+        // 当脚本改变了某个运行时状态、但本次交互未由系统自动触发刷新时（例如通过 ui.confirm 回调、
+        // 定时器、网络回调等异步路径修改状态），可手动调用本方法让所有复合文本立即重算。
+        // 内部仅广播一次重算信号，订阅侧（复合文本与动态显隐）会合并后统一刷新，不会死循环。
+        listOf("refreshAll".js, "刷新所有".js, "刷新复合文本".js).func {
+            JsRichTextRefresher.refresh()
+            null
+        }
     }
 
     // ======================== VPN 控制 API ========================
@@ -360,6 +379,17 @@ object PvzToolGlobals {
         // 当前 VPN 是否处于激活状态（即是否处于断网状态）：vpn.isActive() / vpn.是否激活() / vpn.是否开启()
         listOf("isActive".js, "是否激活".js, "是否开启".js, "是否已开启".js).func {
             LocalVpnService.isVpnActive.value.js
+        }
+
+        // VPN 是否已获得系统授权（等价于 Kotlin 侧 LocalVpnService.prepareVpn(context) == null）：
+        // vpn.isPrepared() / vpn.是否已授权() / vpn.已授权() / vpn.是否可用()
+        // 返回 false 表示尚未授权，此时调用 disconnect() 不会真正断网（需先在系统弹窗中授权）。
+        // 常用于悬浮窗按钮的 isShowFromJs，未授权时自动隐藏断网按钮。
+        listOf("isPrepared".js, "是否已授权".js, "已授权".js, "是否可用".js).func {
+            withContext(Dispatchers.Main) {
+                val context = ContextUtil.getCurrentActivity() ?: InitializePvz2.context
+                runCatching { LocalVpnService.prepareVpn(context) == null }.getOrDefault(false)
+            }.js
         }
     }
 

@@ -150,6 +150,8 @@
 | `ui.select()` | `ui.选择()` | 单项选择弹窗（图标网格 / 列表 / 纯文字单选） |
 | `ui.multiSelect()` | `ui.多选()` | 多项选择弹窗（返回选中值数组） |
 | `ui.showGameDisplay()` | `ui.弹出画面设置()` / `ui.画面设置()` | 弹出游戏画面设置全屏浮窗（同悬浮球"画面设置"） |
+| `ui.isCustomGameDisplayEnabled()` | `ui.是否启用自定义画面()` / `ui.画面设置是否可用()` | 「自定义游戏画面」开关是否已开启（可用作 `isShowFromJs` 条件） |
+| `ui.refreshAll()` | `ui.刷新所有()` / `ui.刷新复合文本()` | 主动刷新所有复合文本与动态显隐（见下方详解） |
 
 #### vpn 对象
 | 英文 | 中文别名 | 说明 |
@@ -157,6 +159,7 @@
 | `vpn.disconnect()` | `vpn.断网()` / `vpn.断开网络()` | 断开网络（开启 VPN 拦截） |
 | `vpn.restore()` | `vpn.恢复()` / `vpn.恢复网络()` | 恢复网络（关闭 VPN） |
 | `vpn.isActive()` | `vpn.是否激活()` / `vpn.是否开启()` | 当前 VPN 是否处于激活状态（即是否断网） |
+| `vpn.isPrepared()` | `vpn.是否已授权()` / `vpn.已授权()` / `vpn.是否可用()` | VPN 是否已获系统授权（可用作 `isShowFromJs` 条件） |
 
 #### audio 对象
 | 英文 | 中文别名 | 说明 |
@@ -1942,6 +1945,69 @@ ctrl2.close();
 // 直接弹出游戏画面设置浮窗
 ui.showGameDisplay();
 ui.弹出画面设置();
+```
+
+#### ui.isCustomGameDisplayEnabled / ui.是否启用自定义画面 / ui.画面设置是否可用
+
+查询设置中「自定义游戏画面」开关是否已开启。
+
+**语法**：`ui.isCustomGameDisplayEnabled() -> boolean`
+
+**参数**：无
+
+**说明**：
+- 直接读取 `SettingsDialogState.isUseCustomGameDisplay`（用户在设置弹窗里切换的持久化开关）。
+- 开关关闭时 `ui.showGameDisplay()` 不会有任何反应（控制器内部会直接 return），因此建议先用本方法判断。
+- 典型用法是作为悬浮窗按钮的 `isShowFromJs`，未开启时自动隐藏「画面设置」按钮，见 `config_documentation.md` 的 floatingWindow 章节。
+- 任何异常均返回 `false`。
+
+**返回**：boolean - 是否已开启自定义游戏画面
+
+**示例**：
+```javascript
+if (ui.isCustomGameDisplayEnabled()) {
+    ui.showGameDisplay();
+} else {
+    toast.show("请先在设置中开启「自定义游戏画面」");
+}
+```
+
+```yaml
+# 用作悬浮窗按钮的可见性条件
+- id: game_display
+  name: "画面设置"
+  isShowFromJs: "ui.isCustomGameDisplayEnabled()"
+  jsScript: "ui.showGameDisplay();"
+```
+
+#### ui.refreshAll / ui.刷新所有 / ui.刷新复合文本
+
+手动广播一次「复合文本重算」信号，让界面上所有 `{{js:...}}` 文本与 `isShowFromJs` 动态显隐立即重新求值。
+
+**语法**：`ui.refreshAll() -> void`
+
+**参数**：无
+
+**说明**：
+- 绝大多数交互由系统自动触发刷新（BUTTON 点击 / CHECKBOX / SLIDER / 确认 / 进入游戏脚本执行完毕后都会自动广播一次），一般**无需**手动调用。
+- 当脚本通过**异步路径**改变了运行时状态、而该路径不归上述自动刷新覆盖时，才需要手动调用。典型场景：
+  - `ui.confirm` / `ui.prompt` 的 `onConfirm` 回调里修改了状态；
+  - `thread` / `timer` 定时器、`http` 网络回调中修改了状态；
+  - 自行维护的全局变量被某段逻辑改掉后希望界面立刻同步。
+- 内部仅把重算版本号 +1，订阅侧（复合文本与动态显隐）会以「合并防抖」方式统一刷新，因此**不会**出现「刷新 → 重算 → 再刷新」的死循环（前提是文本表达式本身不要直接调用 `ui.refreshAll()`）。
+- 任何线程都可调用，线程安全。
+
+**返回**：无（void）
+
+**示例**：
+```javascript
+// 在确认弹窗回调里改了状态，自动刷新覆盖不到，手动补一次
+ui.confirm("切换主题", "确定切换到暗色主题？", {
+    onConfirm: () => {
+        myTheme = "dark";        // 自定义全局状态
+        ui.refreshAll();         // 手动让 {{js:myTheme}} 等文本立即重算
+    }
+});
 ```
 
 ## 8.5. js - JS 执行器
@@ -3732,6 +3798,40 @@ if (vpn.isActive()) {
 }
 ```
 
+#### vpn.isPrepared / vpn.是否已授权 / vpn.已授权 / vpn.是否可用
+
+查询 VPN 是否已获得系统授权（即能否真正执行断网）。
+
+**语法**：`vpn.isPrepared() -> boolean`
+
+**参数**：无
+
+**说明**：
+- 等价于 Kotlin 侧的 `LocalVpnService.prepareVpn(context) == null`：系统 `VpnService.prepare()` 返回 `null` 代表已授权，返回 Intent 代表需要用户先在系统弹窗中确认。
+- 返回 `false` 时调用 `vpn.disconnect()` **不会真正断网**，因此断网类功能建议先用本方法做前置判断。
+- Context 优先取当前前台 Activity（`ContextUtil.getCurrentActivity()`），拿不到则回退全局 Context；调用切主线程执行，异常一律返回 `false`。
+
+**返回**：boolean - 是否已授权
+
+**示例**：
+```javascript
+if (!vpn.isPrepared()) {
+    toast.show("请先授权 VPN 后再使用断网功能");
+} else if (vpn.isActive()) {
+    vpn.restore();
+} else {
+    vpn.disconnect();
+}
+```
+
+```yaml
+# 用作悬浮窗按钮的可见性条件：未授权时整个按钮隐藏
+- id: vpn_toggle
+  name: "{{js:vpn.isActive() ? '恢复网络' : '断开网络'}}"
+  isShowFromJs: "vpn.isPrepared()"
+  jsScript: "vpn.isActive() ? vpn.restore() : vpn.disconnect();"
+```
+
 *文档版本: 2.1*
 *最后更新: 2026-07-17*
 *新增：ui 系列弹窗通用可定制化——所有弹窗（alert/confirm/prompt/select/multiSelect/actionSheet/slider/loading）新增按钮文字（confirmText/cancelText）、按钮背景色（confirmColor/cancelColor，支持命名色与 #RRGGBB/#AARRGGBB 十六进制）、可关闭性（dismissible/可关闭，alert/confirm/prompt/slider/loading 用此名；select/multiSelect/actionSheet 沿用 cancelable），以及事件回调（onConfirm/onCancel/onSelect/onChange/onDismiss，均为 function(value) 形式、异步触发且不阻塞 await）。slider 另增 decimals（小数位）/showValue（是否显示大字体数值）与实时 onChange 回调；loading 另增 update()/更新() 实时刷新文字。详见各弹窗小节与开头「通用选项与回调」*
@@ -3758,6 +3858,7 @@ if (vpn.isActive()) {
 *修正：storage.getAll() 返回数组（非 key-value 对象）*
 *修正：this.findById 仅接受单个 id 参数（返回 item 或 section 对象），无双参及 .item/.section 子属性*
 *新增：vpn VPN 控制对象（disconnect/断网/断开网络、restore/恢复/恢复网络、isActive/是否激活/是否开启，底层 LocalVpnService）+ ui.showGameDisplay/弹出画面设置/画面设置 弹出游戏画面设置全屏浮窗（同悬浮球"画面设置"），并补入别名速查表与第 21 章详解*
+*新增：可见性判定 API —— vpn.isPrepared/是否已授权/已授权/是否可用（等价 LocalVpnService.prepareVpn(context) == null，未授权时 disconnect 不会真断网）、ui.isCustomGameDisplayEnabled/是否启用自定义画面/画面设置是否可用（读取 SettingsDialogState.isUseCustomGameDisplay）。二者主要配合 dream.yml 悬浮窗按钮的 isShowFromJs 字段做运行时动态显隐，详见 config_documentation.md 的 floatingWindow 章节*
 *补充：section 对象新增 descriptionValues/描述值；RADIO 项同时支持 checked/选中 别名*
 *补充：rton.load 支持直接加载 .json 文件；path.toInternalPath 相对路径自动按 $WORK_DIR 处理*
 *新增：picker 文件选择器对象（directory/file/files 及中文别名），支持选择目录/单文件/多文件并返回文件对象（基于 SAF DocumentFile）*

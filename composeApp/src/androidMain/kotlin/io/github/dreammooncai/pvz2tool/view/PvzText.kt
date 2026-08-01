@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import io.github.dreammooncai.pvz2tool.DynamicSection
 import io.github.dreammooncai.pvz2tool.SectionItem
 import io.github.dreammooncai.pvz2tool.VersionDef
+import io.github.dreammooncai.pvz2tool.js.JsRichTextRefresher
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.ui.main.DynamicSectionState
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
@@ -44,6 +45,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -133,6 +136,31 @@ private suspend fun executeJsExprNoContext(expr: String): String {
     }
 }
 
+/**
+ * 批量求值文本中出现的所有 {{js:...}} 表达式。
+ * 有上下文时走带上下文重载（JS 可访问 this.当前），否则降级为无上下文执行。
+ * 单个表达式失败时回退为原始标签文本，不影响其余表达式。
+ */
+private suspend fun evaluateJsExpressions(
+    expressions: List<String>,
+    context: JsExecutionContext?
+): Map<String, String> {
+    val results = mutableMapOf<String, String>()
+    for (expr in expressions) {
+        results[expr] = try {
+            val result = if (context != null) {
+                executeJsExprWithContext(expr, context)
+            } else {
+                executeJsExprNoContext(expr)
+            }
+            result.ifBlank { "{{js:$expr}}" }
+        } catch (e: Exception) {
+            "{{js:$expr}}"
+        }
+    }
+    return results
+}
+
 // --------------- 复合文本链接点击：执行 JS / 跳转浏览器 ---------------
 
 /**
@@ -207,6 +235,9 @@ private fun handleLinkClick(
     } else {
         scope.launch {
             runCatching { executeJsFromLink(url, jsContext) }
+            // 链接点击属于用户交互，脚本执行完后刷新所有 {{js:...}}
+            // （executeJsFromLink 内部按 isRichText = true 调用，不会自动触发刷新）
+            JsRichTextRefresher.refresh()
         }
     }
 }
@@ -483,33 +514,21 @@ fun PvzRichText(
     }
 
     // 2. 异步执行 JS 并缓存结果（使用 produceState 支持 suspend）
-    val jsCache by produceState(emptyMap(), jsExpressions, effectiveContext) {
-        if (effectiveContext != null && jsExpressions.isNotEmpty()) {
-            // 有上下文：使用带上下文的 executeScript，使 JS 中可访问 this.当前
-            val results = mutableMapOf<String, String>()
-            for (expr in jsExpressions) {
-                try {
-                    val result = executeJsExprWithContext(expr, effectiveContext)
-                    results[expr] = result.ifBlank { "{{js:$expr}}" }
-                } catch (e: Exception) {
-                    results[expr] = "{{js:$expr}}"
-                }
-            }
-            value = results
-        } else if (jsExpressions.isNotEmpty()) {
-            // 无上下文：降级为无参执行（兼容无上下文场景）
-            val results = mutableMapOf<String, String>()
-            for (expr in jsExpressions) {
-                try {
-                    val result = executeJsExprNoContext(expr)
-                    results[expr] = result.ifBlank { "{{js:$expr}}" }
-                } catch (e: Exception) {
-                    results[expr] = "{{js:$expr}}"
-                }
-            }
-            value = results
-        } else {
+    //    订阅 JsRichTextRefresher.revision：任何用户交互触发的 JS（BUTTON / CHECKBOX / SLIDER /
+    //    悬浮窗按钮 / 链接点击）执行完毕后都会自增该版本号，这里随之重新求值，
+    //    使 "{{js:vpn.isActive() ? '恢复网络' : '断开网络'}}" 这类文本能跟随状态实时更新。
+    val jsCache by produceState<Map<String, String>>(emptyMap(), jsExpressions, effectiveContext) {
+        if (jsExpressions.isEmpty()) {
             value = emptyMap()
+            return@produceState
+        }
+        var isFirstEmission = true
+        // collectLatest：连续刷新信号会取消上一轮（含下面的 delay），天然合并成一次求值
+        JsRichTextRefresher.revision.collectLatest {
+            // 首帧立即求值；后续刷新做一个极短防抖，合并同一批次的多次通知
+            if (!isFirstEmission) delay(60)
+            isFirstEmission = false
+            value = evaluateJsExpressions(jsExpressions, effectiveContext)
         }
     }
 

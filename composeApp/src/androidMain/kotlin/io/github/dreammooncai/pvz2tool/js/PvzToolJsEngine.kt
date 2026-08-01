@@ -213,11 +213,18 @@ object PvzToolJsEngine {
             }.getOrDefault("")
         } finally {
             JsFileAccess.cacheFileList.toList().forEach { file -> file.close() }
+            // 非复合文本求值（即 BUTTON / CHECKBOX / SLIDER 等组件触发的脚本）执行完毕后，
+            // 通知所有 {{js:...}} 复合文本重新计算，使 name / desc / buttonText 能反映最新的 JS 状态。
+            // isRichText = true 的调用是复合文本自身求值，跳过以避免「求值 → 刷新 → 再求值」死循环。
+            if (!isRichText) JsRichTextRefresher.refresh()
         }
     }
 
     /**
      * 执行一段 JS 脚本字符串（无上下文，用于通用脚本执行）。
+     *
+     * 注意：该重载同时被复合文本的无上下文降级求值复用，因此**不会**自动触发
+     * [JsRichTextRefresher.refresh]。若调用方是用户交互（如悬浮窗按钮），请在执行后手动调用。
      */
     suspend fun executeScript(script: String): String {
         val engine = getJSEngine()

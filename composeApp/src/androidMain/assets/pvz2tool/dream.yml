@@ -2474,6 +2474,38 @@ ui:
       widthHint: "宽度（dp）"
       heightHint: "高度（dp）"
 
+  # 悬浮窗内容配置（动态可配置，与「栏目」BUTTON 项字段一致；示例默认展示断网与画面设置）
+  floatingWindow:
+    # 悬浮窗面板内按钮列表（按数组顺序从上到下排列），每个按钮点击后执行其 jsScript
+    # 字段说明：
+    #   id          必填，唯一标识
+    #   name        按钮文字（不填则用 buttonText）。支持复合文本；写成 {{js:表达式}} 时，
+    #               每次 jsScript 执行完毕都会自动重算，可实现「断网 ⇄ 恢复」这类文案自动翻转
+    #   buttonText  按钮文字（可选，优先级高于 name），同样支持复合文本
+    #   buttonColor 按钮颜色：blue(默认) | red | green | orange | purple
+    #   icon        左侧图标资源名（相对于 assets/pvz2tool/images/，可选，预留）
+    #   desc        按钮下方描述文字（可选，预留）
+    #   jsScript    点击执行的 JS 脚本（支持 vpn.disconnect() / ui.showGameDisplay() 等全局 API）
+    #   jsPath      脚本文件路径（jsScript 为空时从本地/APK 加载）
+    #   isShowFromJs 可见性 JS 表达式：返回 true 才显示该按钮，不填=始终显示。
+    #               与 name 一样会在每次脚本执行后自动重算，可实现运行时动态显隐。
+    #               常用判定：vpn.isPrepared()（VPN 已授权）、ui.isCustomGameDisplayEnabled()（已开启自定义画面）
+    #   isShowFromJsPath 可见性脚本文件路径（isShowFromJs 为空时生效），路径规则同 jsPath；读不到文件=隐藏
+    # 注：isShowFromJs / isShowFromJsPath 同样可用在「栏目功能项」（sections[n].items[n]）上，用法完全一致
+    emptyTip: "（悬浮窗暂无内容，请在 dream.yml 的 ui.floatingWindow.items 中配置）"
+    allHiddenTip: "（当前没有可用的功能）"
+    items:
+      - id: vpn_toggle
+        name: "{{js:vpn.isActive() ? '恢复网络' : '断开网络'}}"
+        buttonColor: "red"
+        isShowFromJs: "vpn.isPrepared()"
+        jsScript: "vpn.isActive() ? vpn.restore() : vpn.disconnect();"
+      - id: game_display
+        name: "画面设置"
+        buttonColor: "green"
+        isShowFromJs: "ui.isCustomGameDisplayEnabled()"
+        jsScript: "ui.showGameDisplay();"
+
   # JS 日志面板配置
   log:
     panelTitle: "JS 日志"

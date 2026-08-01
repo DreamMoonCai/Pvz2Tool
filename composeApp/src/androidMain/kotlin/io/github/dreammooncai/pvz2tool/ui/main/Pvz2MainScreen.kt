@@ -37,7 +37,8 @@ import androidx.compose.material3.*
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.runtime.*import androidx.compose.ui.Alignment
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -101,6 +102,7 @@ import io.github.dreammooncai.pvz2tool.controller.SoundController
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.z4kn4fein.semver.Version
+import io.github.dreammooncai.pvz2tool.js.rememberJsVisibility
 import io.github.dreammooncai.pvz2tool.js.JsConsole
 import io.github.dreammooncai.pvz2tool.js.JsLogLevel
 import io.github.dreammooncai.pvz2tool.js.JsLogger
@@ -486,7 +488,7 @@ private fun SectionButtonItem(
  * 根据颜色字符串渲染对应颜色的 PVZ 按钮，抽出复用。
  */
 @Composable
-private fun RenderColoredButton(
+fun RenderColoredButton(
     color: String,
     text: String,
     modifier: Modifier,
@@ -1445,7 +1447,19 @@ private fun DynamicSectionComponent(
                 theme = theme
             )
         } else {
-            section.items.forEach { item ->
+            // 逐项求值 isShowFromJs / isShowFromJsPath（两者皆空视为始终显示）。
+            // 求值订阅 JsRichTextRefresher，因此栏目内任意交互执行脚本后，功能项可实时显隐。
+            // 注意：composable 调用必须在条件分支之外、按固定顺序执行，故先 forEach 收集再渲染。
+            val visibleItems = ArrayList<SectionItem>(section.items.size)
+            section.items.forEach { candidate ->
+                if (rememberJsVisibility(candidate.isShowFromJs, candidate.isShowFromJsPath)) {
+                    visibleItems += candidate
+                }
+            }
+
+            // key(item.id)：隐藏/显示会改变渲染项数量，用稳定 key 绑定各项内部 remember 状态，
+            // 避免显隐切换时后续项的 CoroutineScope / 输入框状态等发生错位。
+            visibleItems.forEach { item -> key(item.id) {
                 CompositionLocalProvider(LocalJsExecutionContext provides JsExecutionContext(
                     section = section,
                     item = item,
@@ -1949,8 +1963,8 @@ private fun DynamicSectionComponent(
                     }
                 }
 
-                // item 之间的分隔线（最后一个 item 不加分隔线）
-                if (item != section.items.last()) {
+                // item 之间的分隔线（最后一个可见 item 不加分隔线）
+                if (item != visibleItems.last()) {
                     HorizontalDivider(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1959,7 +1973,7 @@ private fun DynamicSectionComponent(
                         color = theme.dividerColor.copy(alpha = theme.dividerAlpha)
                     )
                 }
-            }
+            } }
 
             // 保存按钮（如果有配置）
             section.confirmButtonText?.let { btnText ->

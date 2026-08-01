@@ -115,6 +115,46 @@ simplifiedLaunch: true
 | `items[n].jsScript` | String | BUTTON/RADIO/CHECKBOX/SLIDER/INFO | 点击/切换时执行的 JS 脚本，支持 async/await；**当 assetPath 目录下存在 SMF 文件时，脚本可通过 `this.data` 访问并修改 SMF 数据** |
 | `items[n].jsPath` | String | BUTTON/RADIO/CHECKBOX/SLIDER/INFO | JS 脚本文件路径；当 `jsScript` 为空时从该路径加载 JS 文件；默认 `version/版本ID/栏目ID/功能项ID/main.js`；支持占位符变量 |
 | `items[n].smfList` | Array | BUTTON/RADIO/CHECKBOX | SMF 基名列表，如 `["dynamic"]`；用于 JS 中 `$SMF` 占位符解析和 SMF 数据修改；不配置则不加载 SMF；查找顺序：1. `pvz2tool/version/版本ID/smf/<名称>(.rsb.smf/.obb)` 2. `pvz2tool/<baseAssetPath>/<名称>(.rsb.smf/.obb)`,对于obb文件内置对象名为data.obb |
+| `items[n].isShowFromJs` | String | 全部 | **可见性 JS 表达式**：返回真值才渲染该功能项，不填 = 始终显示；详见下方「功能项动态显隐」 |
+| `items[n].isShowFromJsPath` | String | 全部 | **可见性脚本文件路径**（`isShowFromJs` 为空时生效）；路径规则同 `jsPath`；文件读不到时判定为隐藏 |
+
+#### 功能项动态显隐（isShowFromJs / isShowFromJsPath）
+
+给任意类型的功能项加上 `isShowFromJs`，即可用一行 JS 表达式描述「什么情况下才显示我」：
+
+```yaml
+items:
+  - id: vpn_switch
+    type: BUTTON
+    name: "{{js:vpn.isActive() ? '恢复网络' : '断开网络'}}"
+    isShowFromJs: "vpn.isPrepared()"        # VPN 已授权才显示这一项
+    jsScript: "vpn.isActive() ? vpn.restore() : vpn.disconnect();"
+
+  - id: advanced_patch
+    type: CHECKBOX
+    name: "高级补丁"
+    isShowFromJsPath: "version/1.0/checks/advanced.js"   # 判定逻辑写在独立脚本文件里
+```
+
+- **写法**：`isShowFromJs` 是**裸表达式**，不要加 `{{js:}}` 包裹；`name` / `desc` 里的动态文案才用 `{{js:}}`。
+- **优先级**：`isShowFromJs` > `isShowFromJsPath`，两者都为空 = 始终显示（不会触碰 JS 引擎，无性能开销）。
+- **路径规则**：`isShowFromJsPath` 与 `jsPath` 一致 —— 支持占位符变量，按「绝对路径 → 本地工作目录 → APK Assets」顺序查找；文件不存在时判定为隐藏。
+- **脚本文件写法**：判定结果取脚本的**完成值**，所以最后一句必须是「值表达式」，不能是 `if` 或 `return`。多分支请用三元或立即执行函数：
+
+  ```js
+  // ✅ 正确
+  var v = app.version();
+  v >= 11 && file.exists('$WORK_DIR/patch.rsb')
+
+  // ✅ 正确（多分支用 IIFE）
+  (function () { if (!vpn.isPrepared()) return false; return !vpn.isActive(); })()
+
+  // ❌ 错误：末句是 if，完成值为 undefined → 判定为隐藏
+  if (vpn.isPrepared()) { true } else { false }
+  ```
+- **真假判定**：`false` / `0` / `null` / `undefined` / `NaN` / 空串 → 隐藏，其余 → 显示；**表达式报错也按隐藏处理**（保守策略）。
+- **自动重算**：与 `{{js:...}}` 动态文案共用同一条刷新通道 —— 同栏目内任意 BUTTON 点击、CHECKBOX 勾选、SLIDER 拖动结束后都会重新判定，因此功能项可以随运行时状态实时出现/消失，无需重进页面。
+- **首帧行为**：求值完成前不渲染，避免「先闪现再消失」；被隐藏的项不参与分隔线计算，不会留下空白横线。
 
 **按钮类型专属字段（BUTTON）**：
 | 属性 | 类型 | 说明 |
@@ -656,6 +696,69 @@ settings:
     heightHint: "高度（dp）"
 ```
 
+**floatingWindow 配置详解（悬浮窗面板内容，动态可配置）：**
+
+悬浮窗展开面板（奶黄绿框卡片）内的按钮列表，按数组顺序从上到下排列。每个按钮点击后执行其配置的 JS 脚本，能力由 JS 全局 API 提供（详见 `js_documentation.md`，例如 `vpn.disconnect()` 断网、`ui.showGameDisplay()` 弹出画面设置）。字段与「栏目」的 BUTTON 项保持一致：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `floatingWindow` | Object | 见下表 | 悬浮窗内容配置（位于 `ui:` 下） |
+| `items` | List | `[]` | 按钮列表，详见下表 |
+| `emptyTip` | String | `（悬浮窗暂无内容，请在 dream.yml 的 ui.floatingWindow.items 中配置）` | `items` 未配置时的占位提示 |
+| `allHiddenTip` | String | `（当前没有可用的功能）` | `items` 已配置但全部被 `isShowFromJs` 隐藏时的占位提示 |
+| `items[].id` | String | - | 必填，唯一标识 |
+| `items[].name` | String | - | 按钮文字（不填则回退 `buttonText` / `id`）。支持复合文本，含 `{{js:...}}` 时会在每次脚本执行后自动重算 |
+| `items[].buttonText` | String | - | 按钮文字（可选，优先级高于 `name`），同样支持复合文本 |
+| `items[].buttonColor` | String | `blue` | 按钮颜色：`blue` / `red` / `green` / `orange` / `purple` |
+| `items[].icon` | String | - | 左侧图标资源名（相对于 `assets/pvz2tool/images/`，预留） |
+| `items[].desc` | String | - | 按钮下方描述文字（预留） |
+| `items[].jsScript` | String | - | 点击执行的 JS 脚本（`jsPath` 为空时生效） |
+| `items[].jsPath` | String | - | JS 脚本文件路径（`jsScript` 为空时从本地/APK 加载） |
+| `items[].isShowFromJs` | String | - | **可见性 JS 表达式**：返回 `true` 才渲染该按钮，不填 = 始终显示。会随复合文本一起自动重算，可实现运行时动态显隐 |
+| `items[].isShowFromJsPath` | String | - | **可见性脚本文件路径**（`isShowFromJs` 为空时生效）。路径规则同 `jsPath`（占位符展开 + 绝对路径/本地工作目录/APK Assets 三级查找）；文件读不到时判定为隐藏 |
+
+**floatingWindow 使用示例（默认展示断网与画面设置）：**
+```yaml
+ui:
+  floatingWindow:
+    emptyTip: "（悬浮窗暂无内容，请在 dream.yml 的 ui.floatingWindow.items 中配置）"
+    allHiddenTip: "（当前没有可用的功能）"
+    items:
+      # 按钮文案用 {{js:...}} 动态生成：点击执行 jsScript 后会自动重算，实现「断网 ⇄ 恢复」文案翻转
+      # isShowFromJs 决定要不要渲染：VPN 未获系统授权时整个按钮直接隐藏
+      - id: vpn_toggle
+        name: "{{js:vpn.isActive() ? '恢复网络' : '断开网络'}}"
+        desc: "点击在「断网」与「恢复网络」之间切换"
+        buttonColor: "red"
+        isShowFromJs: "vpn.isPrepared()"
+        jsScript: "vpn.isActive() ? vpn.restore() : vpn.disconnect();"
+      # 仅在设置里开启了「自定义游戏画面」时才显示
+      - id: game_display
+        name: "画面设置"
+        buttonColor: "green"
+        isShowFromJs: "ui.isCustomGameDisplayEnabled()"
+        jsScript: "ui.showGameDisplay();"
+```
+
+> **动态文案原理**：`jsScript` 执行完毕后工具箱会广播一次「复合文本重算」信号，界面上所有 `{{js:...}}`（包含按钮自身的 `name`）都会重新求值。因此无需手动维护状态，直接用表达式描述「当前应该显示什么」即可。
+
+**isShowFromJs 说明（按 JS 条件动态显隐）：**
+
+- **写法**：直接写一个返回布尔的 JS 表达式，**不要**加 `{{js:}}` 包裹。例如 `vpn.isPrepared()`、`ui.isCustomGameDisplayEnabled()`，也可用逻辑运算组合：`vpn.isPrepared() && !vpn.isActive()`。
+- **判定逻辑较长时**：改用 `isShowFromJsPath` 指向一个脚本文件（`isShowFromJs` 为空时才生效），路径规则同 `jsPath`（占位符展开 + 绝对路径/本地工作目录/APK Assets 三级查找），文件读不到时判定为隐藏。
+- **同样适用于栏目功能项**：`sections[n].items[n]` 也支持这两个字段，用法完全一致，详见「功能项动态显隐」。
+- **真假判定**：按 JS 语义解析返回值 —— `false` / `0` / `null` / `undefined` / `NaN` / 空串视为隐藏，其余视为显示。**表达式报错时按隐藏处理**（保守策略，避免展示不可用功能）。
+- **重算时机**：与 `{{js:...}}` 文案完全一致 —— 任意用户交互脚本（悬浮窗按钮、栏目 BUTTON / CHECKBOX / SLIDER 等）执行完毕后自动重算，因此授权状态、设置开关变化后按钮会实时出现/消失。
+- **首帧行为**：求值完成前按钮不渲染，避免「先闪现再消失」。
+- **全部隐藏时**：面板显示 `allHiddenTip`；若 `items` 本身为空则显示 `emptyTip`。
+- **常用判定 API**（完整列表见 `js_documentation.md`）：
+
+  | 表达式 | 含义 |
+  |--------|------|
+  | `vpn.isPrepared()` | VPN 是否已获系统授权（等价于原先 Kotlin 侧的 `prepareVpn(context) == null`） |
+  | `vpn.isActive()` | 当前是否处于断网状态 |
+  | `ui.isCustomGameDisplayEnabled()` | 设置中「自定义游戏画面」开关是否已开启 |
+
 所有文本类配置均支持**复合颜色样式**，语法：
 
 - **颜色与阴影**：
@@ -706,6 +809,21 @@ settings:
   - **参数**：
     - `JS路径`：`pvz2tool/js/` 下的脚本文件名；以 `/` 开头则为绝对路径。
   - **递归解析**：JS 表达式的返回值如果包含 `{{...}}` 复合文本标签，会自动递归解析（支持颜色标签、链接标签、图标标签、嵌套 `{{js:...}}` 标签等）。
+  - **自动重算（交互联动）**：任何**用户交互触发的 JS** 执行完毕后，界面上所有 `{{js:...}}` 都会**自动重新求值**一次，使文本能反映脚本刚刚改变的状态。触发源包括：
+    - `BUTTON` 类型的按钮点击（`jsScript` / `jsPath`）
+    - `CHECKBOX` 类型的勾选切换
+    - `SLIDER` 类型的拖动结束
+    - 栏目级确认按钮、进入游戏时的栏目级 / 版本级脚本
+    - 悬浮窗（`ui.floatingWindow.items`）按钮点击
+    - 复合文本中的链接点击（`{{link:...}}` 指向 JS）
+
+    因此可以直接把「状态文案」写成 JS 表达式，点击后自动翻转：
+    ```yaml
+    - id: vpn_toggle
+      name: "{{js:vpn.isActive() ? '恢复网络' : '断开网络'}}"
+      jsScript: "vpn.isActive() ? vpn.restore() : vpn.disconnect();"
+    ```
+    > **说明**：复合文本自身求值时**不会**再次触发刷新，不存在死循环；连续多次刷新信号会被合并（约 60ms 防抖），避免同一批次重复求值。不含 `{{js:...}}` 的文本不参与重算，无额外开销。
   - **示例**：
     - `{{js:test.js}}` → 执行`pvz2tool/js/test.js`并显示返回结果。
     - `{{js:/data/data/com.example/files/helper.js}}` → 执行绝对路径的 JS 文件。

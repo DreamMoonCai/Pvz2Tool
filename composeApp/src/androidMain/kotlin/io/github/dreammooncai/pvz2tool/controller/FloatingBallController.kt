@@ -14,9 +14,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -34,9 +37,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.petterp.floatingx.assist.helper.FxScopeHelper
 import com.petterp.floatingx.compose.enableComposeSupport
 import com.petterp.floatingx.listener.IFxConfigStorage
@@ -45,16 +48,28 @@ import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.Pvz2ToolTheme
 import io.github.dreammooncai.pvz2tool.icon.CloseFrame
 import io.github.dreammooncai.pvz2tool.icon.CloseFramePress
+import io.github.dreammooncai.pvz2tool.FloatingWindowItem
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
-import io.github.dreammooncai.pvz2tool.service.LocalVpnService
-import io.github.dreammooncai.pvz2tool.ui.main.SettingsDialogState
+import io.github.dreammooncai.pvz2tool.js.JsRichTextRefresher
+import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
+import io.github.dreammooncai.pvz2tool.js.rememberJsVisibility
 import io.github.dreammooncai.pvz2tool.icon.Pvz2Icon
+import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzDialogCard
+import io.github.dreammooncai.pvz2tool.ui.main.RenderColoredButton
 import io.github.dreammooncai.pvz2tool.view.ImageSvgButton
+import io.github.dreammooncai.pvz2tool.view.PvzBlueButton
 import io.github.dreammooncai.pvz2tool.view.PvzGreenButton
+import io.github.dreammooncai.pvz2tool.view.PvzOrangeButton
+import io.github.dreammooncai.pvz2tool.view.PvzPurpleButton
+import io.github.dreammooncai.pvz2tool.view.PvzRedButton
+import io.github.dreammooncai.pvz2tool.view.PvzRichText
+import io.github.dreammooncai.pvz2tool.view.PvzTextOliveStyle
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import java.lang.ref.WeakReference
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -62,7 +77,6 @@ import kotlin.time.Duration.Companion.milliseconds
 private object Constants {
     val BALL_SIZE: Dp = 52.dp
     val CARD_WIDTH: Dp = 210.dp
-    val CARD_HEIGHT: Dp = 160.dp
     val AUTO_HIDE_DELAY = 5000.milliseconds // 悬浮球完全显示后自动收起时间
     const val ANIMATION_DURATION_IN = 600
     const val ANIMATION_DURATION_OUT = 400
@@ -400,9 +414,18 @@ object FloatingBallController {
 
     @Composable
     private fun CardView() {
-        val isVpn by LocalVpnService.isVpnActive.collectAsState()
-        val context = LocalContext.current
         val hostActivity = LocalActivity.current
+        val scope = rememberCoroutineScope()
+        val floatingConfig = InitializePvz2.config.ui.floatingWindow
+        val items = floatingConfig.items
+
+        // 逐项求值 isShowFromJs / isShowFromJsPath（两者皆空视为始终显示）。求值订阅 JsRichTextRefresher，
+        // 因此任意脚本执行后按钮可实时显隐（如 VPN 授权完成、画面设置开关切换）。
+        // 注意：composable 调用必须在 if 之外、按固定顺序执行，故用 forEach 收集而非 filter 内联判断。
+        val visibleItems = ArrayList<FloatingWindowItem>(items.size)
+        items.forEach { item ->
+            if (rememberJsVisibility(item.isShowFromJs, item.isShowFromJsPath)) visibleItems += item
+        }
 
         // 关闭走与 GameDisplayFloatingController 一致的【全屏】二次确认弹窗：
         // 复用 GeneralFloatingDialogController（独立 FloatingX 全屏遮罩层），覆盖整屏而非仅卡片范围。
@@ -441,43 +464,59 @@ object FloatingBallController {
 
             PvzDialogCard(
                 title = null,
-                modifier = Modifier.size(Constants.CARD_WIDTH, Constants.CARD_HEIGHT)
+                modifier = Modifier.width(Constants.CARD_WIDTH)
             ) {
-                if (LocalVpnService.prepareVpn(context) == null) {
-                    Box(
+                if (visibleItems.isEmpty()) {
+                    // 区分「压根没配」与「配了但全被 isShowFromJs 隐藏」，便于排查配置问题
+                    PvzRichText(
+                        text = if (items.isEmpty()) floatingConfig.emptyTip else floatingConfig.allHiddenTip,
+                        fontSize = 12.sp,
+                        defaultStyle = PvzTextOliveStyle,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                } else {
+                    Column(
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(), contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        if (isVpn) {
-                            PvzGreenButton("恢复网络", modifier = Modifier.size(150.dp, 44.dp)) {
-                                LocalVpnService.stopVpn(InitializePvz2.context)
-                            }
-                        } else {
-                            PvzGreenButton("断开网络", modifier = Modifier.size(150.dp, 44.dp)) {
-                                runCatching {
-                                    LocalVpnService.startVpn(InitializePvz2.context)
-                                }.onFailure {
-                                    LocalVpnService.stopVpn(InitializePvz2.context)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (SettingsDialogState.isUseCustomGameDisplay) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(), contentAlignment = Alignment.Center
-                    ) {
-                        val act = LocalActivity.current ?: return@Box
-                        PvzGreenButton("画面设置", modifier = Modifier.size(150.dp, 44.dp)) {
-                            GameDisplayFloatingController.show(act)
+                        visibleItems.forEach { item ->
+                            FloatingActionButton(item = item, scope = scope)
                         }
                     }
                 }
             }
         }
+    }
+
+    /**
+     * 单个悬浮窗功能按钮：渲染为整宽彩色按钮，点击执行其 JS 脚本（jsScript 优先，jsPath 兜底）。
+     * 按钮颜色由 item.buttonColor 决定（blue/red/green/orange/purple）。
+     */
+    @Composable
+    private fun FloatingActionButton(item: FloatingWindowItem, scope: CoroutineScope) {
+        val label = item.displayName
+        val resolvedColor = (item.buttonColor ?: "blue").lowercase()
+        val modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+        val onClick = {
+            val script = item.jsScript?.takeIf { it.isNotBlank() }
+                ?: item.jsPath?.let { path ->
+                    AssetExtractorHolder.openInputStream(JsFileResolver.resolvePlaceholders(path))
+                        ?.use { it.bufferedReader().readText() }
+                }
+            if (script != null) {
+                scope.launch {
+                    runCatching { PvzToolJsEngine.executeScript(script) }
+                    // 通知所有 {{js:...}} 复合文本重算，使按钮文案（如「断开网络」↔「恢复网络」）
+                    // 能随本次脚本改变的状态即时更新。
+                    JsRichTextRefresher.refresh()
+                }
+            }
+        }
+        RenderColoredButton(resolvedColor,text = label, modifier = modifier, onClick = onClick)
     }
 }
