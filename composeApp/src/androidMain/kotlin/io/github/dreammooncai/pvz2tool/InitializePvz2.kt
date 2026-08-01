@@ -88,6 +88,8 @@ object InitializePvz2 {
 
     // 初始化配置（基础配置 + 本地配置合并）
     fun initConfig() {
+        // 更换本地配置目录 / 重新加载配置时，作废资源路径与 SAF DocumentFile 缓存（见 AssetExtractorHolder）
+        AssetExtractorHolder.clearResourceCaches()
         val appContext = context.applicationContext
         val yaml = Yaml()
 

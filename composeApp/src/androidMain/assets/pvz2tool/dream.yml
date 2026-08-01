@@ -855,6 +855,47 @@ sections:
           "已更新加载提示（演示中直接关闭）";
           ctrl.close();
 
+      - id: "test_ui_16"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "通用弹窗(ui.popup)"
+        buttonColor: "green"
+        jsScript: |-
+          ui.popup("我的设置", [
+            { type: "switch", title: "开启省电模式", value: false, onChange: function (v) {
+                console.log("省电模式 = " + v);
+            } },
+            { type: "arrow", title: "高级选项", onClick: function (nav) {
+                // 进入子页面：子页面可再带 switch/text 等项
+                nav.push({
+                    title: "高级选项",
+                    bottomText: "以下选项需谨慎修改",
+                    items: [
+                        { type: "switch", title: "实验性功能", value: true },
+                        // 无内边距文本（直接写字符串）
+                        "—— 说明文字（纯字符串自动当 text 项）——",
+                        // 含边距文本（仿开关行，仅文字）
+                        { type: "text", title: "此操作不可恢复" },
+                        { type: "arrow", title: "关闭弹窗", onClick: function (n) {
+                            n.close();   // 直接关闭整个弹窗
+                        } }
+                    ]
+                });
+            } },
+            // 无内边距文本项（纯字符串自动按 text 渲染，bare）
+            "普通文本项（无需 type，纯字符串自动渲染为 text）",
+            // 含边距文本项（省略 type 也按 text 处理，仿开关行）
+            { title: "查看更多帮助请访问官网" },
+            { type: "spacer" },
+            { type: "arrow", title: "关闭弹窗", onClick: function (nav) {
+                nav.close();
+            } }
+          ], {
+            onClose: function () { console.log("弹窗已关闭") }
+          });
+          "已弹出通用设置弹窗"
+
       # ---------- 测试：使用 version/new/smf/dynamic.rsb.smf ----------
       - id: "test_dynamic_手动解包"
         name: "测试 SMF 手动解包"

@@ -14,10 +14,8 @@ fun AsyncImageFromAssets(
     contentScale: ContentScale = ContentScale.Fit,
     contentDescription: String? = null,
 ) {
-    val model = remember { AssetExtractorHolder.open(filePath) }
-
     AsyncImage(
-        model = model, // Assets 路径协议
+        model = AssetExtractorHolder.open(filePath), // Assets 路径协议
         contentDescription = contentDescription,
         contentScale = contentScale,
         modifier = modifier,

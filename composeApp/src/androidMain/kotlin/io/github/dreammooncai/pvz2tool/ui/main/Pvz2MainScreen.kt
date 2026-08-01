@@ -118,6 +118,7 @@ import io.github.dreammooncai.pvz2tool.ui.dialog.JsItemChoiceDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsActionSheetDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsSliderDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsLoadingDialog
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsPopupDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzStyledDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzTutorialDialog
 import io.github.dreammooncai.pvz2tool.view.PvzTextStyle
@@ -2627,6 +2628,7 @@ fun Pvz2MainScreen(
     JsSliderDialog()
     JsLoadingDialog()
     JsExtractorDialog()
+    JsPopupDialog()
 
     // 2. 显示设置弹窗（仅传状态）
     PvzSettingsDialog()

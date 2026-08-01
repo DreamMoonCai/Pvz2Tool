@@ -152,6 +152,7 @@
 | `ui.showGameDisplay()` | `ui.弹出画面设置()` / `ui.画面设置()` | 弹出游戏画面设置全屏浮窗（同悬浮球"画面设置"） |
 | `ui.isCustomGameDisplayEnabled()` | `ui.是否启用自定义画面()` / `ui.画面设置是否可用()` | 「自定义游戏画面」开关是否已开启（可用作 `isShowFromJs` 条件） |
 | `ui.refreshAll()` | `ui.刷新所有()` / `ui.刷新复合文本()` | 主动刷新所有复合文本与动态显隐（见下方详解） |
+| `ui.popup()` | `ui.弹出()` / `ui.对话框()` / `ui.showPopup()` | 通用设置风格弹窗（标题 + 内容项 + 可进入子页面），见下方详解 |
 
 #### vpn 对象
 | 英文 | 中文别名 | 说明 |
@@ -2010,6 +2011,79 @@ ui.confirm("切换主题", "确定切换到暗色主题？", {
 });
 ```
 
+#### ui.popup / ui.弹出 / ui.对话框 / ui.showPopup
+
+弹出**设置风格**的通用弹窗：顶部带绿色标题栏、主体是一组内容项（开关 / 箭头项 / 文本 / 间隔），并且每一项的交互回调里都能拿到一个 `nav` 对象，可以**进入子页面 / 返回 / 关闭**。整个弹窗与「设置弹窗」共用同一套视觉与导航框架（绿色标题栏、奶黄卡片、返回按钮子页面栈），因此 JS 也能拥有和原生设置完全一致的层级化 UI。
+
+> **注意**：`button` 类型**不再支持**。需要可点击的操作项请使用 `arrow`（点击进入子页面或在 `onClick` 里 `nav.close()`），不要写 `{ type: "button", ... }`。
+
+**语法**：`ui.popup(title, items, options?) -> void`
+
+**参数**：
+- `title` (string)：弹窗标题，显示在绿色标题栏。
+- `items` (Array)：主页面内容项数组，每项可以是**纯字符串**或**对象**：
+  - **纯字符串** `"xxx"` → 自动按 **text（bare，无内边距）** 渲染，即一块不带额外边距的纯文本。
+  - **对象**字段：
+    | 字段 | 类型 | 说明 |
+    |------|------|------|
+    | `type` | string | 项类型：`"switch"`（开关）/ `"arrow"`（箭头项，点击执行回调）/ `"text"`（文本）/ `"spacer"`（12dp 间隔）。**不填 type 时一律按 `"text"`（含边距，仿开关行仅文字）渲染**。 |
+    | `title` | string | 项的标题文字（`switch`/`arrow` 必填；`text` 也可用 `title` 表示含边距文本）。 |
+    | `value` | boolean | `switch` 类型的初始开关状态（默认 false）。 |
+    | `text` | string | `text` 类型显示的文本；纯字符串项与未指定 `title` 的 text 项由此字段承载。 |
+    | `onChange` | function(value) | `switch` 类型状态变化回调，参数 `value` 为新的布尔值（已 `.js` 包裹）。 |
+    | `onClick` | function(nav) | `arrow` 类型的点击回调，参数 `nav` 为导航对象（见下）。 |
+- `options` (object，可选)：
+  - `onClose` (function)：弹窗**整体关闭**时触发（点击标题栏关闭按钮、点遮罩外、子页面栈回到首页后再点返回、或 `nav.close()` 都会触发）。
+
+**`text` 两种形态**：
+- **bare（无内边距）**：直接写字符串字面量 `"普通文本项"`，或 `{ type: "text", text: "xxx" }`。用于段落/说明，不套用开关行内边距与分隔线。
+- **含边距（仿开关行）**：写 `{ type: "text", title: "xxx" }`（省略 type 也会自动判定为 text）。视觉上与开关项完全一致，只是右侧没有控件，仅有文字与底部分隔线。
+
+**`nav` 导航对象（在 `onClick` / 子页面回调中可用）**：
+- `nav.push(page)` / `nav.进入子页面(page)` / `nav.pushPage(page)`：进入一个子页面。`page` 为对象：
+  | 字段 | 类型 | 说明 |
+  |------|------|------|
+  | `title` | string | 子页面标题（进入后显示在绿色标题栏，带返回按钮）。 |
+  | `items` | Array | 子页面内容项，结构与主页面 `items` 完全一致（含 switch/arrow/text/spacer 与纯字符串项）。 |
+  | `bottomText` | string | 子页面底部说明文字（可选，居中显示）。 |
+- `nav.pop()` / `nav.返回()` / `nav.back()`：返回上一页（若已是首页则关闭整个弹窗）。
+- `nav.close()` / `nav.关闭()`：直接关闭整个弹窗（并触发 `options.onClose`）。
+
+> **说明**：子页面栈由框架维护，进入子页面 → 点返回 → 回到首页；在首页再点返回/关闭按钮即关闭弹窗。回调始终是**挂起协程**，可直接在其中调用其它 `ui.*` 或 `http` 等异步 API。
+
+**示例**：
+```javascript
+// 主页面：一个开关 + 一个进入子页面的箭头项 + 一段无内边距说明 + 一个含边距文本 + 间隔
+ui.popup("我的设置", [
+    { type: "switch", title: "开启省电模式", value: false, onChange: function(v){
+        console.log("省电模式 =", v);
+    }},
+    { type: "arrow", title: "高级选项", onClick: function(nav){
+        // 进入子页面，子页面本身也可以再 push 更深层级
+        nav.push({
+            title: "高级选项",
+            bottomText: "以下选项需谨慎修改",
+            items: [
+                { type: "switch", title: "实验性功能", value: true, onChange: function(v){ /* ... */ }},
+                // 含边距文本：仿开关行，仅文字
+                { type: "text", title: "此操作不可恢复" },
+                // 无内边距文本：直接写字符串
+                "—— 分隔说明文字 ——",
+                { type: "spacer" }
+            ]
+        });
+    }},
+    // 无内边距文本项（纯字符串自动按 text 渲染）
+    "设置将在退出后生效",
+    // 含边距文本项（省略 type 也按 text 处理）
+    { title: "查看更多帮助请访问官网" }
+], {
+    onClose: function(){
+        console.log("弹窗已关闭");
+    }
+});
+```
+
 ## 8.5. js - JS 执行器
 
 `js` 对象提供在 JS 脚本中动态执行其他 JS 代码或 JS 文件的能力。
@@ -3854,6 +3928,7 @@ if (!vpn.isPrepared()) {
 *修正：pvz.<type>.all 返回 Array（数据对象数组），单个条目仍可由父对象按 code/name 访问*
 *修正：file.copy/file.复制 当 toPath 带扩展名时按目标文件处理并重命名，否则视为目标目录*
 *修正：file.list 路径无效时返回空数组 []（非 null）*
+*新增：ui.popup/ui.弹出/ui.对话框/ui.showPopup 通用设置风格弹窗——参数 (title, items, options?)，items 支持 switch/arrow/button/text/spacer 五类型（纯字符串自动当 text，未给 type 有 text 自动 text、其余默认 button），onChange/onClick 回调；回调内通过 nav 对象 push/进入子页面（page 含 title/items/bottomText，子页面可再 push 更深层级）、pop/返回、close/关闭；options.onClose 为整体关闭回调。复用 PvzPopupHost/PvzPopupNavigator 导航框架，与设置弹窗同一套绿色标题栏+奶黄卡片视觉*
 *修正：file.resolve() 中性对象 isFile 实际为 true（兼具文件对象特征），并区分读写类/属性类方法的异常行为*
 *修正：storage.getAll() 返回数组（非 key-value 对象）*
 *修正：this.findById 仅接受单个 id 参数（返回 item 或 section 对象），无双参及 .item/.section 子属性*

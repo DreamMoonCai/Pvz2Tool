@@ -118,11 +118,14 @@ fun PvzStyledDialog(
     if (isVisible) {
         Dialog(
             onDismissRequest = onDismissRequest,
-            properties = DialogProperties(dismissOnClickOutside = dismissible)
+            properties = DialogProperties(
+                dismissOnClickOutside = dismissible,
+                usePlatformDefaultWidth = false
+            )
         ) {
             PvzDialogCard(
                 title = titleText,
-                modifier = Modifier.fillMaxWidth(0.9f)
+                modifier = Modifier.fillMaxWidth(0.5f)
             ) {
                     // 核心：和 PvzPopupContent 完全一致的 探测+滚动显示 逻辑
                     PerfectAdaptiveLayout(

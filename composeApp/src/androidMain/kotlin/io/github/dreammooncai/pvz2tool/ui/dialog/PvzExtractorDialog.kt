@@ -875,6 +875,54 @@ class AssetExtractorHolder(
     val extractor: AssetResourceExtractor
 ) {
     companion object {
+        // ======================== 资源读取缓存 ========================
+        // 消除每次 recomposition 触发的 SAF listFiles() 目录遍历（2000 个图标场景的主线程卡顿根因），
+        // 同时让 AsyncImage 每次拿到同一个 Uri 对象（稳定 coil 缓存 key，避免重复解码）。
+        // 失效时机：更换本地配置目录 / 重新加载配置（见 InitializePvz2.initConfig 调用 clearResourceCaches）。
+        private val localDocCache = ConcurrentHashMap<String, DocumentFile>()
+
+        // open() 顶层结果缓存：所有分支（SAF 本地目录 / APK Assets / 绝对路径 / URL）统一按 path 记忆最终的 Uri 实例。
+        // 这是滚动卡顿的真正修复点——原本每次 recomposition 都会对 Assets 分支执行 assets.open()（主线程 I/O），2000 图标下极其昂贵。
+        private val openUriCache = ConcurrentHashMap<String, Uri>()
+
+        // Assets 存在性判断缓存：isAssetFileExist 本质是 assets.open() 抛异常判定，必须缓存避免重复主线程 I/O。
+        private val assetExistsCache = ConcurrentHashMap<String, Boolean>()
+        private val assetDirExistsCache = ConcurrentHashMap<String, Boolean>()
+
+        private fun assetFileExists(assetPath: String): Boolean {
+            return assetExistsCache[assetPath] ?: run {
+                InitializePvz2.context.isAssetFileExist(assetPath).also { assetExistsCache[assetPath] = it }
+            }
+        }
+
+        private fun assetDirExists(assetPath: String): Boolean {
+            return assetDirExistsCache[assetPath] ?: run {
+                InitializePvz2.context.isAssetDirExist(assetPath).also { assetDirExistsCache[assetPath] = it }
+            }
+        }
+
+        /** 清空所有资源读取缓存。更换本地配置目录或重新加载配置时必须调用。 */
+        fun clearResourceCaches() {
+            localDocCache.clear()
+            openUriCache.clear()
+            assetExistsCache.clear()
+            assetDirExistsCache.clear()
+        }
+
+        /**
+         * 解析本地工作目录下某路径对应的 DocumentFile（带缓存）。
+         * 原本每次都会 root.listFiles() 遍历目录，2000 个图标场景下每个图标都走一遍 → 主线程卡顿；
+         * 现按「本地根 Uri + 相对路径」缓存 DocumentFile 结果，并令 open() 每次返回同一个 Uri 实例。
+         */
+        private fun resolveLocalDocument(path: String): DocumentFile? {
+            val root = runCatching { InitializePvz2.config.getLocalWorkDir(InitializePvz2.context) }.getOrNull() ?: return null
+            val key = "${root.uri}::$path"
+            localDocCache[key]?.let { return it }
+            val doc = buildDocumentFilePath(root, removeThePrefix(path))
+            localDocCache[key] = doc ?: return null
+            return doc
+        }
+
         /**
          * 资源元信息（工作目录优先）
          */
@@ -907,7 +955,7 @@ class AssetExtractorHolder(
             // 1. 本地工作目录（优先）
             val localWorkDir = runCatching { InitializePvz2.config.getLocalWorkDir(InitializePvz2.context) }.getOrNull()
             if (localWorkDir != null) {
-                val localDocument = buildDocumentFilePath(localWorkDir, removeThePrefix(path))
+                val localDocument = resolveLocalDocument(path)
                 if (localDocument != null && localDocument.exists()) {
                     return ResourceInfo(
                         exists = true,
@@ -921,8 +969,8 @@ class AssetExtractorHolder(
 
             // 2. APK Assets
             val assetPath = complementThePrefix(path)
-            val isDir = InitializePvz2.context.isAssetDirExist(assetPath)
-            val isFile = InitializePvz2.context.isAssetFileExist(assetPath)
+            val isDir = assetDirExists(assetPath)
+            val isFile = assetFileExists(assetPath)
             val size = if (isFile) {
                 try {
                     InitializePvz2.context.assets.openFd(assetPath).use { it.length }
@@ -954,10 +1002,10 @@ class AssetExtractorHolder(
 
         private fun listAssetFilesRecursive(assetPath: String): List<String> {
             return when {
-                InitializePvz2.context.isAssetFileExist(assetPath) -> {
+                assetFileExists(assetPath) -> {
                     listOf(assetPath)
                 }
-                InitializePvz2.context.isAssetDirExist(assetPath) -> {
+                assetDirExists(assetPath) -> {
                     val childNames = InitializePvz2.context.assets.list(assetPath) ?: emptyArray()
                     childNames.flatMap { childName ->
                         val childPath = if (assetPath.isEmpty()) childName else "$assetPath/$childName"
@@ -984,7 +1032,7 @@ class AssetExtractorHolder(
             val localWorkDir = runCatching { InitializePvz2.config.getLocalWorkDir(InitializePvz2.context) }.getOrNull()
 
             if (localWorkDir != null) {
-                val localDocument = buildDocumentFilePath(localWorkDir, removeThePrefix(internalPath))
+                val localDocument = resolveLocalDocument(internalPath)
                 if (localDocument?.exists() == true) {
                     return listLocalDocumentFiles(localDocument)
                 }
@@ -1009,42 +1057,31 @@ class AssetExtractorHolder(
          * 优先级：URL > 绝对路径(/开头) > getLocalWorkDir (SAF/本地文件) > Assets
          */
         fun open(path: String): Uri? {
-            // 0. 检测是否为 URL（支持 http:// 和 https://）
+            // 顶层统一缓存：无论哪个分支，path 解析结果只算一次，后续直接返回同一个 Uri 实例。
+            // 彻底消除每次 recomposition 触发的 assets.open() / SAF 目录遍历等主线程 I/O（覆盖非工作目录的 APK Assets 资源）。
+            openUriCache[path]?.let { return it }
+            val uri = resolveOpen(path)
+            openUriCache[path] = uri ?: return null
+            return uri
+        }
+
+        private fun resolveOpen(path: String): Uri? {
             if (path.startsWith("http://") || path.startsWith("https://")) {
-                Log.d("SmartResource", "使用远程 URL: $path")
                 return path.toUri()
             }
 
-            // 0.5 绝对路径：直接使用本地文件系统
             if (path.startsWith("/")) {
                 val file = File(path)
-                return if (file.exists() && file.canRead()) {
-                    Log.d("SmartResource", "使用绝对路径: $path")
-                    Uri.fromFile(file)
-                } else null
+                return if (file.exists() && file.canRead()) Uri.fromFile(file) else null
             }
 
-            // 1. 获取本地工作目录
-            val localWorkDir = runCatching { InitializePvz2.config.getLocalWorkDir(InitializePvz2.context) }.getOrNull()
-
-            if (localWorkDir != null) {
-                // 尝试在本地目录中递归寻找文件
-                val localDocument = buildDocumentFilePath(localWorkDir, removeThePrefix(path))
-
-                if (localDocument != null && localDocument.exists() && localDocument.isFile) {
-                    return try {
-                        Log.d("SmartResource", "从本地目录读取: ${localDocument.uri}")
-                        localDocument.uri
-                    } catch (e: Exception) {
-                        Log.e("SmartResource", "读取本地文件失败: $path", e)
-                        null
-                    }
-                }
+            // 本地工作目录优先（带缓存：消除每次 recomposition 的 SAF 目录遍历，并稳定 coil 缓存 key）
+            val localDoc = resolveLocalDocument(path)
+            if (localDoc != null && localDoc.exists() && localDoc.isFile) {
+                return localDoc.uri
             }
             val assetPath = complementThePrefix(path)
-            Log.d("SmartResource", "从 Assets 读取: $assetPath")
-            // 2. 如果本地没有，则从 Assets 获取
-            return if (InitializePvz2.context.isAssetFileExist(assetPath)) "file:///android_asset/$assetPath".toUri() else null
+            return if (assetFileExists(assetPath)) "file:///android_asset/$assetPath".toUri() else null
         }
 
         fun openInputStream(path: String): InputStream? = runCatching {
@@ -1052,12 +1089,8 @@ class AssetExtractorHolder(
         }.getOrNull()
 
         fun existFromLocalWorkDir(path: String): Boolean {
-            val localWorkDir = runCatching { InitializePvz2.config.getLocalWorkDir(InitializePvz2.context) }.getOrNull()
-            if (localWorkDir != null) {
-                val localDocument = buildDocumentFilePath(localWorkDir, removeThePrefix(path))
-                if (localDocument != null && localDocument.exists()) return true
-            }
-            return false
+            val localDocument = resolveLocalDocument(path)
+            return localDocument != null && localDocument.exists()
         }
 
         fun exist(path: String): Boolean {
@@ -1067,7 +1100,7 @@ class AssetExtractorHolder(
             }
             if (existFromLocalWorkDir(path)) return true
             val assetPath = complementThePrefix(path)
-            return InitializePvz2.context.isAssetFileExist(assetPath) || InitializePvz2.context.isAssetDirExist(assetPath)
+            return assetFileExists(assetPath) || assetDirExists(assetPath)
         }
 
         private fun complementThePrefix(path: String): String = if (path.startsWith("${Pvz2ToolConfig.PATH_NAME}/")) path else "${Pvz2ToolConfig.PATH_NAME}/$path"
@@ -1094,13 +1127,12 @@ class AssetExtractorHolder(
                 return ResourcePair(ResourceSource.AssetPath(complementThePrefix(internalPath)), targetDir, forceOverride, sectionName)
             }
 
-            val localDocument = buildDocumentFilePath(localWorkDir, removeThePrefix(internalPath))
+            // 复用 open() 的本地目录缓存（resolveLocalDocument 已按「根Uri+相对路径」记忆 DocumentFile，消除每次 SAF listFiles 遍历）
+            val localDocument = resolveLocalDocument(internalPath)
 
             return if (localDocument?.exists() == true) {
-                Log.d("SmartResource", "使用本地文件: ${localDocument.uri}")
                 ResourcePair(ResourceSource.LocalDocument(localDocument), targetDir, forceOverride, sectionName)
             } else {
-                Log.d("SmartResource", "使用APK Assets: $internalPath")
                 ResourcePair(ResourceSource.AssetPath(complementThePrefix(internalPath)), targetDir, forceOverride, sectionName)
             }
         }

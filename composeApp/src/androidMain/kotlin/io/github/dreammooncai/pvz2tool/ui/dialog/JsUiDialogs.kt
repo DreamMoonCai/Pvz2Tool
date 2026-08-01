@@ -33,6 +33,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.DialogProperties
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.js
 import kotlin.math.roundToInt
@@ -59,6 +60,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import io.github.dreammooncai.pvz2tool.ui.popup.PvzPopupContent
+import io.github.dreammooncai.pvz2tool.ui.popup.PvzPopupItem
+import io.github.dreammooncai.pvz2tool.ui.popup.PvzPopupItemSwitch
+import io.github.dreammooncai.pvz2tool.ui.popup.PvzPopupItemArrow
+import io.github.dreammooncai.pvz2tool.ui.popup.PvzPopupText
+import io.github.dreammooncai.pvz2tool.ui.popup.PvzPopupHost
+import io.github.dreammooncai.pvz2tool.ui.popup.MainPopup
+import io.github.dreammooncai.pvz2tool.ui.popup.SubPopup
+import io.github.dreammooncai.pvz2tool.ui.popup.PvzPopupNavigator
 
 // ======================== 颜色解析辅助 ========================
 // 将 JS 传入的颜色字符串解析为 Compose Color；支持命名色与十六进制；非法值返回 null（沿用默认主题色）。
@@ -240,6 +250,35 @@ data class JsLoadingState(
     val onDismiss: (suspend (JsAny?) -> Unit)? = null
 )
 
+// ======================== 通用弹窗（设置风格，支持子页面）数据结构 ========================
+
+/** 通用弹窗（设置风格，支持子页面）中的单个项 */
+data class JsPopupItem(
+    val type: String = "text", // "switch" | "arrow" | "text" | "spacer"
+    val title: String = "",
+    val value: Boolean = false, // 仅 switch 用
+    val text: String = "", // 仅 text 用（纯字符串项以 bare 渲染，无额外边距）
+    val bare: Boolean = false, // true=纯文本无内边距（由字符串字面量生成）；false=含边距（仿开关行，仅文字）
+    val onChange: (suspend (JsAny?) -> Unit)? = null, // switch 状态变化回调(newValue)
+    val onClick: (suspend (JsAny?) -> Unit)? = null // arrow 点击回调(接收 nav 对象)
+)
+
+/** 通用弹窗中的一个页面（主页面或子页面） */
+data class JsPopupPage(
+    val title: String = "",
+    val items: List<JsPopupItem> = emptyList(),
+    val bottomText: String? = null
+)
+
+/** 通用弹窗状态（设置风格，支持子页面 push/pop） */
+data class JsPopupState(
+    val isVisible: Boolean = false,
+    val title: String = "",
+    val items: List<JsPopupItem> = emptyList(),
+    val navObj: JsAny? = null, // 传给 JS 回调的 nav 对象（push/pop/close）
+    val onClose: (suspend (JsAny?) -> Unit)? = null // 弹窗关闭时触发
+)
+
 // ======================== JS UI 管理器 ========================
 
 object JsUiManager {
@@ -277,6 +316,36 @@ object JsUiManager {
     // 加载指示状态流
     private val _loadingState = MutableStateFlow(JsLoadingState())
     val loadingState: StateFlow<JsLoadingState> = _loadingState.asStateFlow()
+
+    // 通用弹窗（设置风格，支持子页面）状态流
+    private val _popupState = MutableStateFlow(JsPopupState())
+    val popupState: StateFlow<JsPopupState> = _popupState.asStateFlow()
+    // 弹窗内 PvzPopupHost 的 navigator 引用（由 JsPopupDialog 渲染时捕获，供 JS 的 nav.push/pop 调用）
+    var popupNavigatorRef: PvzPopupNavigator? = null
+
+    /** 显示通用弹窗（设置风格，支持子页面） */
+    fun showPopup(
+        title: String,
+        items: List<JsPopupItem>,
+        navObj: JsAny?,
+        onClose: (suspend (JsAny?) -> Unit)? = null
+    ) {
+        _popupState.value = JsPopupState(
+            isVisible = true,
+            title = title,
+            items = items,
+            navObj = navObj,
+            onClose = onClose
+        )
+    }
+
+    /** 隐藏通用弹窗（并异步触发 onClose 回调） */
+    fun hidePopup() {
+        val cb = _popupState.value.onClose
+        _popupState.value = JsPopupState()
+        popupNavigatorRef = null
+        extractorScope.launch { runCatching { cb?.invoke(null) } }
+    }
 
     // 解压器实例（由 JS 调用时创建）
     private var extractorHolder: AssetExtractorHolder? = null
@@ -711,6 +780,120 @@ object JsUiManager {
 }
 
 // ======================== Compose 弹窗组件 ========================
+
+/**
+ * JS 通用弹窗（设置风格，支持子页面）
+ * 通过 ui.popup(title, items, options) 触发；items 声明式描述主页面项，
+ * 项的回调里通过 nav 对象的 push/pop/close 进入/返回/关闭子页面。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun JsPopupDialog() {
+    val state by JsUiManager.popupState.collectAsState()
+    val scope = rememberCoroutineScope()
+
+    if (state.isVisible) {
+        BasicAlertDialog(
+            onDismissRequest = { JsUiManager.hidePopup() },
+            properties = DialogProperties(dismissOnClickOutside = false, usePlatformDefaultWidth = false)
+        ) {
+            PvzPopupHost(
+                startDestination = MainPopup(state.title),
+                onDismiss = { JsUiManager.hidePopup() }
+            ) { route, navigator ->
+                // 捕获 navigator 供 JS 的 nav.push/pop 调用
+                JsUiManager.popupNavigatorRef = navigator
+                when (route) {
+                    is MainPopup -> {
+                        JsPopupPageContent(
+                            title = route.title,
+                            showBackButton = false,
+                            onClose = { JsUiManager.hidePopup() },
+                            items = state.items,
+                            scope = scope,
+                            navObj = state.navObj
+                        )
+                    }
+                    is SubPopup -> {
+                        val page = route.data as? JsPopupPage
+                        if (page != null) {
+                            JsPopupPageContent(
+                                title = route.title,
+                                showBackButton = true,
+                                onBack = { navigator.pop() },
+                                items = page.items,
+                                scope = scope,
+                                navObj = state.navObj,
+                                bottomText = page.bottomText
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun JsPopupPageContent(
+    title: String,
+    showBackButton: Boolean,
+    onClose: () -> Unit = {},
+    onBack: () -> Unit = {},
+    items: List<JsPopupItem>,
+    scope: CoroutineScope,
+    navObj: JsAny?,
+    bottomText: String? = null
+) {
+    PvzPopupContent(
+        title = title,
+        showBackButton = showBackButton,
+        onBack = onBack,
+        onClose = onClose,
+        bottomContent = {
+            if (bottomText != null) {
+                PvzPopupText(
+                    bottomText,
+                    horizontalArrangement = Arrangement.Center
+                )
+            }
+        }
+    ) {
+        items.forEach { item ->
+            when (item.type) {
+                "switch" -> {
+                    var checked by remember(item) { mutableStateOf(item.value) }
+                    PvzPopupItemSwitch(
+                        title = item.title,
+                        selected = checked,
+                        onCheckedChange = { newVal ->
+                            checked = newVal
+                            scope.launch { item.onChange?.invoke(newVal.js) }
+                        }
+                    )
+                }
+                "arrow" -> PvzPopupItemArrow(title = item.title) {
+                    scope.launch { item.onClick?.invoke(navObj) }
+                }
+                "text" -> {
+                    val content = item.title.ifBlank { item.text }
+                    if (item.bare) {
+                        // 纯字符串项：无额外内边距，直接渲染文字
+                        PvzRichText(
+                            content,
+                            defaultStyle = PvzTextStyle(Color(0xFF423F00), null),
+                            fontSize = 20.sp
+                        )
+                    } else {
+                        // 含边距文本：仿开关行（相同内边距与分隔线），仅显示文字无控件
+                        PvzPopupItem(content, isSpacer = true) {}
+                    }
+                }
+                "spacer" -> Spacer(Modifier.height(12.dp))
+            }
+        }
+    }
+}
 
 /**
  * JS 提示弹窗（单按钮）

@@ -32,6 +32,10 @@ import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsActionItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsChoiceItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsPopupItem
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsPopupPage
+import io.github.dreammooncai.pvz2tool.ui.popup.SubPopup
+import io.github.dreammooncai.pvz2tool.ui.popup.PvzPopupNavigator
 import io.github.dreammooncai.pvz2tool.ui.music.BackgroundMusicState
 import io.github.dreammooncai.util.getAssetLastModified
 import io.github.dreammooncai.util.isAssetDirExist
@@ -352,6 +356,47 @@ object PvzToolGlobals {
         // 内部仅广播一次重算信号，订阅侧（复合文本与动态显隐）会合并后统一刷新，不会死循环。
         listOf("refreshAll".js, "刷新所有".js, "刷新复合文本".js).func {
             JsRichTextRefresher.refresh()
+            null
+        }
+
+        // 通用弹窗（设置风格，支持子页面）：ui.popup(title, items, options?) / ui.弹出(...) / ui.对话框(...)
+        // items: 数组，每项可为 字符串 或 对象 { type:"switch"|"arrow"|"text"|"spacer", title, value, text, onChange, onClick }
+        //   - 字符串项："普通文本" → 自动按 text 渲染（无额外内边距，bare）
+        //   - 对象 type 省略且有文本 → 按 text 渲染（含边距，仿开关行仅文字）
+        //   - switch: value 为初始开关状态；onChange(newValue) 在状态变化时回调
+        //   - arrow: onClick(nav) 点击回调，nav 为导航对象：nav.push(page) 进入子页面、nav.pop() 返回、nav.close() 关闭
+        //   - text: 纯文本（bare 无内边距 / 含边距两种，见上）；spacer: 间距
+        // 子页面 page = { title, items, bottomText? }，结构与主页面一致（items 同上）
+        // options.onClose: 弹窗关闭时回调（返回/关闭按钮/nav.close 均触发）
+        listOf("popup".js, "弹出".js, "对话框".js, "showPopup".js).func(
+            FunctionParam("title"), FunctionParam("items"), FunctionParam("options")
+        ) { args ->
+            val runtime = this
+            val title = toString(args[0])
+            val itemsRaw = args.getOrNull(1).orNull?.toKotlin(this) as? List<*> ?: emptyList<Any>()
+            val options = args[2].orNull as? JsObject
+            val items = parsePopupItems(itemsRaw)
+            val onClose = bindJsCallback(options, "onClose", runtime)
+            // 构造 nav 对象：push 进入子页面、pop 返回、close 关闭
+            val navObj = Object("nav") {
+                listOf("push".js, "进入子页面".js, "pushPage".js).func(FunctionParam("page")) { a ->
+                    val pageRaw = a.getOrNull(0).orNull as? JsObject
+                    if (pageRaw != null) {
+                        val page = parsePopupPage(pageRaw)
+                        JsUiManager.popupNavigatorRef?.navigate(SubPopup(page.title, page))
+                    }
+                    null
+                }
+                listOf("pop".js, "返回".js, "back".js).func { _ ->
+                    JsUiManager.popupNavigatorRef?.pop()
+                    null
+                }
+                listOf("close".js, "关闭".js).func { _ ->
+                    JsUiManager.hidePopup()
+                    null
+                }
+            }
+            JsUiManager.showPopup(title, items, navObj, onClose)
             null
         }
     }
@@ -677,4 +722,50 @@ private suspend fun ScriptRuntime.parseActionItems(raw: List<*>): List<JsActionI
             }
         }
     }
+}
+
+private suspend fun ScriptRuntime.parsePopupItems(raw: List<*>): List<JsPopupItem> {
+    return raw.mapNotNull { el ->
+        when (el) {
+            is JsObject -> {
+                val type = toString((el.get("type".js, this).orNull ?: el.get("类型".js, this).orNull ?: "".js))
+                val title = toString((el.get("title".js, this).orNull ?: el.get("标题".js, this).orNull ?: "".js))
+                val value = (el.get("value".js, this).orNull ?: el.get("值".js, this).orNull)
+                    ?.let { it.toKotlin(this) as? Boolean } ?: false
+                val text = toString((el.get("text".js, this).orNull ?: el.get("文本".js, this).orNull ?: "".js))
+                val onChangeJs = el.get("onChange".js, this).orNull as? JSFunction
+                val onClickJs = el.get("onClick".js, this).orNull as? JSFunction
+                val onChange: (suspend (JsAny?) -> Unit)? =
+                    onChangeJs?.let { fn -> { v -> runCatching { fn.invoke(listOf(v), this) } } }
+                val onClick: (suspend (JsAny?) -> Unit)? =
+                    onClickJs?.let { fn -> { v -> runCatching { fn.invoke(listOf(v), this) } } }
+                // 类型推断：未给 type 时按 text(含边距) 渲染；button 类型不再支持
+                val effectiveType = when {
+                    type == "switch" || type == "arrow" || type == "text" || type == "spacer" -> type
+                    text.isNotBlank() -> "text"
+                    else -> "text"
+                }
+                JsPopupItem(
+                    type = effectiveType,
+                    title = title,
+                    value = value,
+                    text = text,
+                    bare = false,
+                    onChange = onChange,
+                    onClick = onClick
+                )
+            }
+            is String -> JsPopupItem(type = "text", text = el, bare = true)
+            else -> null
+        }
+    }
+}
+
+private suspend fun ScriptRuntime.parsePopupPage(raw: JsObject): JsPopupPage {
+    val title = toString((raw.get("title".js, this).orNull ?: raw.get("标题".js, this).orNull ?: "".js))
+    val itemsRaw = raw.get("items".js, this).orNull?.toKotlin(this) as? List<*> ?: emptyList<Any>()
+    val items = parsePopupItems(itemsRaw)
+    val bottomText = raw.get("bottomText".js, this).orNull?.let { toString(it) }
+        ?: raw.get("底部文本".js, this).orNull?.let { toString(it) }
+    return JsPopupPage(title = title, items = items, bottomText = bottomText)
 }
