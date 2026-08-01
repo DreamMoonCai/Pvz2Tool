@@ -1860,3 +1860,28 @@ fun JsLoadingDialog() {
         onClose = { JsUiManager.hideLoading() }
     )
 }
+
+/**
+ * JS 弹窗宿主：一次性挂起全部 JS 驱动的弹窗（alert/confirm/prompt/itemChoice/
+ * progress/actionSheet/slider/loading/extractor/popup）。
+ *
+ * 这样弹窗列表只在一处定义，可被两处复用：
+ *  - 主界面 [Pvz2MainScreen]（悬浮窗未启用时）
+ *  - 游戏内常驻遮罩 [JsDialogsFloatingHost]（悬浮窗启用时，盖在游戏上方）
+ *
+ * 所有子弹窗内部均以 `BasicAlertDialog` 实现，空闲时各自 StateFlow 不可见、
+ * 不渲染任何内容，因此本宿主在空闲态是空 Composition，不会拦截下层触摸。
+ */
+@Composable
+fun JsDialogsHost() {
+    JsAlertDialog()
+    JsConfirmDialog()
+    JsPromptDialog()
+    JsItemChoiceDialog()
+    JsProgressDialog()
+    JsActionSheetDialog()
+    JsSliderDialog()
+    JsLoadingDialog()
+    JsExtractorDialog()
+    JsPopupDialog()
+}

@@ -112,6 +112,8 @@ object FloatingBallController {
 
         GlobalState.ballControl?.show()
         isShow.value = true
+        // 同步创建 JS 弹窗常驻遮罩，确保游戏内 JS 回调触发的弹窗能盖在游戏上弹出
+        JsDialogsFloatingHost.show(activity)
     }
 
     fun dismiss() {
@@ -126,6 +128,8 @@ object FloatingBallController {
         GlobalState.cardControl?.cancel()
         GlobalState.ballControl = null
         GlobalState.cardControl = null
+        // 同步销毁 JS 弹窗常驻遮罩，避免后台残留空窗口
+        JsDialogsFloatingHost.dismiss()
     }
 
     // ============================== 初始化方法 ==============================

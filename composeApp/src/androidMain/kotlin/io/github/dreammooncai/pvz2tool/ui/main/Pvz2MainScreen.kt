@@ -113,16 +113,8 @@ import io.github.dreammooncai.pvz2tool.js.JsLogger
 import io.github.dreammooncai.pvz2tool.pop.rton.RTON
 import io.github.dreammooncai.pvz2tool.rememberSoundInteractionSource
 import io.github.dreammooncai.pvz2tool.service.RequestPermissionsVpn
-import io.github.dreammooncai.pvz2tool.ui.dialog.JsAlertDialog
-import io.github.dreammooncai.pvz2tool.ui.dialog.JsConfirmDialog
-import io.github.dreammooncai.pvz2tool.ui.dialog.JsExtractorDialog
-import io.github.dreammooncai.pvz2tool.ui.dialog.JsProgressDialog
-import io.github.dreammooncai.pvz2tool.ui.dialog.JsPromptDialog
-import io.github.dreammooncai.pvz2tool.ui.dialog.JsItemChoiceDialog
-import io.github.dreammooncai.pvz2tool.ui.dialog.JsActionSheetDialog
-import io.github.dreammooncai.pvz2tool.ui.dialog.JsSliderDialog
-import io.github.dreammooncai.pvz2tool.ui.dialog.JsLoadingDialog
-import io.github.dreammooncai.pvz2tool.ui.dialog.JsPopupDialog
+import io.github.dreammooncai.pvz2tool.controller.FloatingBallController
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsDialogsHost
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzStyledDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzTutorialDialog
 import io.github.dreammooncai.pvz2tool.view.PvzTextStyle
@@ -2616,6 +2608,8 @@ fun Pvz2MainScreen(
     Pvz2ToolConfig.rootDirectory = rootDirectory
 
     val currentState by InitializePvz2.mPvz2ScreenStateFlow.collectAsState()
+    // 悬浮窗是否正在显示：显示期间 JS 弹窗由 JsDialogsFloatingHost 常驻遮罩承载，主界面不再挂载，避免重复
+    val floatingShown by FloatingBallController.isShow.collectAsState()
 
     var showTutorial by remember { mutableStateOf(false) }
     if (showTutorial) PvzTutorialDialog(onDismiss = { showTutorial = false })
@@ -2623,16 +2617,10 @@ fun Pvz2MainScreen(
     var showAnnouncement by remember { mutableStateOf(false) }
     if (showAnnouncement) PvzAnnouncementDialog(onDismiss = { showAnnouncement = false })
 
-    JsAlertDialog()
-    JsConfirmDialog()
-    JsPromptDialog()
-    JsItemChoiceDialog()
-    JsProgressDialog()
-    JsActionSheetDialog()
-    JsSliderDialog()
-    JsLoadingDialog()
-    JsExtractorDialog()
-    JsPopupDialog()
+    // JS 弹窗宿主：悬浮窗未显示时挂主界面（悬浮窗显示期间由 JsDialogsFloatingHost 常驻遮罩承载，避免重复）
+    if (!floatingShown) {
+        JsDialogsHost()
+    }
 
     // 2. 显示设置弹窗（仅传状态）
     PvzSettingsDialog()
