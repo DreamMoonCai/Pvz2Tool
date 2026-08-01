@@ -440,8 +440,8 @@ class Pvz2InitializeActivity : ComponentActivity() {
     }
 
     fun onResetDataClick() {
-//        FloatingBallController.showFloatingControl(this)
-//        return
+        FloatingBallController.showFloatingControl(this)
+        return
         if (SettingsDialogState.isUseResetPacketDeepClearing) {
             InitializePvz2.config.getSmfDirectoryFile().deleteRecursively()
         }

@@ -36,6 +36,10 @@ import io.github.dreammooncai.util.getAssetLastModified
 import io.github.dreammooncai.util.isAssetDirExist
 import io.github.dreammooncai.util.isAssetFileExist
 import io.github.dreammooncai.util.openUriInputStreamOrAssetNull
+import android.app.Activity
+import io.github.dreammooncai.pvz2tool.controller.GameDisplayFloatingController
+import io.github.dreammooncai.pvz2tool.service.LocalVpnService
+import io.github.dreammooncai.util.ContextUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
@@ -319,6 +323,42 @@ object PvzToolGlobals {
                 }
             }
         }
+
+        // 弹出游戏画面设置浮窗（与悬浮球"画面设置"按钮同款全屏弹窗）：ui.showGameDisplay() / ui.弹出画面设置() / ui.画面设置()
+        // 通过 ContextUtil.getCurrentActivity() 取当前前台 Activity（拿不到则回退到全局 Context，须为 Activity 才能弹窗）
+        listOf("showGameDisplay".js, "弹出画面设置".js, "画面设置".js).func {
+            withContext(Dispatchers.Main) {
+                val activity = ContextUtil.getCurrentActivity() ?: (InitializePvz2.context as? Activity)
+                if (activity != null) {
+                    runCatching { GameDisplayFloatingController.show(activity) }
+                }
+            }
+            null
+        }
+    }
+
+    // ======================== VPN 控制 API ========================
+    val vpn = Object("vpn") {
+        // 断开网络（开启 VPN 拦截）：vpn.disconnect() / vpn.断网() / vpn.断开网络()
+        listOf("disconnect".js, "断网".js, "断开网络".js).func {
+            withContext(Dispatchers.Main) {
+                runCatching { LocalVpnService.startVpn(InitializePvz2.context) }
+            }
+            null
+        }
+
+        // 恢复网络（关闭 VPN）：vpn.restore() / vpn.恢复() / vpn.恢复网络()
+        listOf("restore".js, "恢复".js, "恢复网络".js).func {
+            withContext(Dispatchers.Main) {
+                runCatching { LocalVpnService.stopVpn(InitializePvz2.context) }
+            }
+            null
+        }
+
+        // 当前 VPN 是否处于激活状态（即是否处于断网状态）：vpn.isActive() / vpn.是否激活() / vpn.是否开启()
+        listOf("isActive".js, "是否激活".js, "是否开启".js, "是否已开启".js).func {
+            LocalVpnService.isVpnActive.value.js
+        }
     }
 
     val console = Object("console") {
@@ -527,6 +567,9 @@ object PvzToolGlobals {
         }
         listOf("reflect".js, "反射".js).forEach { key ->
             runtime.set(key, JsReflect.js, VariableType.Global)
+        }
+        listOf("vpn".js, "虚拟专网".js, "VPN".js).forEach { key ->
+            runtime.set(key, vpn, VariableType.Global)
         }
         runtime.get("Number".js)?.get("prototype".js, runtime)?.let { it as? JsObject }?.let { prototype ->
             listOf("encrypt".js, "加密".js).forEach { key ->

@@ -14,21 +14,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -51,9 +43,14 @@ import com.petterp.floatingx.listener.IFxConfigStorage
 import com.petterp.floatingx.listener.control.IFxScopeControl
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.Pvz2ToolTheme
+import io.github.dreammooncai.pvz2tool.icon.CloseFrame
+import io.github.dreammooncai.pvz2tool.icon.CloseFramePress
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.service.LocalVpnService
 import io.github.dreammooncai.pvz2tool.ui.main.SettingsDialogState
+import io.github.dreammooncai.pvz2tool.icon.Pvz2Icon
+import io.github.dreammooncai.pvz2tool.ui.dialog.PvzDialogCard
+import io.github.dreammooncai.pvz2tool.view.ImageSvgButton
 import io.github.dreammooncai.pvz2tool.view.PvzGreenButton
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,7 +62,7 @@ import kotlin.time.Duration.Companion.milliseconds
 private object Constants {
     val BALL_SIZE: Dp = 52.dp
     val CARD_WIDTH: Dp = 210.dp
-    val CARD_HEIGHT: Dp = 116.dp
+    val CARD_HEIGHT: Dp = 160.dp
     val AUTO_HIDE_DELAY = 5000.milliseconds // 悬浮球完全显示后自动收起时间
     const val ANIMATION_DURATION_IN = 600
     const val ANIMATION_DURATION_OUT = 400
@@ -398,72 +395,54 @@ object FloatingBallController {
 
     @Composable
     private fun CardContent() {
-        CardView(
-            onMinimize = {
-                // 只有当没有在切换状态时才响应点击
-                if (!GlobalState.isSwitchingState && !GlobalState.touchLock) {
-                    switchToBall()
-                }
-            }
-        )
+        CardView()
     }
 
     @Composable
-    private fun CardView(onMinimize: () -> Unit) {
+    private fun CardView() {
         val isVpn by LocalVpnService.isVpnActive.collectAsState()
         val context = LocalContext.current
+        val hostActivity = LocalActivity.current
 
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color(0xE6222222),
-            shadowElevation = 10.dp,
-            modifier = Modifier.size(Constants.CARD_WIDTH, Constants.CARD_HEIGHT)
+        // 关闭走与 GameDisplayFloatingController 一致的【全屏】二次确认弹窗：
+        // 复用 GeneralFloatingDialogController（独立 FloatingX 全屏遮罩层），覆盖整屏而非仅卡片范围。
+        Column(
+            modifier = Modifier.width(Constants.CARD_WIDTH),
+            horizontalAlignment = Alignment.End
         ) {
-            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val dotColor = if (isVpn) Color(0xFF4CAF50) else Color(0xFFF44336)
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(dotColor)
-                    )
-                    Spacer(Modifier.weight(1f))
-
-                    IconButton(
-                        onClick = onMinimize,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.08f))
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Remove,
-                            contentDescription = "缩小",
-                            tint = Color.White.copy(alpha = 0.85f),
-                            modifier = Modifier.size(18.dp)
-                        )
+            ImageSvgButton(
+                imageVector = Pvz2Icon.CloseFrame,
+                imageVectorPress = Pvz2Icon.CloseFramePress,
+                contentDescription = InitializePvz2.config.ui.dialog.deleteSaveDesc,
+                modifier = Modifier
+                    .padding(end = 12.dp)
+                    .size(40.dp, 36.dp),
+                onClick = {
+                    if (hostActivity != null) {
+                        GeneralFloatingDialogController.showDialog(hostActivity) {
+                            CommonConfirmDialog(
+                                title = InitializePvz2.config.ui.settings.floatingExitConfirmTitle,
+                                message = InitializePvz2.config.ui.settings.floatingExitConfirmMessage,
+                                cancelText = InitializePvz2.config.ui.dialog.cancel,
+                                confirmText = InitializePvz2.config.ui.settings.floatingExitConfirmButtonText,
+                                onConfirm = {
+                                    GeneralFloatingDialogController.dismissDialog()
+                                    dismiss()
+                                }
+                            )
+                        }
+                    } else {
+                        dismiss()
                     }
+                },
+                pressSound = InitializePvz2.config.ui.sounds.buttonSettingsPress,
+                releaseSound = InitializePvz2.config.ui.sounds.buttonSettingsRelease
+            )
 
-                    IconButton(
-                        onClick = { dismiss() },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.08f))
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = "关闭",
-                            tint = Color(0xFFFF5252),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-
+            PvzDialogCard(
+                title = null,
+                modifier = Modifier.size(Constants.CARD_WIDTH, Constants.CARD_HEIGHT)
+            ) {
                 if (LocalVpnService.prepareVpn(context) == null) {
                     Box(
                         modifier = Modifier
@@ -487,16 +466,14 @@ object FloatingBallController {
                 }
 
                 if (SettingsDialogState.isUseCustomGameDisplay) {
-                    Spacer(Modifier.padding(top = 10.dp))
-
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth(), contentAlignment = Alignment.Center
                     ) {
-                        val activity = LocalActivity.current ?: return@Box
+                        val act = LocalActivity.current ?: return@Box
                         PvzGreenButton("画面设置", modifier = Modifier.size(150.dp, 44.dp)) {
-                            GameDisplayFloatingController.show(activity)
+                            GameDisplayFloatingController.show(act)
                         }
                     }
                 }

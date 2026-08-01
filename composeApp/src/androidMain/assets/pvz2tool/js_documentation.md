@@ -149,6 +149,14 @@
 | `ui.extract()` | `ui.解压()` | 解压根资源 |
 | `ui.select()` | `ui.选择()` | 单项选择弹窗（图标网格 / 列表 / 纯文字单选） |
 | `ui.multiSelect()` | `ui.多选()` | 多项选择弹窗（返回选中值数组） |
+| `ui.showGameDisplay()` | `ui.弹出画面设置()` / `ui.画面设置()` | 弹出游戏画面设置全屏浮窗（同悬浮球"画面设置"） |
+
+#### vpn 对象
+| 英文 | 中文别名 | 说明 |
+|------|----------|------|
+| `vpn.disconnect()` | `vpn.断网()` / `vpn.断开网络()` | 断开网络（开启 VPN 拦截） |
+| `vpn.restore()` | `vpn.恢复()` / `vpn.恢复网络()` | 恢复网络（关闭 VPN） |
+| `vpn.isActive()` | `vpn.是否激活()` / `vpn.是否开启()` | 当前 VPN 是否处于激活状态（即是否断网） |
 
 #### audio 对象
 | 英文 | 中文别名 | 说明 |
@@ -1914,6 +1922,28 @@ ctrl2.update("已下载 50%");
 ctrl2.close();
 ```
 
+#### ui.showGameDisplay / ui.弹出画面设置 / ui.画面设置
+
+弹出游戏画面设置全屏浮窗（与悬浮球"画面设置"按钮同款）。
+
+**语法**：`ui.showGameDisplay() -> void`
+
+**参数**：无
+
+**说明**：
+- 通过 `ContextUtil.getCurrentActivity()` 获取当前前台 Activity 来承载浮窗；若拿不到，则回退到全局 `InitializePvz2.context`（须为 Activity 才能弹窗）。
+- 弹窗内容与悬浮球面板的"画面设置"完全一致：分辨率、比例、全屏、自定义窗口宽高等游戏画面选项。
+- 任何异常均静默吞掉（runCatching），不影响脚本后续执行。
+
+**返回**：void
+
+**示例**：
+```javascript
+// 直接弹出游戏画面设置浮窗
+ui.showGameDisplay();
+ui.弹出画面设置();
+```
+
 ## 8.5. js - JS 执行器
 
 `js` 对象提供在 JS 脚本中动态执行其他 JS 代码或 JS 文件的能力。
@@ -3630,6 +3660,78 @@ console.log(r);
 otherInst.call("attach", inst);
 ```
 
+## 21. vpn - VPN 控制
+
+`vpn` 对象提供 VPN 断网 / 恢复的网络控制能力（底层为 `LocalVpnService`）。
+
+> **别名**：`vpn` / `虚拟专网` / `VPN` 均可访问同一对象。
+
+### 方法
+
+#### vpn.disconnect / vpn.断网 / vpn.断开网络
+
+断开网络（开启 VPN 拦截）。
+
+**语法**：`vpn.disconnect() -> void`
+
+**参数**：无
+
+**说明**：
+- 内部调用 `LocalVpnService.startVpn(context)` 启动 VPN 拦截，使设备进入断网状态。
+- 若系统尚未授予 VPN 权限，`startVpn` 不会真正断网（与悬浮球"断开网络"按钮行为一致）。
+- 操作在主线程执行，任何异常均静默吞掉（runCatching）。
+
+**返回**：void
+
+**示例**：
+```javascript
+vpn.disconnect();   // 断网
+vpn.断网();
+```
+
+#### vpn.restore / vpn.恢复 / vpn.恢复网络
+
+恢复网络（关闭 VPN）。
+
+**语法**：`vpn.restore() -> void`
+
+**参数**：无
+
+**说明**：
+- 内部调用 `LocalVpnService.stopVpn(context)` 彻底关闭 VPN，设备恢复正常网络。
+- 操作在主线程执行，任何异常均静默吞掉（runCatching）。
+
+**返回**：void
+
+**示例**：
+```javascript
+vpn.restore();      // 恢复网络
+vpn.恢复网络();
+```
+
+#### vpn.isActive / vpn.是否激活 / vpn.是否开启
+
+查询当前 VPN 是否处于激活状态（即是否处于断网状态）。
+
+**语法**：`vpn.isActive() -> boolean`
+
+**参数**：无
+
+**说明**：
+- 直接读取 `LocalVpnService.isVpnActive` 状态流，返回 `true` 表示 VPN 已开启（已断网），`false` 表示网络正常。
+
+**返回**：boolean - 是否已断网
+
+**示例**：
+```javascript
+if (vpn.isActive()) {
+    console.log("当前处于断网状态");
+    vpn.restore();   // 恢复网络
+} else {
+    vpn.disconnect(); // 断网
+}
+```
+
 *文档版本: 2.1*
 *最后更新: 2026-07-17*
 *新增：ui 系列弹窗通用可定制化——所有弹窗（alert/confirm/prompt/select/multiSelect/actionSheet/slider/loading）新增按钮文字（confirmText/cancelText）、按钮背景色（confirmColor/cancelColor，支持命名色与 #RRGGBB/#AARRGGBB 十六进制）、可关闭性（dismissible/可关闭，alert/confirm/prompt/slider/loading 用此名；select/multiSelect/actionSheet 沿用 cancelable），以及事件回调（onConfirm/onCancel/onSelect/onChange/onDismiss，均为 function(value) 形式、异步触发且不阻塞 await）。slider 另增 decimals（小数位）/showValue（是否显示大字体数值）与实时 onChange 回调；loading 另增 update()/更新() 实时刷新文字。详见各弹窗小节与开头「通用选项与回调」*
@@ -3655,6 +3757,7 @@ otherInst.call("attach", inst);
 *修正：file.resolve() 中性对象 isFile 实际为 true（兼具文件对象特征），并区分读写类/属性类方法的异常行为*
 *修正：storage.getAll() 返回数组（非 key-value 对象）*
 *修正：this.findById 仅接受单个 id 参数（返回 item 或 section 对象），无双参及 .item/.section 子属性*
+*新增：vpn VPN 控制对象（disconnect/断网/断开网络、restore/恢复/恢复网络、isActive/是否激活/是否开启，底层 LocalVpnService）+ ui.showGameDisplay/弹出画面设置/画面设置 弹出游戏画面设置全屏浮窗（同悬浮球"画面设置"），并补入别名速查表与第 21 章详解*
 *补充：section 对象新增 descriptionValues/描述值；RADIO 项同时支持 checked/选中 别名*
 *补充：rton.load 支持直接加载 .json 文件；path.toInternalPath 相对路径自动按 $WORK_DIR 处理*
 *新增：picker 文件选择器对象（directory/file/files 及中文别名），支持选择目录/单文件/多文件并返回文件对象（基于 SAF DocumentFile）*

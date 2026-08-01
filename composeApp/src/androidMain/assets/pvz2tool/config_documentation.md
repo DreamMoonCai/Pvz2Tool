@@ -596,6 +596,9 @@ sections:
 | `exitConfirmMessage` | String | `确定要退出游戏吗？` | 退出确认弹窗内容 |
 | `isUseExitConfirm` | Boolean | `true` | 退出游戏二次确认默认值 |
 | `exitConfirmButtonText` | String | `确认退出` | 退出确认弹窗"确认"按钮文字 |
+| `floatingExitConfirmTitle` | String | `确认退出` | 悬浮球关闭二次确认弹窗标题 |
+| `floatingExitConfirmMessage` | String | `确定要退出悬浮窗吗(直至重启游戏后显示)？` | 悬浮球关闭二次确认弹窗内容 |
+| `floatingExitConfirmButtonText` | String | `确认` | 悬浮球关闭二次确认弹窗"确认"按钮文字 |
 | `showFloatingWindow` | String | `是否开启悬浮窗` | 工具悬浮窗开关标签 |
 | `isShowFloatingWindow` | Boolean | `true` | 是否默认开启工具悬浮窗 |
 | `applyButtonText` | String | `应 用` | 游戏画面设置悬浮窗"应用"按钮文字 |
@@ -633,6 +636,9 @@ settings:
   exitConfirmMessage: "确定要退出游戏吗？"
   isUseExitConfirm: true
   exitConfirmButtonText: "确认退出"
+  floatingExitConfirmTitle: "确认退出"
+  floatingExitConfirmMessage: "确定要退出悬浮窗吗(直至重启游戏后显示)？"
+  floatingExitConfirmButtonText: "确认"
   applyButtonText: "应 用"
   gameDisplay:
     isUseCustomGameDisplay: false     # 总开关，false = 不启用（默认横屏全屏）

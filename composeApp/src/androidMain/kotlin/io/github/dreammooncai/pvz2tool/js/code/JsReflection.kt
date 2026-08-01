@@ -43,8 +43,6 @@ import kotlin.reflect.KClass
  *   从而支持「拿实例再调用其方法 / 读写其字段」「把实例作为另一方法的参数」等链式用法——无需任何
  *   全局注册表或 id 属性。
  *
- * 所有 YukiReflection 调用均包在 `runCatching` 中，失败静默返回 null，不中断脚本。
- *
  * ⚠️ 关于 `.func` 的形参声明（重要）：
  * keight 的 `func` 会用 `FunctionParam` 列表声明 JS 函数的形参，body 收到的 `args` 列表**长度恰好等于
  * 声明的形参个数**；不写形参（`.func { args -> }`）则 `args` 永远是空列表，JS 传入的实参会全部丢失。
@@ -85,25 +83,23 @@ private fun flattenVarargs(args: List<JsAny?>): List<JsAny?> {
  * 把 JS 侧的类型名解析为 [Class]。[loader] 非 null 时用于解析自定义/DEX 内的类。
  * 支持基础类型缩写（int/long/.../boolean/string 等）与完整类名（走 [toClass]）。
  */
-private fun resolveType(name: String, loader: ClassLoader?): Class<*>? = runCatching {
-    when (name.lowercase().trim()) {
-        // 短名一律解析为基本类型（int.class 等）；装箱类型请用全限定名（如 java.lang.Integer）。
-        // YukiReflection 的 param 按 Class 精确匹配、不会在基本/装箱间自动转换（见 KReflectionTool.typeEq），
-        // 因此必须解析成基本型才能匹配声明为 int 的方法；装箱版由下方 numericCandidates 的候选覆盖。
-        "int" -> Int::class.javaPrimitiveType
-        "integer" -> Int::class.java
-        "long" -> Long::class.javaPrimitiveType
-        "double" -> Double::class.javaPrimitiveType
-        "float" -> Float::class.javaPrimitiveType
-        "short" -> Short::class.javaPrimitiveType
-        "byte" -> Byte::class.javaPrimitiveType
-        "boolean", "bool" -> Boolean::class.javaPrimitiveType
-        "char", "character" -> Char::class.javaPrimitiveType
-        "void" -> Void::class.javaPrimitiveType
-        "string" -> String::class.java
-        else -> name.trim().toClass(loader ?: defaultClassLoader, false)
-    }
-}.getOrNull()
+private fun resolveType(name: String, loader: ClassLoader?): Class<*>? = when (name.lowercase().trim()) {
+    // 短名一律解析为基本类型（int.class 等）；装箱类型请用全限定名（如 java.lang.Integer）。
+    // YukiReflection 的 param 按 Class 精确匹配、不会在基本/装箱间自动转换（见 KReflectionTool.typeEq），
+    // 因此必须解析成基本型才能匹配声明为 int 的方法；装箱版由下方 numericCandidates 的候选覆盖。
+    "int" -> Int::class.javaPrimitiveType
+    "integer" -> Int::class.java
+    "long" -> Long::class.javaPrimitiveType
+    "double" -> Double::class.javaPrimitiveType
+    "float" -> Float::class.javaPrimitiveType
+    "short" -> Short::class.javaPrimitiveType
+    "byte" -> Byte::class.javaPrimitiveType
+    "boolean", "bool" -> Boolean::class.javaPrimitiveType
+    "char", "character" -> Char::class.javaPrimitiveType
+    "void" -> Void::class.javaPrimitiveType
+    "string" -> String::class.java
+    else -> name.trim().toClass(loader ?: defaultClassLoader, false)
+}
 
 /**
  * 基本类型与其装箱类型的双向对应表。用于 [numericCandidates] 生成「基本↔装箱」候选。
@@ -177,11 +173,12 @@ private inline fun <R> findWithCandidates(
     candidates: List<List<Class<*>>>,
     crossinline build: (List<Class<*>>) -> R
 ): R? {
+    var lastThrowable: Throwable? = null
     for (c in candidates) {
-        val r = runCatching { build(c) }.getOrNull()
+        val r = runCatching { build(c) }.onFailure { lastThrowable = it }.getOrNull()
         if (r != null) return r
     }
-    return null
+    return if (lastThrowable != null) throw lastThrowable else null
 }
 
 /**
@@ -194,9 +191,8 @@ private inline fun <R> findWithCandidates(
  */
 private fun coerceArg(value: Any?, target: KClass<*>): Any? {
     if (value == null) return null
-    val t = target
     if (value is Number) {
-        return when (t) {
+        return when (target) {
             Int::class -> value.toInt()
             Long::class -> value.toLong()
             Double::class -> value.toDouble()
@@ -207,8 +203,8 @@ private fun coerceArg(value: Any?, target: KClass<*>): Any? {
             else -> value
         }
     }
-    if (value is Boolean && (t == Boolean::class)) return value
-    if (value is CharSequence) return value.toString()
+    if (value is Boolean && target == Boolean::class) return value
+    if (value is CharSequence && (target == String::class)) return value.toString()
     return value
 }
 
@@ -342,12 +338,10 @@ private class JsClassWrapper(
             clazz.superclass?.let { classWrapper(it, loader) }
         }
         listOf("getDeclaredMethods".js, "方法列表".js).func { _ ->
-            runCatching { clazz.declaredMethods.map { it.name }.distinct().map { it.js } }
-                .getOrNull()?.let { listOf(*it.toTypedArray()).js }
+            clazz.declaredMethods.map { it.name }.distinct().map { it.js }.js
         }
         listOf("getDeclaredFields".js, "字段列表".js).func { _ ->
-            runCatching { clazz.declaredFields.map { it.name }.distinct().map { it.js } }
-                .getOrNull()?.let { listOf(*it.toTypedArray()).js }
+            clazz.declaredFields.map { it.name }.distinct().map { it.js }.js
         }
         listOf("toString".js).func { _ -> clazz.name.js }
     }
@@ -401,13 +395,14 @@ private fun fieldWrapper(clazz: Class<*>, name: String, loader: ClassLoader?): J
         // get(instance?)
         listOf("get".js, "读取".js, "获取".js).func("instance") { args ->
             val instance = args.getOrNull(0)?.let { convertArg(it) }
-            runCatching { convertResult(clazz.field { this.name = name }.get(instance).any(), loader) }.getOrNull()
+            convertResult(clazz.field { this.name = name }.get(instance).any(), loader)
         }
         // set(instance?, value)
         listOf("set".js, "写入".js, "设置".js).func("instance", "value") { args ->
             val instance = args.getOrNull(0)?.let { convertArg(it) }
             val value = args.getOrNull(1)?.let { convertArg(it) }
-            runCatching { clazz.field { this.name = name }.get(instance).set(value); null }.getOrNull()
+            clazz.field { this.name = name }.get(instance).set(value)
+            null
         }
     }
 }
@@ -451,32 +446,32 @@ private class JsInstanceWrapper(
             val methodArgs = all.drop(1)
             val candidates = inferCandidates(methodArgs)
             val margs = methodArgs.map { convertArg(it) }.toTypedArray()
-            runCatching {
-                for (ts in candidates) {
-                    val r = runCatching {
-                        val finder = obj.javaClass.method {
-                            this.name = methodName
-                            if (ts.isNotEmpty()) param(*ts.toTypedArray())
-                        }
-                        val proxy = finder.get(obj)
-                        val coerced = margs.mapIndexed { i, a -> coerceArg(a, ts.getOrNull(i)?.kotlin ?: Any::class) }.toTypedArray()
-                        convertResult(proxy.call(*coerced), loader)
-                    }.getOrNull()
-                    if (r != null) return@runCatching r
-                }
-                null
-            }.getOrNull()
+            var lastThrowable: Throwable? = null
+            for (ts in candidates) {
+                val r = runCatching {
+                    val finder = obj.javaClass.method {
+                        this.name = methodName
+                        if (ts.isNotEmpty()) param(*ts.toTypedArray())
+                    }
+                    val proxy = finder.get(obj)
+                    val coerced = margs.mapIndexed { i, a -> coerceArg(a, ts.getOrNull(i)?.kotlin ?: Any::class) }.toTypedArray()
+                    convertResult(proxy.call(*coerced), loader)
+                }.onFailure { lastThrowable = it }.getOrNull()
+                if (r != null) return@func r
+            }
+            if (lastThrowable != null) throw lastThrowable else null
         }
         // get(fieldName)
         listOf("get".js, "读字段".js).func("fieldName") { args ->
             val fieldName = args.getOrNull(0).orNull?.toString()?.trim() ?: return@func null
-            runCatching { convertResult(obj.javaClass.field { this.name = fieldName }.get(obj).any(), loader) }.getOrNull()
+            convertResult(obj.javaClass.field { this.name = fieldName }.get(obj).any(), loader)
         }
         // set(fieldName, value)
         listOf("set".js, "写字段".js).func("fieldName", "value") { args ->
             val fieldName = args.getOrNull(0).orNull?.toString()?.trim() ?: return@func null
             val value = args.getOrNull(1)?.let { convertArg(it) }
-            runCatching { obj.javaClass.field { this.name = fieldName }.get(obj).set(value); null }.getOrNull()
+            obj.javaClass.field { this.name = fieldName }.get(obj).set(value)
+            null
         }
         listOf("getId".js, "取ID".js).func { _ -> System.identityHashCode(obj).js }
         listOf("getClass".js, "取类".js).func { _ -> obj.javaClass.let { classWrapper(it, loader) } }
@@ -505,7 +500,7 @@ private class JsLoaderWrapper(
         // findClass(name)
         listOf("findClass".js, "查找类".js).func("name") { args ->
             val name = args.getOrNull(0).orNull?.toString()?.trim() ?: return@func null
-            runCatching { classWrapper(name.toClass(loader, true), loader) }.getOrNull()
+            classWrapper(name.toClass(loader, true), loader)
         }
         listOf("toString".js).func { _ -> "DexClassLoader($path)".js }
     }
@@ -525,15 +520,13 @@ object JsDex {
         listOf("load".js, "加载".js, "loadDex".js).func("path", "parent") { args ->
             val path = args.getOrNull(0).orNull?.toString()?.trim() ?: return@func null
             val parent = resolveParent(args.getOrNull(1))
-            runCatching {
-                val dexFile = resolveDexFile(path)
-                val optimized = File(InitializePvz2.context.cacheDir, "dex_opt_${System.currentTimeMillis()}").also {
-                    it.mkdirs()
-                    it.deleteOnExit() // 与其他缓存一致：进程退出时自动清理（API26+ 优化目录不被使用、恒为空，可正常删除）
-                }
-                val loader = DexClassLoader(dexFile.absolutePath, optimized.absolutePath, null, parent)
-                loaderWrapper(loader, dexFile.absolutePath)
-            }.getOrNull()
+            val dexFile = resolveDexFile(path)
+            val optimized = File(InitializePvz2.context.cacheDir, "dex_opt_${System.currentTimeMillis()}").also {
+                it.mkdirs()
+                it.deleteOnExit() // 与其他缓存一致：进程退出时自动清理（API26+ 优化目录不被使用、恒为空，可正常删除）
+            }
+            val loader = DexClassLoader(dexFile.absolutePath, optimized.absolutePath, null, parent)
+            loaderWrapper(loader, dexFile.absolutePath)
         }
     }
 
@@ -600,7 +593,7 @@ object JsReflect {
         listOf("findClass".js, "查找类".js, "反射".js).func("name", "loader") { args ->
             val name = args.getOrNull(0).orNull?.toString()?.trim() ?: return@func null
             val loader = args.getOrNull(1)?.toKotlin(this) as? ClassLoader
-            runCatching { classWrapper(name.toClass(loader ?: defaultClassLoader, true), loader) }.getOrNull()
+            classWrapper(name.toClass(loader ?: defaultClassLoader, true), loader)
         }
     }
 }

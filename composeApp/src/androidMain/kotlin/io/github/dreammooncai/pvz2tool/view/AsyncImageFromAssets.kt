@@ -1,6 +1,7 @@
 package io.github.dreammooncai.pvz2tool.view
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
@@ -13,8 +14,10 @@ fun AsyncImageFromAssets(
     contentScale: ContentScale = ContentScale.Fit,
     contentDescription: String? = null,
 ) {
+    val model = remember { AssetExtractorHolder.open(filePath) }
+
     AsyncImage(
-        model = AssetExtractorHolder.open(filePath), // Assets 路径协议
+        model = model, // Assets 路径协议
         contentDescription = contentDescription,
         contentScale = contentScale,
         modifier = modifier,

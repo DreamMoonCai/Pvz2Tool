@@ -4,7 +4,6 @@ import android.app.Activity
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,10 +33,11 @@ import com.petterp.floatingx.compose.enableComposeSupport
 import com.petterp.floatingx.listener.control.IFxScopeControl
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.Pvz2ToolTheme
+import io.github.dreammooncai.pvz2tool.ui.dialog.PvzDialogCard
 import io.github.dreammooncai.pvz2tool.view.PvzGreenButton
+import io.github.dreammooncai.pvz2tool.view.PvzRedButton
 import io.github.dreammooncai.pvz2tool.view.PvzRichText
-import io.github.dreammooncai.pvz2tool.view.PvzTextGreenStyle
-import io.github.dreammooncai.pvz2tool.view.PvzTextWhiteStyle
+import io.github.dreammooncai.pvz2tool.view.PvzTextOliveStyle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -218,53 +216,39 @@ fun CommonConfirmDialog(
 ) {
     BaseFloatingDialog(
         content = {
-            Column(
-                modifier = Modifier
-                    .width(320.dp)
-                    .background(
-                        color = Color(0xFF2E2E2E),
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = Color(0xFF4CAF50).copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                    .padding(horizontal = 24.dp, vertical = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+            PvzDialogCard(
+                title = title,
+                modifier = Modifier.width(320.dp)
             ) {
-                // 标题
-                PvzRichText(
-                    text = title,
-                    defaultStyle = PvzTextGreenStyle,
-                    fontSize = 20.sp,
-                    textAlign = TextAlign.Center
-                )
-
-                // 描述文案
-                PvzRichText(
-                    text = message,
-                    defaultStyle = PvzTextWhiteStyle,
-                    fontSize = 15.sp,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 22.sp
-                )
-
-                // 按钮行
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                Column(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
-                    PvzCancelButton(
-                        text = cancelText,
-                        onClick = onCancel,
-                        modifier = Modifier.weight(1f)
+                    // 描述文案（橄榄色，与 PvzConfirmDialog 一致）
+                    PvzRichText(
+                        text = message,
+                        defaultStyle = PvzTextOliveStyle.copy(shadowColor = null),
+                        fontSize = 15.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 22.sp
                     )
-                    PvzGreenButton(
-                        text = confirmText,
-                        modifier = Modifier.weight(1f).height(44.dp)
+
+                    // 按钮行：左取消(红) / 右确认(绿)，与 PvzConfirmDialog 完全一致
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        onConfirm()
+                        PvzRedButton(
+                            text = cancelText,
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            onClick = onCancel
+                        )
+                        PvzGreenButton(
+                            text = confirmText,
+                            modifier = Modifier.weight(1f).height(48.dp)
+                        ) {
+                            onConfirm()
+                        }
                     }
                 }
             }
@@ -293,29 +277,6 @@ fun ExitConfirmDialog(onExit: () -> Unit) {
 //endregion
 
 //region ===================== 公共按钮组件（全局复用） =====================
-@Composable
-private fun PvzCancelButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .height(44.dp)
-            .background(
-                color = Color(0xFF555555),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        PvzRichText(
-            text = text,
-            defaultStyle = PvzTextWhiteStyle,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
+// 取消/确认按钮统一收敛为 PvzRedButton / PvzGreenButton（与 PvzConfirmDialog 一致），
+// 不再使用自定义 PvzCancelButton，避免风格漂移。
 //endregion

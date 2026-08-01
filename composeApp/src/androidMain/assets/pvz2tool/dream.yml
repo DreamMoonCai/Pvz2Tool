@@ -2453,6 +2453,10 @@ ui:
     exitConfirmMessage: "确定要退出游戏吗？"
     isUseExitConfirm: true
     exitConfirmButtonText: "确认退出"
+    # 悬浮球关闭二次确认弹窗
+    floatingExitConfirmTitle: "确认退出"
+    floatingExitConfirmMessage: "确定要退出悬浮窗吗(直至重启游戏后显示)？"
+    floatingExitConfirmButtonText: "确认"
     # 游戏画面子项默认值
     gameDisplay:
       isUseCustomGameDisplay: true       # 总开关默认关闭

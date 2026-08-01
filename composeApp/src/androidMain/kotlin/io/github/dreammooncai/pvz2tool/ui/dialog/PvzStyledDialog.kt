@@ -44,6 +44,55 @@ import io.github.dreammooncai.pvz2tool.view.PvzTextWhiteStyle
 import kotlinx.coroutines.launch
 
 /**
+ * PVZ 风格弹窗卡片外壳：奶黄渐变底 + 三层绿框 + 绿色标题栏。
+ * [PvzStyledDialog] 与悬浮窗确认框（CommonConfirmDialog）共用，保证风格一致、单一来源。
+ */
+@Composable
+fun PvzDialogCard(
+    title: String? = null,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Box(
+        modifier = modifier
+            .background(
+                Brush.verticalGradient(colors = listOf(Color(0xFFF3EEB9), Color(0xFFF2EDBB))),
+                RoundedCornerShape(15.dp)
+            )
+            .border(3.dp, Color(0xFF344702), RoundedCornerShape(15.dp))
+            .padding(2.dp)
+            .border(5.dp, Color(0xFF8ED229), RoundedCornerShape(15.dp))
+            .padding(0.5.dp)
+            .border(1.dp, Color(0xFF78A52B), RoundedCornerShape(15.dp))
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(vertical = if (title != null) 10.dp else 8.dp)
+        ) {
+            if (title != null) {
+                // 标题栏
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Brush.verticalGradient(colors = listOf(Color(0xFF88CD23), Color(0xFF97DC02))))
+                        .padding(vertical = 15.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    PvzRichText(
+                        title,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        defaultStyle = PvzTextWhiteStyle.copy(shadowColor = null)
+                    )
+                }
+                Box(modifier = Modifier.height(20.dp))
+            }
+            content()
+        }
+    }
+}
+
+/**
  * PVZ风格通用弹窗框架（支持滚动 + 底部固定内容，和Popup行为一致）
  * @param isVisible 是否显示弹窗
  * @param titleText 弹窗标题
@@ -71,43 +120,10 @@ fun PvzStyledDialog(
             onDismissRequest = onDismissRequest,
             properties = DialogProperties(dismissOnClickOutside = dismissible)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .background(
-                        Brush.verticalGradient(colors = listOf(Color(0xFFF3EEB9), Color(0xFFF2EDBB))),
-                        RoundedCornerShape(15.dp)
-                    )
-                    .border(3.dp, Color(0xFF344702), RoundedCornerShape(15.dp))
-                    .padding(2.dp)
-                    .border(5.dp, Color(0xFF8ED229), RoundedCornerShape(15.dp))
-                    .padding(0.5.dp)
-                    .border(1.dp, Color(0xFF78A52B), RoundedCornerShape(15.dp))
+            PvzDialogCard(
+                title = titleText,
+                modifier = Modifier.fillMaxWidth(0.9f)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(vertical = 10.dp)
-                ) {
-                    // 标题栏
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                Brush.verticalGradient(colors = listOf(Color(0xFF88CD23), Color(0xFF97DC02)))
-                            )
-                            .padding(vertical = 15.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        PvzRichText(
-                            titleText,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            defaultStyle = PvzTextWhiteStyle.copy(shadowColor = null)
-                        )
-                    }
-
-                    Box(modifier = Modifier.height(20.dp))
-
                     // 核心：和 PvzPopupContent 完全一致的 探测+滚动显示 逻辑
                     PerfectAdaptiveLayout(
                         height = 0.dp,
@@ -162,7 +178,6 @@ fun PvzStyledDialog(
                             }
                         }
                     )
-                }
             }
         }
     }

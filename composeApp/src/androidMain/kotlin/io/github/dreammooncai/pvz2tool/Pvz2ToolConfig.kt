@@ -613,6 +613,12 @@ data class Pvz2ToolConfigUISettings(
     val isUseExitConfirm: Boolean = true,
     /** 退出确认按钮文字 */
     val exitConfirmButtonText: String = "确认退出",
+    /** 悬浮球关闭二次确认弹窗标题 */
+    val floatingExitConfirmTitle: String = "确认退出",
+    /** 悬浮球关闭二次确认弹窗内容 */
+    val floatingExitConfirmMessage: String = "确定要退出悬浮窗吗(直至重启游戏后显示)？",
+    /** 悬浮球关闭二次确认弹窗"确认"按钮文字 */
+    val floatingExitConfirmButtonText: String = "确认",
 )
 
 /**
