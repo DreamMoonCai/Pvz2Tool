@@ -4339,7 +4339,7 @@ private fun FloatingWindowSettingsContent(
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     UiSectionHeader("悬浮窗基础设置 (ui.settings)")
-                    if (simplifiedLaunch)
+                    if (!simplifiedLaunch)
                         UiInputCard("showFloatingWindow", "「开启悬浮窗」开关标签文本。") {
                             IntegratorInputField(showFloatingWindowLabel, "如：是否开启悬浮窗") { onShowFloatingWindowLabel(it) }
                         }
@@ -4357,7 +4357,7 @@ private fun FloatingWindowSettingsContent(
                     UiSwitchCard("isUseExitConfirm", "默认是否启用退出确认（仅影响首次启动）。") {
                         PvzCheckRow("默认启用退出确认", isUseExitConfirm) { onIsUseExitConfirm(!isUseExitConfirm) }
                     }
-                    if (simplifiedLaunch) {
+                    if (!simplifiedLaunch) {
                         UiInputCard("exitConfirmTitle", "退出确认弹窗标题。") {
                             IntegratorInputField(exitConfirmTitle, "如：退出游戏") { onExitConfirmTitle(it) }
                         }
@@ -4372,7 +4372,7 @@ private fun FloatingWindowSettingsContent(
             }
 
             // 悬浮球退出确认
-            if (simplifiedLaunch) {
+            if (!simplifiedLaunch) {
                 Spacer(Modifier.height(10.dp))
                 PvzDialogCard(title = null) {
                     Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
