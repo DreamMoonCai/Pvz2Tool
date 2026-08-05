@@ -509,7 +509,7 @@ object JsDevice {
             }
             listOf("versionCode".js, "版本号".js).func {
                 @Suppress("DEPRECATION")
-                runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionCode ?: -1 }
+                runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionCode }
                     .getOrDefault(-1).js
             }
             listOf("appName".js, "应用名称".js).func {

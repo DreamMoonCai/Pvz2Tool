@@ -40,6 +40,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.text.LinkInteractionListener
+import io.github.dreammooncai.pvz2tool.InitializePvz2
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -60,7 +61,15 @@ data class JsExecutionContext(
 )
 
 // 通过 CompositionLocal 向下传递 JS 执行上下文，避免每个 PvzRichText 调用点手动传参
-val LocalJsExecutionContext = compositionLocalOf<JsExecutionContext?> { null }
+val LocalJsExecutionContext = compositionLocalOf {
+    if (InitializePvz2.isConfigReady()) {
+        JsExecutionContext(
+            section = null,
+            item = null,
+            version = InitializePvz2.mPvz2ScreenStateFlow.value.selectedVersion ?: return@compositionLocalOf null,
+        )
+    } else null
+}
 
 // --------------- JS 执行辅助方法 ---------------
 
@@ -73,7 +82,7 @@ private suspend fun executeJsExprWithContext(expr: String, context: JsExecutionC
         val result = if (expr.endsWith(".js")) {
             val jsFile = if (expr.startsWith("/")) {
                 File(expr).inputStream()
-            } else AssetExtractorHolder.openInputStream("js/$expr")
+            } else AssetExtractorHolder.openInputStream("js/${expr.removePrefix("js/")}")
             jsFile?.use { jsFile ->
                 val jsCode = jsFile.bufferedReader().readText()
                 PvzToolJsEngine.executeScript(
@@ -122,13 +131,13 @@ private suspend fun executeJsExprNoContext(expr: String): String {
         val result = if (expr.endsWith(".js")) {
             val jsFile = if (expr.startsWith("/")) {
                 File(expr).inputStream()
-            } else AssetExtractorHolder.openInputStream("js/$expr")
+            } else AssetExtractorHolder.openInputStream("js/${expr.removePrefix("js/")}")
             jsFile?.use { jsFile ->
                 val jsCode = jsFile.bufferedReader().readText()
-                PvzToolJsEngine.executeScript(jsCode)
-            } ?: PvzToolJsEngine.executeScript(expr)
+                PvzToolJsEngine.executeScript(jsCode, source = "复合文本")
+            } ?: PvzToolJsEngine.executeScript(expr, source = "复合文本")
         } else {
-            PvzToolJsEngine.executeScript(expr)
+            PvzToolJsEngine.executeScript(expr, source = "复合文本")
         }
         result.ifBlank { "{{js:$expr}}" }
     } catch (e: Exception) {
@@ -215,7 +224,7 @@ private suspend fun loadJsFileContent(url: String): String? = withContext(Dispat
             }
             else -> {
                 // 工具箱相对路径：从 js/ 目录读取
-                AssetExtractorHolder.openInputStream("js/$trimmed")?.bufferedReader()?.readText()
+                AssetExtractorHolder.openInputStream("js/${trimmed.removePrefix("js/")}")?.bufferedReader()?.readText()
             }
         }
     }.getOrNull()
@@ -267,7 +276,7 @@ private suspend fun executeJsFromLink(url: String, jsContext: JsExecutionContext
             updateSectionState = jsContext.updateSectionState
         )
     } else {
-        PvzToolJsEngine.executeScript(code)
+        PvzToolJsEngine.executeScript(code, source = "复合文本")
     }
 }
 

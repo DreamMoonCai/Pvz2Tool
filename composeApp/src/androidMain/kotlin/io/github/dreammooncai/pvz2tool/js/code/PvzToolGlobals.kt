@@ -12,6 +12,7 @@ import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.Pvz2ToolConfig
+import io.github.dreammooncai.pvz2tool.ScheduleDef
 import io.github.dreammooncai.pvz2tool.controller.SoundController
 import io.github.dreammooncai.pvz2tool.js.JsConsole
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
@@ -27,8 +28,16 @@ import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
 import io.github.dreammooncai.pvz2tool.js.orNull
+import io.github.dreammooncai.pvz2tool.timer.TimerManager
 import io.github.dreammooncai.pvz2tool.pop.plugin.crypt.Pvz2NumberCrypt
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.builtins.ListSerializer
+import android.app.NotificationChannel
+import android.app.NotificationManager as AndroidNotificationManager
+import androidx.core.app.NotificationCompat
+import android.content.Context
+import android.os.Build
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsActionItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsChoiceItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
@@ -42,6 +51,7 @@ import io.github.dreammooncai.util.isAssetDirExist
 import io.github.dreammooncai.util.isAssetFileExist
 import io.github.dreammooncai.util.openUriInputStreamOrAssetNull
 import android.app.Activity
+import androidx.core.graphics.drawable.IconCompat
 import io.github.dreammooncai.pvz2tool.controller.GameDisplayFloatingController
 import io.github.dreammooncai.pvz2tool.service.LocalVpnService
 import io.github.dreammooncai.pvz2tool.ui.main.SettingsDialogState
@@ -438,6 +448,80 @@ object PvzToolGlobals {
         }
     }
 
+    val notifications = Object("notifications") {
+        listOf("show".js, "显示".js).func(
+            FunctionParam("title"), FunctionParam("message"), FunctionParam("options")
+        ) { args ->
+            val title = toString(args[0]); val message = toString(args[1])
+            val opts = args[2].orNull as? JsObject
+            val ctx = InitializePvz2.context
+            val cid = opts?.get("channelId".js, this)?.orNull?.let { toString(it) } ?: "pvz2tool_default"
+            val cname = opts?.get("channelName".js, this)?.orNull?.let { toString(it) } ?: "工具箱通知"
+            val icon = opts?.get("icon".js, this)?.orNull?.let { toString(it) }
+            val auto = opts?.get("autoCancel".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: true
+            if (Build.VERSION.SDK_INT >= 26) {
+                val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as AndroidNotificationManager
+                if (nm.getNotificationChannel(cid) == null)
+                    nm.createNotificationChannel(NotificationChannel(cid, cname, AndroidNotificationManager.IMPORTANCE_DEFAULT))
+            }
+            val id = (System.currentTimeMillis() % 100000).toInt()
+            // 通知 small icon：应用图标可能为 0（未在 <application> 声明 icon）
+            // 兜底：生成 1px 白色 Bitmap 通过 IconCompat 传入，100% 可靠
+            val smallIcon = ctx.applicationInfo.icon.takeIf { it != 0 }
+            val b = NotificationCompat.Builder(ctx, cid)
+                .setContentTitle(title).setContentText(message)
+                .setAutoCancel(auto)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            if (smallIcon != null) {
+                b.setSmallIcon(smallIcon)
+            } else {
+                b.setSmallIcon(android.R.drawable.ic_popup_reminder)
+            }
+            if (icon != null) {
+                val iconRes = AssetExtractorHolder.openInputStream(icon)
+                if (iconRes != null) b.setSmallIcon(IconCompat.createWithBitmap(android.graphics.BitmapFactory.decodeStream(iconRes)))
+            }
+            (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as AndroidNotificationManager).notify(id, b.build())
+            id.js
+        }
+        listOf("cancel".js, "取消".js).func(FunctionParam("id")) { args ->
+            val id = args[0].orNull?.let { toNumber(it).toInt() } ?: return@func null
+            (InitializePvz2.context.getSystemService(Context.NOTIFICATION_SERVICE) as AndroidNotificationManager).cancel(id)
+            null
+        }
+    }
+
+    val timer = Object("timer") {
+        listOf("schedule".js, "注册".js).func(
+            FunctionParam("id"), FunctionParam("name"), FunctionParam("cron"), FunctionParam("script")
+        ) { args ->
+            val id = toString(args[0]); val name = toString(args[1])
+            val cron = toString(args[2]); val script = toString(args[3])
+            TimerManager.addOrUpdate(InitializePvz2.context,
+                ScheduleDef(id = id, name = name, cron = cron, jsScript = script))
+            id.js
+        }
+        listOf("list".js, "列表".js).func { _ ->
+            val timers = TimerManager.loadTimers(InitializePvz2.context)
+            PvzToolJsEngine.parse(Json.encodeToString(ListSerializer(ScheduleDef.serializer()), timers))
+        }
+        listOf("cancel".js, "取消".js).func(FunctionParam("id")) { args ->
+            TimerManager.remove(InitializePvz2.context, toString(args[0])).js
+        }
+        listOf("cancelAll".js, "全部取消".js).func { _ ->
+            TimerManager.cancelAll(InitializePvz2.context); null
+        }
+        listOf("nextTrigger".js, "下次".js).func { _ ->
+            val id = currentTimerId
+            if (id != null) for (t in TimerManager.loadTimers(InitializePvz2.context)) {
+                if (t.id == id) { TimerManager.schedule(InitializePvz2.context, t); break }
+            }
+            null
+        }
+    }
+
+    @Volatile var currentTimerId: String? = null
+
     val console = Object("console") {
         listOf("log".js, "日志".js).func(FunctionParam("msg", isVararg = true)) { args -> out(args, JsConsole::verbose) }
         listOf("info".js, "信息".js).func(FunctionParam("msg", isVararg = true)) { args -> out(args, JsConsole::info) }
@@ -488,7 +572,7 @@ object PvzToolGlobals {
                 null
             } else {
                 val inputStream = InitializePvz2.context.openUriInputStreamOrAssetNull(uri)
-                inputStream?.bufferedReader()?.use { it.readText() }?.js ?: null
+                inputStream?.bufferedReader()?.use { it.readText() }?.js
             }
         }
 
@@ -647,6 +731,12 @@ object PvzToolGlobals {
         }
         listOf("vpn".js, "虚拟专网".js, "VPN".js).forEach { key ->
             runtime.set(key, vpn, VariableType.Global)
+        }
+        listOf("notifications".js, "通知".js).forEach { key ->
+            runtime.set(key, notifications, VariableType.Global)
+        }
+        listOf("timer".js, "定时器".js).forEach { key ->
+            runtime.set(key, timer, VariableType.Global)
         }
         runtime.get("Number".js)?.get("prototype".js, runtime)?.let { it as? JsObject }?.let { prototype ->
             listOf("encrypt".js, "加密".js).forEach { key ->

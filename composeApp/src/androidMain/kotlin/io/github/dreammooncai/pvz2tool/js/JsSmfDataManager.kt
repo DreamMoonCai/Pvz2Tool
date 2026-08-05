@@ -1,7 +1,6 @@
 package io.github.dreammooncai.pvz2tool.js
 
 import io.github.dreammooncai.pvz2tool.InitializePvz2
-import io.github.dreammooncai.pvz2tool.SectionItem
 import io.github.dreammooncai.pvz2tool.VersionDef
 import io.github.dreammooncai.pvz2tool.pop.core.rsb.Rsb
 import io.github.dreammooncai.pvz2tool.pop.core.rsb.RsbCommonConfig
@@ -49,15 +48,16 @@ class JsSmfEntryCache(
 
 /**
  * 版本级 SMF 数据管理器：
- * - 负责按 item.smfList 批量定位、解包、打包 SMF 文件
- * - 缓存按版本隔离（同版本不同 item 共享同一份解包缓存）
+ * - 负责按 smfList 批量定位、解包、打包 SMF 文件
+ * - 缓存按版本隔离（同版本不同调用方共享同一份解包缓存）
  * - SMF 文件查找优先级：
  *   1. `pvz2tool/version/<versionId>/smf/<name>.rsb.smf`（版本专属）
  *   2. `pvz2tool/<version.baseAssetPath>/<name>.rsb.smf`（baseAssetPath 默认 version/base/smf）
  */
 class JsSmfDataManager(
     private val version: VersionDef,
-    private val item: SectionItem,
+    private val sectionName: String? = null,
+    private val smfList: List<String> = emptyList(),
     private val holder: AssetExtractorHolder,
     private val targetSmfDir: File?
 ) {
@@ -69,11 +69,11 @@ class JsSmfDataManager(
     }
 
     /**
-     * 根据 item.smfList 构建每个 SMF 名到 [JsSmfEntryCache] 的映射。
+     * 根据 smfList 构建每个 SMF 名到 [JsSmfEntryCache] 的映射。
      * 键为不含扩展名的基名（如 "dynamic"），方便 JS 访问 `data.dynamic.*`。
      */
     val caches: Map<String, JsSmfEntryCache> by lazy {
-        item.smfList.associateWith { name ->
+        smfList.associateWith { name ->
             val fileName = if (name.endsWith(".rsb.smf", ignoreCase = true) || name.endsWith(".obb",ignoreCase = true)) name
             else "$name.rsb.smf"
             JsSmfEntryCache(version.id, fileName)
@@ -103,11 +103,11 @@ class JsSmfDataManager(
             holder.extract(*caches.mapNotNull { (_,cache) ->
                 val versionPath = "${version.resolveAssetPath()}/${cache.smfFileName}"
                 if (AssetExtractorHolder.exist(versionPath)) {
-                    return@mapNotNull AssetExtractorHolder.resource(versionPath,cache.originalDir, sectionName = item.displayName)
+                    return@mapNotNull AssetExtractorHolder.resource(versionPath,cache.originalDir, sectionName = sectionName ?: "SMF")
                 }
                 val basePath = version.baseAssetPath?.let { "$it/${cache.smfFileName}" }
                 if (basePath != null && AssetExtractorHolder.exist(basePath)) {
-                    return@mapNotNull AssetExtractorHolder.resource(basePath,cache.originalDir, sectionName = item.displayName)
+                    return@mapNotNull AssetExtractorHolder.resource(basePath,cache.originalDir, sectionName = sectionName ?: "SMF")
                 }
                 JsConsole.warn("找不到 SMF 文件：${cache.smfFileName}，已跳过")
                 return@mapNotNull null

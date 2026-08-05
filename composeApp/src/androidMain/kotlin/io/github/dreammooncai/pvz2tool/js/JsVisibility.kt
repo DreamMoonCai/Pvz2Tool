@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
+import io.github.dreammooncai.pvz2tool.view.JsExecutionContext
+import io.github.dreammooncai.pvz2tool.view.LocalJsExecutionContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -33,7 +35,8 @@ private const val VISIBILITY_DEBOUNCE_MS = 60L
  * 与 `{{js:...}}` 动态文案的刷新时机完全一致。
  *
  * ## 防循环
- * 求值走 [PvzToolJsEngine.executeScript] 的**无上下文重载**，该重载不会触发
+ * 求值优先走 [PvzToolJsEngine.executeScript] 的**带上下文重载**（当 [LocalJsExecutionContext] 提供上下文时，
+ * JS 可访问 `this.当前`）；无上下文时降级为无上下文重载。两种重载都不会触发
  * [JsRichTextRefresher.refresh]，所以不存在「求值 → 刷新 → 再求值」死循环。
  */
 object JsVisibility {
@@ -61,14 +64,33 @@ object JsVisibility {
      *    返回值必定是 `"true"` / `"false"`，规避不同引擎对布尔 `toString()` 的表示差异。
      * 2. 若包装后语法不成立（例如表达式其实是多语句脚本），回退为原样执行 + 真值解析。
      */
-    suspend fun evaluate(expression: String): Boolean {
+    suspend fun evaluate(expression: String, context: JsExecutionContext? = null): Boolean {
         val expr = expression.trim().trimEnd(';').trim()
         if (expr.isEmpty()) return false
-        runCatching { PvzToolJsEngine.executeScript("String(!!($expr))") }
+        // 有上下文时走带上下文重载（JS 可访问 this.当前），否则走无上下文降级重载
+        val runner: suspend (String) -> String = { script ->
+            if (context != null) {
+                // 可见性求值本身就在 JsRichTextRefresher.revision 的 collectLatest 订阅内重算，
+                // 必须 isRichText = true 抑制末尾的 refresh()，否则会触发「求值→刷新→再求值」死循环。
+                PvzToolJsEngine.executeScript(
+                    script = script,
+                    section = context.section,
+                    item = context.item,
+                    version = context.version,
+                    sectionStates = context.sectionStates,
+                    isRichText = true,
+                    updateSectionState = context.updateSectionState,
+                    source = "可见性求值"
+                )
+            } else {
+                PvzToolJsEngine.executeScript(script, source = "可见性求值")
+            }
+        }
+        runCatching { runner("String(!!($expr))") }
             .getOrNull()
             ?.takeIf { it.isNotBlank() }
             ?.let { return parseBoolean(it) }
-        return runCatching { parseBoolean(PvzToolJsEngine.executeScript(expression)) }.getOrDefault(false)
+        return runCatching { parseBoolean(runner(expression)) }.getOrDefault(false)
     }
 
     /**
@@ -92,12 +114,12 @@ object JsVisibility {
      *
      * @return 两者都为空 → true（无条件显示）；有条件但求值失败/异常 → false（保守隐藏）。
      */
-    suspend fun evaluate(expression: String?, path: String?): Boolean {
-        expression?.takeIf { it.isNotBlank() }?.let { return evaluate(it) }
+    suspend fun evaluate(expression: String?, path: String?, context: JsExecutionContext? = null): Boolean {
+        expression?.takeIf { it.isNotBlank() }?.let { return evaluate(it, context) }
         // 两者皆空 = 未配置条件 → 无条件显示
         val scriptPath = path?.takeIf { it.isNotBlank() } ?: return true
         // 配了路径却读不到文件：视为条件不成立（隐藏），避免静默展示不可用功能
-        return readScript(scriptPath)?.let { evaluate(it) } ?: false
+        return readScript(scriptPath)?.let { evaluate(it, context) } ?: false
     }
 }
 
@@ -114,17 +136,19 @@ object JsVisibility {
  */
 @Composable
 fun rememberJsVisibility(expression: String?, expressionPath: String? = null): Boolean {
+    // 在组合体内捕获当前 JS 执行上下文（Provider 提供或默认版本上下文），供可见性求值优先使用带上下文重载
+    val jsContext = LocalJsExecutionContext.current
     val expr = expression?.takeIf { it.isNotBlank() }
     val path = expressionPath?.takeIf { it.isNotBlank() }
     // 未配置任何条件：走快路径，不建 produceState、不订阅信号
     if (expr == null && path == null) return true
     // 起始 false：未求值完成前先不渲染，避免不该显示的项闪现一帧
-    val visible by produceState(false, expr, path) {
+    val visible by produceState(false, expr, path, jsContext) {
         var isFirstEmission = true
         JsRichTextRefresher.revision.collectLatest {
             if (!isFirstEmission) delay(VISIBILITY_DEBOUNCE_MS)
             isFirstEmission = false
-            value = JsVisibility.evaluate(expr, path)
+            value = JsVisibility.evaluate(expr, path, jsContext)
         }
     }
     return visible

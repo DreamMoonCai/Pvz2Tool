@@ -41,10 +41,14 @@ fun PvzButton(
     backgroundColor: Color? = null, // JS UI 自定义按钮底色（传入时覆盖默认渐变）
     onClick: () -> Unit
 ) {
-    val interactionSource = rememberSoundInteractionSource(
-        InitializePvz2.config.ui.sounds.buttonClickPress,
-        InitializePvz2.config.ui.sounds.buttonClickRelease
-    )
+    val interactionSource = if (InitializePvz2.isConfigReady()) {
+        rememberSoundInteractionSource(
+            InitializePvz2.config.ui.sounds.buttonClickPress,
+            InitializePvz2.config.ui.sounds.buttonClickRelease
+        )
+    } else {
+        remember { MutableInteractionSource() }
+    }
     val isPressed by interactionSource.collectIsPressedAsState()
     // 自定义底色：由底色推导与原版一致的立体渐变（正常凸起/按下凹下），否则用主题渐变
     val effNormal: Brush

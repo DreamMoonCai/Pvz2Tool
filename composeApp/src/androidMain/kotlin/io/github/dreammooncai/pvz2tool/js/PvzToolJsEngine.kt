@@ -180,8 +180,9 @@ object PvzToolJsEngine {
         isRichText: Boolean = false,
         onRunJsListener: (suspend ScriptRuntime.(section: DynamicSection?,item: SectionItem?) -> Unit)? = null,
         updateSectionState: ((String, (DynamicSectionState) -> DynamicSectionState) -> Unit)? = null,
+        source: String? = null,
     ): String {
-        JsConsole.info("执行: ${item?.displayName ?: section?.title}")
+        JsConsole.info("执行: ${item?.displayName ?: section?.title ?: source ?: "动态代码"}")
         return try {
             runCatching {
                 getJSEngine().runtime.callJsFunction(script,section,item,version,sectionStates,isRichText,onRunJsListener) { section, item, newValue ->
@@ -223,10 +224,14 @@ object PvzToolJsEngine {
     /**
      * 执行一段 JS 脚本字符串（无上下文，用于通用脚本执行）。
      *
+     * @param source 执行环境标识（如「悬浮窗按钮」「顶栏图标」「可见性求值」「复合文本」），
+     *   用于日志「执行:」输出所在位置；为空时回退为「动态代码」。
+     *
      * 注意：该重载同时被复合文本的无上下文降级求值复用，因此**不会**自动触发
      * [JsRichTextRefresher.refresh]。若调用方是用户交互（如悬浮窗按钮），请在执行后手动调用。
      */
-    suspend fun executeScript(script: String): String {
+    suspend fun executeScript(script: String, source: String? = null): String {
+        JsConsole.info("无上下文执行: ${source ?: "动态代码"}")
         val engine = getJSEngine()
         val result = engine.evaluate(script)
         return result?.toString() ?: ""
@@ -235,11 +240,13 @@ object PvzToolJsEngine {
     suspend fun executeScript(
         extractor: AssetExtractorHolder,
         script: String,
-        section: DynamicSection,
-        item: SectionItem,
+        section: DynamicSection?,
+        item: SectionItem?,
         version: VersionDef,
         sectionStates: Map<String, DynamicSectionState> = emptyMap(),
         updateSectionState: ((String, (DynamicSectionState) -> DynamicSectionState) -> Unit)? = null,
+        smfListOverride: List<String>? = null,
+        source: String? = null,
     ): String {
         return executeScript(
             script = script,
@@ -248,13 +255,21 @@ object PvzToolJsEngine {
             version = version,
             sectionStates = sectionStates,
             onRunJsListener = { section,item ->
-                val manager = JsSmfDataManager(version, item ?: return@executeScript, extractor,section?.resolveTargetDirectory() ?: return@executeScript)
+                // 优先用调用方显式指定的 smfList（顶栏图标/悬浮窗自身配置的），否则回退到 item 的 smfList。
+                // 这样即使 item 为空（顶栏图标渲染时 jsContext.item 为 null）也能独立加载并注入 data。
+                val effectiveSmfList = smfListOverride ?: item?.smfList
+                if (effectiveSmfList.isNullOrEmpty()) return@executeScript
 
-                // 仅当 smfList 非空时才走准备/打包流程
-                if (item.smfList.isNotEmpty()) {
-                    manager.prepareSmf()
-                    pendingSmfPacks.add(manager)
-                }
+                val manager = JsSmfDataManager(
+                    version = version,
+                    sectionName = source ?: item?.displayName,
+                    smfList = effectiveSmfList,
+                    holder = extractor,
+                    targetSmfDir = section?.resolveTargetDirectory()
+                )
+
+                manager.prepareSmf()
+                pendingSmfPacks.add(manager)
 
                 val builder = JsSmfDataBuilder(manager)
                 val data = builder.buildFromExtractedDir()
@@ -263,6 +278,7 @@ object PvzToolJsEngine {
                 }
             },
             updateSectionState = updateSectionState,
+            source = source,
         )
     }
 

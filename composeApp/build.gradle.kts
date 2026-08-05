@@ -60,6 +60,7 @@ kotlin {
             implementation(libs.keight)
             implementation(libs.bcprov.jdk18on)
             implementation(libs.coil.compose)
+            implementation(libs.arsclib)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -169,6 +170,11 @@ run {
     }
 }
 
+
+// 合并引擎离线验证需要较大堆（目标游戏 APK 可能数百 MB，.so/dex 会被整块读入内存）
+tasks.named<Test>("jvmTest") {
+    maxHeapSize = "4g"
+}
 
 dependencies {
     implementation(libs.androidx.appcompat)

@@ -215,7 +215,7 @@ sections:
         type: "CHECKBOX"
         icon: "auto_collect.png"
         smfList: [ "dynamic" ]
-        jsPath: "version/auto_collect.js"
+        jsPath: "js/auto_collect.js"
 
   # ==========================================
   # 栏目: 福利中心 - GOLD
@@ -244,7 +244,7 @@ sections:
         type: "BUTTON"
         buttonText: "🎁 立即兑换"
         buttonColor: "green"
-        jsPath: "giftcode/redeem_giftcode.js"
+        jsPath: "js/giftcode/redeem_giftcode.js"
 
       # ----- 分隔线 -----
       - id: "welfare_sep_1"
@@ -257,7 +257,7 @@ sections:
         desc: "查看你总计兑换过多少个礼品码"
         type: "INFO"
         infoValue: "暂无兑换记录"
-        jsPath: "giftcode/welfare_status.js"
+        jsPath: "js/giftcode/welfare_status.js"
 
       # ----- 查看已使用礼品码按钮 -----
       - id: "show_used_codes"
@@ -265,7 +265,7 @@ sections:
         desc: "查看所有已成功兑换的礼品码"
         type: "BUTTON"
         buttonColor: "blue"
-        jsPath: "giftcode/show_used_codes.js"
+        jsPath: "js/giftcode/show_used_codes.js"
 
       # ----- 分隔线 -----
       - id: "welfare_sep_2"
@@ -299,7 +299,7 @@ sections:
   # 栏目: JS 执行器测试
   # 测试新增的 js.run()/js.call()/js.执行() API
   # ==========================================
-  - id: "js_executor_demo"
+  - id: "example_js_executor_demo"
     title: "JS 执行器测试"
     theme: "PURPLE"
 
@@ -383,7 +383,7 @@ sections:
   # 栏目: HTTP 网络请求测试
   # 测试新增的 http(网络) 对象 API
   # ==========================================
-  - id: "http_demo"
+  - id: "example_http_demo"
     title: "HTTP 网络请求测试"
     theme: "ORANGE"
 
@@ -590,9 +590,9 @@ sections:
   #       name 或 desc 有内容 → 左侧文字 + 右侧小按钮
   #       name 和 desc 均为空 → 渲染为全宽横条大按钮（与存档按钮风格一致）
   # ==========================================
-  - id: "js_tools"
+  - id: "example_js_tools"
     title: "JS 工具"
-#    isExpanded: true
+    #    isExpanded: true
     theme: "BLUE"
 
     items:
@@ -947,7 +947,7 @@ sections:
   # 展示 RADIO、CHECKBOX、SLIDER 与 jsScript 的配合使用
   # 完整 API 文档见: js_documentation.md
   # ==========================================
-  - id: "js_linkage"
+  - id: "example_js_linkage"
     title: "JS 脚本联动示例"
     theme: "GREEN"
 
@@ -963,7 +963,7 @@ sections:
         jsScript: |-
           console.log("切换到正常速度模式");
           // 可以访问全局状态
-          console.log("当前难度: " + this.all.js_linkage.difficulty_easy.selected);
+          console.log("当前难度: " + this.all.example_js_linkage.difficulty_easy.selected);
           "速度已设置为: 正常"
 
       - id: "speed_fast"
@@ -1105,18 +1105,18 @@ sections:
         buttonColor: "blue"
         jsScript: |-
           // 读取 js_linkage 栏目的信息
-          var section = this.all.js_linkage;
+          var section = this.all.example_js_linkage;
           console.log("栏目标题: " + section.title);
           console.log("栏目触发方式: " + section.trigger);
 
           // 读取特定项的状态
-          var speedNormal = this.all.js_linkage.speed_normal;
+          var speedNormal = this.all.example_js_linkage.speed_normal;
           console.log("正常速度是否选中: " + speedNormal.selected);
 
-          var autoCollect = this.all.js_linkage.auto_collect_js;
+          var autoCollect = this.all.example_js_linkage.auto_collect_js;
           console.log("自动收集是否启用: " + autoCollect.checked);
 
-          var sunValue = this.all.js_linkage.sun_value_js;
+          var sunValue = this.all.example_js_linkage.sun_value_js;
           console.log("阳光值滑块当前值: " + sunValue.value);
           console.log("阳光值范围: " + sunValue.minValue + " ~ " + sunValue.maxValue);
 
@@ -1182,7 +1182,7 @@ sections:
         type: "BUTTON"
         buttonColor: "red"
         jsScript: |-
-          var section = this.all.js_linkage;
+          var section = this.all.example_js_linkage;
           var items = section.items;
 
           var info = [];
@@ -1236,12 +1236,12 @@ sections:
         buttonColor: "green"
         jsScript: |-
           // 获取各个配置
-          var speedMode = this.all.js_linkage.speed_normal.selected ? "正常" :
-                          this.all.js_linkage.speed_fast.selected ? "快速" : "慢速";
+          var speedMode = this.all.example_js_linkage.speed_normal.selected ? "正常" :
+                          this.all.example_js_linkage.speed_fast.selected ? "快速" : "慢速";
 
-          var autoCollect = this.all.js_linkage.auto_collect_js.checked;
-          var sunValue = this.all.js_linkage.sun_value_js.value;
-          var showDamage = this.all.js_linkage.show_damage_js.checked;
+          var autoCollect = this.all.example_js_linkage.auto_collect_js.checked;
+          var sunValue = this.all.example_js_linkage.sun_value_js.value;
+          var showDamage = this.all.example_js_linkage.show_damage_js.checked;
 
           // 打印汇总
           console.log("=== 当前配置汇总 ===");
@@ -1257,7 +1257,7 @@ sections:
   # 栏目: Toast 轻提示测试
   # 测试新增的 toast(吐司) 对象 API
   # ==========================================
-  - id: "toast_demo"
+  - id: "example_toast_demo"
     title: "Toast 轻提示测试"
     theme: "TEAL"
 
@@ -1307,7 +1307,7 @@ sections:
   # 栏目: DEX 加载测试
   # 测试新增的 dex 对象（load/加载/loadDex、loadFromAsset/从资源加载、loadFromUrl/从网络加载 及句柄 findClass）
   # ==========================================
-  - id: "dex_demo"
+  - id: "example_dex_demo"
     title: "DEX 加载测试"
     theme: "PURPLE"
 
@@ -1329,7 +1329,7 @@ sections:
         type: "BUTTON"
         buttonColor: "blue"
         jsScript: |-
-          var dexPath = path.resolve("$WORK_DIR/test.dex");
+          var dexPath = path.resolve("$WORK_DIR/example/test.dex");
           var loader = dex.load(dexPath);
           if (loader) console.log("DEX 加载成功: " + loader.path);
           loader ? ("DEX 加载成功，句柄路径: " + loader.path + "\n可用 loader.findClass('包名.类名') 反射") : ("未找到 " + dexPath + "\n请将待测 .dex 放到工作目录后重试");
@@ -1341,7 +1341,7 @@ sections:
         type: "BUTTON"
         buttonColor: "green"
         jsScript: |-
-          var loader = dex.loadFromAsset("test.dex");
+          var loader = dex.loadFromAsset("example/test.dex");
           if (loader) console.log("资源 DEX 加载成功: " + loader.path);
           loader ? ("资源 DEX 加载成功: " + loader.path) : "assets 中未找到 test.dex（可放置后重试，或忽略此测试）";
 
@@ -1352,7 +1352,7 @@ sections:
         type: "BUTTON"
         buttonColor: "red"
         jsScript: |-
-          var loader = dex.load("test.dex");
+          var loader = dex.load("example/test.dex");
           loader ? (function() {
             var Cls = loader.findClass("com.pvz2tool.dextest.Calculator");
             var inst = Cls.constructor(["int"]).newInstance(7);   // Calculator(int seed)
@@ -1368,7 +1368,7 @@ sections:
   # 测试新增的 reflect 对象（findClass/方法/字段/构造器/实例 链式）
   # 使用系统类做安全验证，无需额外 DEX
   # ==========================================
-  - id: "reflect_demo"
+  - id: "example_reflect_demo"
     title: "反射 API 测试"
     theme: "GREEN"
 
@@ -1452,7 +1452,7 @@ sections:
         type: "BUTTON"
         buttonColor: "orange"
         jsScript: |-
-          var dexPath = path.resolve("$WORK_DIR/test.dex");
+          var dexPath = path.resolve("$WORK_DIR/example/test.dex");
           var loader = dex.load(dexPath);
           if (!loader) console.log("未找到 " + dexPath + "，无法演示 DEX 内类反射");
           loader ? (
@@ -1467,7 +1467,7 @@ sections:
   # 栏目: 棕色主题 - BROWN（基础浅色主题）
   # 展示所有组件类型和变体
   # ==========================================
-  - id: "theme_brown"
+  - id: "example_theme_brown"
     title: "棕色主题 BROWN"
     theme: "BROWN"
     confirmButtonText: "应用"
@@ -1587,7 +1587,7 @@ sections:
   # ==========================================
   # 栏目: 蓝色主题 - BLUE
   # ==========================================
-  - id: "theme_blue"
+  - id: "example_theme_blue"
     title: "蓝色主题 BLUE"
     theme: "BLUE"
     confirmButtonText: "应用"
@@ -1698,7 +1698,7 @@ sections:
   # ==========================================
   # 栏目: 绿色主题 - GREEN
   # ==========================================
-  - id: "theme_green"
+  - id: "example_theme_green"
     title: "绿色主题 GREEN"
     theme: "GREEN"
     confirmButtonText: "应用"
@@ -1809,7 +1809,7 @@ sections:
   # ==========================================
   # 栏目: 红色主题 - RED
   # ==========================================
-  - id: "theme_red"
+  - id: "example_theme_red"
     title: "红色主题 RED"
     theme: "RED"
     confirmButtonText: "应用"
@@ -1920,7 +1920,7 @@ sections:
   # ==========================================
   # 栏目: 紫色主题 - PURPLE
   # ==========================================
-  - id: "theme_purple"
+  - id: "example_theme_purple"
     title: "紫色主题 PURPLE"
     theme: "PURPLE"
     confirmButtonText: "应用"
@@ -2031,7 +2031,7 @@ sections:
   # ==========================================
   # 栏目: 橙色主题 - ORANGE
   # ==========================================
-  - id: "theme_orange"
+  - id: "example_theme_orange"
     title: "橙色主题 ORANGE"
     theme: "ORANGE"
     confirmButtonText: "应用"
@@ -2142,7 +2142,7 @@ sections:
   # ==========================================
   # 栏目: 蓝底深色主题 - BLUE_BACKGROUND
   # ==========================================
-  - id: "theme_blue_bg"
+  - id: "example_theme_blue_bg"
     title: "蓝底深色 BLUE_BACKGROUND"
     theme: "BLUE_BACKGROUND"
     confirmButtonText: "应用"
@@ -2253,7 +2253,7 @@ sections:
   # ==========================================
   # 栏目: 绿底深色主题 - GREEN_BACKGROUND
   # ==========================================
-  - id: "theme_green_bg"
+  - id: "example_theme_green_bg"
     title: "绿底深色 GREEN_BACKGROUND"
     theme: "GREEN_BACKGROUND"
     confirmButtonText: "应用"

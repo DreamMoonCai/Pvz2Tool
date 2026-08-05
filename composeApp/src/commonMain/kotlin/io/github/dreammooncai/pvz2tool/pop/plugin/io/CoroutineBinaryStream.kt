@@ -771,6 +771,7 @@ private class MemoryBackend(
         }
     }
 
+    @Suppress("UNCHECKED_CAST")
     override fun <T> array(): T? = when (val buffer = buffer) {
         is ByteBuffer -> buffer.array()
         is IntBuffer -> buffer.array()
@@ -1191,6 +1192,7 @@ private class InputStreamBackend(
         }
     }
 
+    @Suppress("UNCHECKED_CAST")
     override fun <T> array(): T? = cache.stream as? T?
 
     override fun close() {

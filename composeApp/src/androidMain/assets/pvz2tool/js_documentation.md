@@ -162,6 +162,21 @@
 | `vpn.isActive()` | `vpn.是否激活()` / `vpn.是否开启()` | 当前 VPN 是否处于激活状态（即是否断网） |
 | `vpn.isPrepared()` | `vpn.是否已授权()` / `vpn.已授权()` / `vpn.是否可用()` | VPN 是否已获系统授权（可用作 `isShowFromJs` 条件） |
 
+#### notifications 对象
+| 英文 | 中文别名 | 说明 |
+|------|----------|------|
+| `notifications.show()` | `notifications.显示()` | 发送系统通知（支持 title/message/options） |
+| `notifications.cancel()` | `notifications.取消()` | 按 ID 取消通知 |
+
+#### timer 对象
+| 英文 | 中文别名 | 说明 |
+|------|----------|------|
+| `timer.schedule()` | `timer.注册()` | 注册定时任务（id/name/cron/script） |
+| `timer.list()` | `timer.列表()` | 列出所有定时任务 |
+| `timer.cancel()` | `timer.取消()` | 按 ID 取消定时任务 |
+| `timer.cancelAll()` | `timer.全部取消()` | 取消所有定时任务 |
+| `timer.nextTrigger()` | `timer.下次()` | 注册当前定时器下一次触发（必须在脚本末尾调用） |
+
 #### audio 对象
 | 英文 | 中文别名 | 说明 |
 |------|----------|------|
@@ -290,6 +305,9 @@
 | `assets` | 资源 | 工具箱资源访问（本地优先+URL支持） | 全局 |
 | `storage` | 存储 | 持久化键值存储 | 全局 |
 | `data` | 数据 | SMF 数据访问（通过 smfList 配置） | 局部 |
+| `vpn` | 虚拟专网 | VPN 断网/恢复网络控制（disconnect/restore/isActive/isPrepared） | 全局 |
+| `notifications` | 通知 | 系统通知发送/取消（show/cancel），支持图标、渠道、点击回调 | 全局 |
+| `timer` | 定时器 | 定时任务管理（schedule/list/cancel/cancelAll/nextTrigger，底层 AlarmManager） | 全局 |
 | `this` | - | 工具上下文（含版本、栏目状态等） | 局部 |
 
 > **作用域说明**：
@@ -3906,6 +3924,187 @@ if (!vpn.isPrepared()) {
   jsScript: "vpn.isActive() ? vpn.restore() : vpn.disconnect();"
 ```
 
+---
+
+## 22. notifications - 系统通知
+
+`notifications` 对象提供 Android 系统通知栏的发送和取消能力。
+
+> **别名**：`notifications` / `通知` 均可访问同一对象。
+
+### 方法
+
+#### notifications.show / notifications.显示
+
+发送一条系统通知。
+
+**语法**：`notifications.show(title, message, options?) -> number`
+
+**参数**：
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `title` | string | 是 | — | 通知标题 |
+| `message` | string | 是 | — | 通知正文 |
+| `options` | object | 否 | — | 可选配置对象 |
+
+**`options` 配置**：
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `icon` | string | `null` | `assets/pvz2tool/` 下的大图路径，有则 `setLargeIcon`，无则默认图标 |
+| `channelId` | string | `"pvz2tool_default"` | 通知渠道 ID（Android 8.0+） |
+| `channelName` | string | `"工具箱通知"` | 通知渠道名（首次创建时设置） |
+| `autoCancel` | boolean | `true` | 点击后是否自动消失 |
+| `tapAction` | string | `null` | 点击通知后执行的 JS 脚本 |
+
+**说明**：
+- 通知渠道首次发送时自动创建（Android 8.0+）。
+- `tapAction` 指定的 JS 在用户点击通知时，通过 `Pvz2InitializeActivity` 执行（有 UI 上下文）。
+- 每次调用生成唯一通知 ID（基于时间戳），返回该 ID 可用于后续 `cancel()`。
+
+**返回**：number — 通知 ID，可用于取消。
+
+**示例**：
+```javascript
+// 简单通知
+notifications.show("签到提醒", "今天记得签到哦！");
+
+// 带图标的通知
+notifications.show("活动提醒", "新活动已开启", {
+    icon: "images/event_icon.png",
+    autoCancel: true,
+});
+
+// 点击通知打开设置页
+notifications.show("检测到更新", "点击查看详情", {
+    tapAction: "ui.alert('更新', '新的版本已发布！');"
+});
+```
+
+#### notifications.cancel / notifications.取消
+
+取消指定 ID 的通知。
+
+**语法**：`notifications.cancel(id) -> void`
+
+**参数**：
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | number | 是 | `show()` 返回的通知 ID |
+
+**返回**：void
+
+**示例**：
+```javascript
+var nid = notifications.show("下载中", "正在下载...");
+// ... 下载完成
+notifications.cancel(nid);
+```
+
+---
+
+## 23. timer - 定时器
+
+`timer` 对象提供定时任务的管理能力（底层基于 `AlarmManager`）。
+
+> **别名**：`timer` / `定时器` 均可访问同一对象。
+
+> **注意**：定时任务在后台 `TimerService` 中执行，**无 UI 上下文**（不能弹窗、不能操作界面），可读写文件、发通知。
+
+### 方法
+
+#### timer.schedule / timer.注册
+
+注册一个定时任务。
+
+**语法**：`timer.schedule(id, name, cron, script) -> string`
+
+**参数**：
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | string | 是 | 唯一标识，重复调用同 id 会覆盖 |
+| `name` | string | 是 | 显示名称（`timer.list()` 中可见） |
+| `cron` | string | 是 | 触发规则，见下方 cron 格式 |
+| `script` | string | 是 | 要执行的 JS 脚本（内联代码） |
+
+**cron 格式**：
+| 格式 | 示例 | 说明 |
+|------|------|------|
+| 五段式 cron | `"0 10 * * *"` | 每天 10:00 触发（仅解析 hour/minute） |
+| `"every Xm"` | `"every 30m"` | 每 30 分钟触发一次 |
+| `"every Xh"` | `"every 2h"` | 每 2 小时触发一次 |
+| `"every Xd"` | `"every 1d"` | 每天触发一次 |
+
+**说明**：
+- 定时器持久化到 SharedPreferences，应用重启后自动恢复。
+- **脚本末尾必须调用 `timer.nextTrigger()`** 注册下一次闹钟，否则只执行一次。
+- 也可在 `dream.yml` 的 `schedules` 字段中静态声明（参见 `config_documentation.md`）。
+
+**返回**：string — 任务 id
+
+**示例**：
+```javascript
+// 每天 10:00 签到提醒
+timer.schedule("daily_sign", "每日签到", "0 10 * * *",
+    "notifications.show('签到提醒', '记得签到！'); timer.nextTrigger();"
+);
+
+// 每 30 分钟检测
+timer.schedule("health_check", "心跳检测", "every 30m",
+    "// 检测逻辑...\ntimer.nextTrigger();"
+);
+```
+
+#### timer.list / timer.列表
+
+列出所有已注册的定时任务。
+
+**语法**：`timer.list() -> JsAny`
+
+**返回**：string — JSON 数组字符串，每项含 `id`、`name`、`cron`、`enabled` 字段。
+
+**示例**：
+```javascript
+var list = timer.list();
+for (var t of list) {
+    console.log(t.id + ": " + t.name + " [" + t.cron + "] enabled=" + t.enabled);
+}
+```
+
+#### timer.cancel / timer.取消
+
+取消指定 ID 的定时任务（同时取消闹钟并移除持久化记录）。
+
+**语法**：`timer.cancel(id) -> boolean`
+
+**参数**：
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | string | 是 | 任务 id |
+
+**返回**：boolean — 是否成功删除
+
+#### timer.cancelAll / timer.全部取消
+
+取消所有定时任务。
+
+**语法**：`timer.cancelAll() -> void`
+
+**返回**：void
+
+#### timer.nextTrigger / timer.下次
+
+注册当前定时器下一次触发。**必须在定时脚本（`jsScript` / `jsPath`）末尾调用**，否则闹钟只触发一次后不会自动续期。
+
+**语法**：`timer.nextTrigger() -> void`
+
+**说明**：
+- 仅从 `TimerService` 的定时脚本中调用有效（`currentTimerId` 已注入）。
+- 普通 UI 脚本中调用此方法无效果（`currentTimerId` 为 null）。
+
+**返回**：void
+
+---
+
 *文档版本: 2.1*
 *最后更新: 2026-07-17*
 *新增：ui 系列弹窗通用可定制化——所有弹窗（alert/confirm/prompt/select/multiSelect/actionSheet/slider/loading）新增按钮文字（confirmText/cancelText）、按钮背景色（confirmColor/cancelColor，支持命名色与 #RRGGBB/#AARRGGBB 十六进制）、可关闭性（dismissible/可关闭，alert/confirm/prompt/slider/loading 用此名；select/multiSelect/actionSheet 沿用 cancelable），以及事件回调（onConfirm/onCancel/onSelect/onChange/onDismiss，均为 function(value) 形式、异步触发且不阻塞 await）。slider 另增 decimals（小数位）/showValue（是否显示大字体数值）与实时 onChange 回调；loading 另增 update()/更新() 实时刷新文字。详见各弹窗小节与开头「通用选项与回调」*
@@ -3944,3 +4143,5 @@ if (!vpn.isPrepared()) {
 *新增：dex DEX 加载对象（load/加载/loadDex、loadFromAsset/从资源加载、loadFromUrl/从网络加载；基于 DexClassLoader 加载 .dex/.apk/.jar 到独立类加载器并返回句柄，句柄可传给 reflect.findClass 反射 DEX 内类）。参见新增第 19 节*
 *新增：reflect 反射对象（findClass/查找类/反射 及 YukiReflection 风格的 Class/Method/Field/Constructor/Instance 链式操作；活对象以「`Wrapper<T>` 子类句柄」（JsClassWrapper/JsInstanceWrapper/JsLoaderWrapper，均实现 Wrapper 并 override toKotlin 还原原始对象）在 JS 间往返，支持实例方法调用、字段读写、实例作为方法参数，无需 id 注册表）。参见新增第 20 节*
 *修正：dex/reflect 句柄机制由「id 注册表 + 句柄」重构为 keight 原生 `Wrapper<T>` 子类（消除全局注册表与所有 `.id` 属性，`convertArg` 退化为 `arg.toKotlin(runtime)`）；并移除 `dex.of/取加载器` 与 `reflect.of/取类` 两个按 id 取回的方法（句柄本身即携带原始对象，无需按 id 找回）*
+*新增：notifications 通知对象（show/显示、cancel/取消）+ timer 定时器对象（schedule/注册、list/列表、cancel/取消、cancelAll/全部取消、nextTrigger/下次）。参见新增第 21、22 节*
+*新增：schedules 定时任务配置（dream.yml 顶层 schedules 列表，支持 cron 表达式或 "every Xh/Xm/Xd" 间隔描述，远程回调 JS 触发 notification 等）。参见 config_documentation.md*

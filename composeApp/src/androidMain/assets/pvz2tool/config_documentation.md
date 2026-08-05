@@ -27,13 +27,54 @@
 | `cgVideoPath` | String | 否 | `opening.mp4` | CG 开场视频路径 |
 | `cgVideoPoster` | String | 否 | `null` | CG 视频超时海报图 |
 | `cgVideoLoadTimeout` | Long | 否 | `5000` | CG 视频超时毫秒 |
-| `gameActivityInvalid` | String | 否 | `设置的游戏Activity有误或不存在` | Activity 错误提示 |
+| `isShowFloatingWindow` | Boolean | 否 | `false` | 默认开启悬浮窗 |
+| `isUseExitConfirm` | Boolean | 否 | `false` | 启用退出确认弹窗 |
+| `isUseCustomGameDisplay` | Boolean | 否 | `false` | 启用自定义游戏画面 |
+| `displayMode` | String | 否 | `ratio` | 显示模式：`fullscreen` / `ratio` / `size` |
+| `windowRatio` | Float | 否 | `1.5` | displayMode=ratio 时的宽高比 |
+| `windowWidth` | Int | 否 | `0` | displayMode=size 时的窗口宽度 (px) |
+| `windowHeight` | Int | 否 | `0` | displayMode=size 时的窗口高度 (px) |
+| `isAllowRotation` | Boolean | 否 | `false` | 允许随意翻转界面 |
+| `floatingWindow` | Array | 否 | `[]` | 悬浮窗功能条目（见下方 `FwItemSimple`） |
+| `schedules` | Array | 否 | `[]` | 定时任务列表（见下方「定时任务配置」章节） |
+
+**`FwItemSimple` 悬浮窗条目**：
+
+| 属性 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | String | 是 | 唯一标识 |
+| `name` | String | 是 | 显示名称 |
+| `buttonColor` | String | 否 | 按钮颜色：`red` / `green` / `blue`，默认 `green` |
+| `jsScript` | String | 否 | 点击执行的 JS 脚本 |
+| `smfList` | Array | 否 | 关联的 SMF 资源列表 |
 
 **精简配置示例**：
 ```yaml
 gameActivity: com.popcap.pvz2cmhd.SexyAppActivity
 simplifiedLaunch: true
-# baseAssetPath: version/base/smf  # 可选，自定义 base 资源路径
+isShowFloatingWindow: true
+isUseCustomGameDisplay: true
+displayMode: ratio
+windowRatio: 1.77
+floatingWindow:
+  - id: vpn_toggle
+    name: 网络开关
+    buttonColor: red
+    jsScript: "vpn.isActive() ? vpn.restore() : vpn.disconnect();"
+  - id: game_display
+    name: 画面设置
+    buttonColor: green
+    jsScript: ui.showGameDisplay()
+schedules:
+  - id: daily_sign
+    name: 每日签到
+    cron: "0 10 * * *"
+    jsScript: |
+      notifications.show("签到提醒", "记得签到！");
+      timer.nextTrigger();
+# cgVideoPath: opening.mp4          # 可选，CG 视频路径
+# gameActivityInvalid: "..."        # 可选，Activity 错误提示
+```
 # smfDirectory: files/              # 可选，自定义 SMF 目录
 # cgVideoPath: opening.mp4          # 可选，CG 视频路径
 # cgVideoPoster: poster.jpg         # 可选，CG 超时海报图
@@ -42,6 +83,64 @@ simplifiedLaunch: true
 ```
 
 > **注意**：精简模式下 CG 开场视频仍会正常播放（如有版本变化），之后直接跳过主界面进入游戏。
+
+---
+
+#### 定时任务配置（schedules）
+
+顶层 `schedules` 字段定义后台定时执行的 JS 脚本。每个定时器通过 `AlarmManager` 触发，在独立的前台 Service 中执行 JS，可配合 `notifications.show()` 发送通知。
+
+| 属性 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `id` | String | 是 | — | 唯一标识符，支持 `timer.list()` / `timer.cancel(id)` |
+| `name` | String | 否 | `""` | 显示名称（用于 `timer.list()` 返回值） |
+| `cron` | String | 是 | — | 触发规则：`"0 10 * * *"` (每天10:00) 或 `"every 30m"` (每30分钟) 等 |
+| `jsScript` | String | 否 | `null` | 定时执行的内联 JS 脚本（与 `jsPath` 二选一） |
+| `jsPath` | String | 否 | `null` | JS 文件路径（与 `jsScript` 二选一，路径解析同 `SectionItem.jsPath`） |
+| `enabled` | Boolean | 否 | `true` | 是否启用 |
+
+**cron 格式支持**：
+- `"0 10 * * *"` — 每天 10:00（五段式 cron，当前只解析 hour/minute）
+- `"every 30m"` / `"every 30min"` — 每 30 分钟
+- `"every 2h"` / `"every 2hour"` — 每 2 小时
+- `"every 1d"` / `"every 1day"` — 每天执行
+
+**配置示例**：
+```yaml
+schedules:
+  - id: daily_sign
+    name: 每日签到提醒
+    cron: "0 10 * * *"
+    jsScript: |
+      notifications.show("签到提醒", "今天记得签到哦！");
+      timer.nextTrigger();
+    enabled: true
+
+  - id: health_check
+    name: 定时检测
+    cron: "every 30m"
+    jsPath: "js/health_check.js"
+```
+
+**JS API 配合使用**：
+```js
+// 在脚本末尾调用，注册下一次触发（否则只执行一次）
+timer.nextTrigger();
+
+// 发送通知（脚本运行在后台，不能弹 UI 弹窗）
+notifications.show("标题", "消息内容", {
+    icon: "images/my_icon.png",    // 可选，assets/pvz2tool 下的大图
+    channelId: "my_channel",       // 可选，自定义通知渠道
+    autoCancel: true,              // 可选，点击后自动消失
+    tapAction: "ui.alert('被点击')" // 可选，点击通知时执行 JS
+});
+```
+
+> **注意事项**：
+> - 定时脚本在后台 Service 中执行，无 UI 上下文（不能弹窗、不能操作界面），可读写文件、发通知。
+> - 脚本末尾必须调用 `timer.nextTrigger()` 注册下次闹钟，否则定时器只触发一次。
+> - 系统深度休眠或省电模式可能导致闹钟延迟。
+> - Android 12+ 需要 `SCHEDULE_EXACT_ALARM` 权限，系统可能提示用户授予。
 
 **主题颜色可选值（BROWN | BLUE | BLUE_BACKGROUND | GREEN | GREEN_BACKGROUND | RED | PURPLE | PURPLE_BACKGROUND | ORANGE | TEAL | TEAL_BACKGROUND | GOLD | GRAY | GRAY_BACKGROUND）**：
 - 带 `_BACKGROUND` 后缀 = 深色背景 + 亮色文字（适合深色风格）

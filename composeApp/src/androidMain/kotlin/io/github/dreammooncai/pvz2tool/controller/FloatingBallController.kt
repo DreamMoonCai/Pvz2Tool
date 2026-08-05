@@ -23,7 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -34,8 +34,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import io.github.dreammooncai.pvz2tool.ui.dialog.rememberAssetExtractor
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -52,6 +53,8 @@ import io.github.dreammooncai.pvz2tool.FloatingWindowItem
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.js.JsRichTextRefresher
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
+import io.github.dreammooncai.pvz2tool.view.JsExecutionContext
+import io.github.dreammooncai.pvz2tool.view.LocalJsExecutionContext
 import io.github.dreammooncai.pvz2tool.js.rememberJsVisibility
 import io.github.dreammooncai.pvz2tool.icon.Pvz2Icon
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
@@ -391,24 +394,15 @@ object FloatingBallController {
 
     @Composable
     private fun FloatingBall(onClick: () -> Unit) {
-        Surface(
-            modifier = Modifier.size(Constants.BALL_SIZE),
-            shape = RoundedCornerShape(14.dp),
-            color = Color.Transparent,
-            shadowElevation = 6.dp,
-            onClick = onClick
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                AsyncImageFromAssets(
-                    JsFileResolver.resolvePlaceholders(InitializePvz2.config.ui.assets.floatingBallIcon).let { if (it.startsWith("/")) it else "images/$it" },
-                    contentDescription = "PVZ2 戴夫",
-                    modifier = Modifier
-                        .size(Constants.BALL_SIZE - 8.dp)
-                        .clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            }
-        }
+        AsyncImageFromAssets(
+            JsFileResolver.resolvePlaceholders(InitializePvz2.config.ui.assets.floatingBallIcon).let { if (it.startsWith("/")) it else "images/$it" },
+            contentDescription = "PVZ2 戴夫",
+            modifier = Modifier
+                .size(Constants.BALL_SIZE)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { onClick() },
+            contentScale = ContentScale.Crop
+        )
     }
 
     @Composable
@@ -503,6 +497,9 @@ object FloatingBallController {
     private fun FloatingActionButton(item: FloatingWindowItem, scope: CoroutineScope) {
         val label = item.displayName
         val resolvedColor = (item.buttonColor ?: "blue").lowercase()
+        // 在组合体内捕获当前 JS 执行上下文，使点击脚本优先走带上下文重载（this.当前 可用）
+        val jsContext = LocalJsExecutionContext.current
+        val jsExtractor = rememberAssetExtractor(LocalContext.current)
         val modifier = Modifier
             .fillMaxWidth()
             .height(44.dp)
@@ -514,7 +511,23 @@ object FloatingBallController {
                 }
             if (script != null) {
                 scope.launch {
-                    runCatching { PvzToolJsEngine.executeScript(script) }
+                    runCatching {
+                        if (jsContext != null) {
+                            PvzToolJsEngine.executeScript(
+                                extractor = jsExtractor,
+                                script = script,
+                                section = jsContext.section,
+                                item = jsContext.item,
+                                version = jsContext.version,
+                                sectionStates = jsContext.sectionStates,
+                                updateSectionState = jsContext.updateSectionState,
+                                smfListOverride = item.smfList,
+                                source = "悬浮窗按钮"
+                            )
+                        } else {
+                            PvzToolJsEngine.executeScript(script, source = "悬浮窗按钮")
+                        }
+                    }
                     // 通知所有 {{js:...}} 复合文本重算，使按钮文案（如「断开网络」↔「恢复网络」）
                     // 能随本次脚本改变的状态即时更新。
                     JsRichTextRefresher.refresh()

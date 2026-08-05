@@ -15,6 +15,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Process
 import android.provider.Settings
+import android.util.Log
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -45,11 +46,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import io.github.dreammooncai.manager.FilePickerManager
 import io.github.dreammooncai.pvz2tool.controller.GameDisplayFloatingController
 import io.github.dreammooncai.pvz2tool.controller.FloatingBallController
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.js.JsSmfDataManager
+import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.code.JsDex
 import io.github.dreammooncai.pvz2tool.js.code.JsPvz
 import io.github.dreammooncai.pvz2tool.js.code.PvzToolGlobals
@@ -67,6 +72,7 @@ import kotlin.coroutines.resume
 import kotlin.system.exitProcess
 import com.highcapable.yukireflection.factory.field
 import io.github.dreammooncai.pvz2tool.controller.GeneralFloatingDialogController
+import io.github.dreammooncai.pvz2tool.timer.TimerManager
 import io.github.dreammooncai.pvz2tool.view.AsyncImageFromAssets
 import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
@@ -130,6 +136,14 @@ class Pvz2InitializeActivity : ComponentActivity() {
         InitializePvz2.init(this)
         // 注入文件选择器管理器，供 JS picker API 使用（其 Launcher 已在 Activity 属性初始化阶段注册）
         InitializePvz2.filePickerManager = filePickerManager
+
+        // 初始化定时器（从 dream.yml schedules 注册 + 重调度已持久化的）
+        TimerManager.initFromConfig(
+            this, InitializePvz2.config.schedules
+        )
+
+        // 处理通知点击：如果从通知点击进入，执行绑定的 JS
+        handleNotificationAction(intent)
 
         // 设置UI
         setContent {
@@ -209,6 +223,7 @@ class Pvz2InitializeActivity : ComponentActivity() {
                     onRetry = null
                 )
                 key(InitializePvz2.mPvz2MainScreenReloadKey) {
+                    val standalone = hasIntegratorActivity()
                     Pvz2MainScreen(
                         onGotoGameClick = ::onGotoGame,
                         onResetDataClick = ::onResetDataClick,
@@ -217,6 +232,10 @@ class Pvz2InitializeActivity : ComponentActivity() {
                             exitProcess(0)
                         },
                         onStateChanged = {},
+                        isStandaloneApp = standalone,
+                        onGoToIntegrator = {
+                            startActivity(Intent(this@Pvz2InitializeActivity, ToolboxIntegratorActivity::class.java))
+                        },
                     )
                 }
                 // 重启后自动进入游戏：主界面就绪即触发「进入游戏」逻辑
@@ -258,6 +277,21 @@ class Pvz2InitializeActivity : ComponentActivity() {
             val packageInfo = packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
             packageInfo.requestedPermissions?.contains(permission) == true
         } catch (e: PackageManager.NameNotFoundException) {
+            false
+        }
+    }
+
+    /**
+     * 是否为「工具本体（standalone）」：判断当前运行包内是否声明了集成器 Activity。
+     * 不能靠写死的包名（io.github.dreammooncai.pvz2tool）判断——并存设计可能使用不同的
+     * 包名/签名做共存安装，但仍是工具本体（内置集成器）；而由集成器合并产出的纯游戏包不会
+     * 带集成器 Activity。故以「ToolboxIntegratorActivity 是否可被解析」作为真正的判据。
+     */
+    private fun hasIntegratorActivity(): Boolean {
+        return try {
+            val intent = Intent(this, ToolboxIntegratorActivity::class.java)
+            packageManager.resolveActivity(intent, 0) != null
+        } catch (e: Exception) {
             false
         }
     }
@@ -541,13 +575,22 @@ private fun SimplifiedLaunchScreen(
 
     // 是否已触发提取
     var extractionStarted by remember { mutableStateOf(false) }
+    // 防止多次触发 onGotoGame()
+    var gotoGameCalled by remember { mutableStateOf(false) }
+    val gotoGameOnce: () -> Unit = {
+        if (!gotoGameCalled) {
+            gotoGameCalled = true
+            // 记录版本，下次启动跳过 CG（仅版本变化时重播）
+            InitializePvz2.mSfmVersion = InitializePvz2.versionName
+            onGotoGame()
+        }
+    }
 
     // 提取完成后的回调
     LaunchedEffect(uiState.isComplete) {
         if (uiState.isComplete) {
-            // 短暂延迟让用户看到完成提示
             delay(500.milliseconds)
-            onGotoGame()
+            gotoGameOnce()
         }
     }
 
@@ -559,7 +602,6 @@ private fun SimplifiedLaunchScreen(
             val resourcesToExtract = mutableListOf<ResourcePair>()
             val targetDir = InitializePvz2.config.getSmfDirectoryFile()
 
-            // 只解压 base 资源（默认 version/base/smf，可通过 baseAssetPath 自定义）
             val baseAssetPath = InitializePvz2.simpleConfig?.baseAssetPath ?: "version/base/smf"
             resourcesToExtract.add(
                 AssetExtractorHolder.resource(
@@ -571,22 +613,33 @@ private fun SimplifiedLaunchScreen(
 
             if (resourcesToExtract.isNotEmpty()) {
                 extractorHolder.setOnDismissListener {
-                    if (it.isComplete) onGotoGame()
+                    if (it.isComplete) gotoGameOnce()
                 }
                 extractorHolder.extract(*resourcesToExtract.toTypedArray())
             } else {
-                // 无需提取，直接进入游戏
-                onGotoGame()
+                gotoGameOnce()
             }
         }
     }
 
-    // 显示提取进度弹窗（复用现有的 PvzExtractorDialog）
     PvzExtractorDialog(
         uiState = uiState,
         isShowNotUpdate = false,
         onDismissRequest = {
-            if (uiState.isComplete) onGotoGame()
+            if (uiState.isComplete) gotoGameOnce()
         }
     )
 }
+
+    /** 处理通知点击：从通知进入时执行绑定的 JS 脚本。 */
+    private fun handleNotificationAction(intent: Intent?) {
+        val action = intent?.getStringExtra("notification_action") ?: return
+        if (action.isBlank()) return
+        val scope = CoroutineScope(Dispatchers.IO)
+        scope.launch {
+            try {
+                PvzToolJsEngine.executeScript(action, source = "通知点击")
+            } catch (_: Exception) {}
+        }
+    }
+

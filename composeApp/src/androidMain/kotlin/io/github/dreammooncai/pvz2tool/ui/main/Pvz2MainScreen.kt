@@ -2012,7 +2012,10 @@ private fun CoreFunctionSection(
     onEnterGame: () -> Unit,
     onTutorial: () -> Unit,
     onResetData: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** 独立应用模式：开始游戏按钮替换为前往集成器 */
+    isStandaloneApp: Boolean = false,
+    onGoToIntegrator: () -> Unit = {},
 ) {
     val config = InitializePvz2.config
 
@@ -2027,13 +2030,23 @@ private fun CoreFunctionSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            PvzPurpleButton(
-                config.ui.button.enterGame,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(Pvz2Constants.Dimension.BUTTON_HEIGHT_MAIN.dp),
-                if (config.ui.button.isEnterGameDefaultIcon) Icons.Default.PlayArrow else null
-            ) { onEnterGame() }
+            if (isStandaloneApp) {
+                PvzPurpleButton(
+                    "前往集成器",
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(Pvz2Constants.Dimension.BUTTON_HEIGHT_MAIN.dp),
+                    Icons.Default.Build
+                ) { onGoToIntegrator() }
+            } else {
+                PvzPurpleButton(
+                    config.ui.button.enterGame,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(Pvz2Constants.Dimension.BUTTON_HEIGHT_MAIN.dp),
+                    if (config.ui.button.isEnterGameDefaultIcon) Icons.Default.PlayArrow else null
+                ) { onEnterGame() }
+            }
             PvzRichText(config.ui.button.showFloatingWindow,modifier = Modifier.padding(horizontal = 8.dp), defaultStyle = PvzTextRedStyle)
             Image(
                 imageVector = if (SettingsDialogState.isShowFloatingWindow) Pvz2Icon.HookSelect else Pvz2Icon.Hook,
@@ -2602,6 +2615,12 @@ fun Pvz2MainScreen(
     onCloseToolbox: () -> Unit,
     rootDirectory: File = InitializePvz2.context.getExternalFilesDir(null)!!.parentFile!!,
     onStateChanged: (Pvz2ScreenState) -> Unit,
+    /** 独立应用模式（非内置于目标 APK）：开始游戏按钮替换为前往集成器 */
+    isStandaloneApp: Boolean = false,
+    onGoToIntegrator: () -> Unit = {},
+    /** 预览模式（集成器预览 dream.yml 时）：顶栏左侧显示取消预览按钮 */
+    isPreviewMode: Boolean = false,
+    onCancelPreview: () -> Unit = {},
 ) {
     val config = InitializePvz2.config
 
@@ -2791,6 +2810,22 @@ fun Pvz2MainScreen(
                                         .fillMaxSize()
                                         .padding(horizontal = availableHeight * 0.18f) // 左右留白随顶栏高度缩放
                                 ) {
+                                    // 预览模式：左侧显示取消预览按钮
+                                    if (isPreviewMode) {
+                                        Box(
+                                            Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(Color.White.copy(alpha = 0.15f))
+                                                .clickable { onCancelPreview() }
+                                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                        ) {
+                                            Text(
+                                                "✕ 取消预览",
+                                                fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
+
                                     PvzRichText(
                                         config.ui.title.topAppBar,
                                         fontWeight = FontWeight.Bold,
@@ -2802,6 +2837,7 @@ fun Pvz2MainScreen(
                                     // ===== yml 配置的顶部图标组（排在「设置」图标左侧）=====
                                     // 先按 isShowFromJs / isShowFromJsPath 收集可见项，再渲染（composable 调用不在条件分支里），
                                     // 并用 key(item.id) 绑定各项内部 remember 状态，避免显隐切换时状态错位（同栏目功能项做法）。
+                                    val jsExtractor = rememberAssetExtractor(LocalContext.current)
                                     val scope = rememberCoroutineScope()
                                     val topBarIconItems = InitializePvz2.config.ui.topBarIcons.items
                                     val visibleTopBarIcons = mutableListOf<TopBarIconItem>()
@@ -2811,12 +2847,17 @@ fun Pvz2MainScreen(
                                         }
                                     }
                                     visibleTopBarIcons.forEach { item ->
+                                        // 在组合体内捕获当前 JS 执行上下文，使点击脚本优先走带上下文重载
+                                        val jsContext = LocalJsExecutionContext.current
                                         key(item.id) {
                                             ImageAssetButton(
                                                 normalPath = item.icon,
                                                 pressPath = item.iconPress,
                                                 contentDescription = item.contentDescription,
-                                                modifier = Modifier.size(imageSize),
+                                                modifier = Modifier.size(
+                                                    item.width?.dp ?: imageSize,
+                                                    item.height?.dp ?: imageSize
+                                                ),
                                                 pressSound = item.pressSound,
                                                 releaseSound = item.releaseSound
                                             ) {
@@ -2829,7 +2870,23 @@ fun Pvz2MainScreen(
                                                     }
                                                 if (script != null) {
                                                     scope.launch {
-                                                        runCatching { PvzToolJsEngine.executeScript(script) }
+                                                        runCatching {
+                                                if (jsContext != null) {
+                                                    PvzToolJsEngine.executeScript(
+                                                        extractor = jsExtractor,
+                                                        script = script,
+                                                        section = jsContext.section,
+                                                        item = jsContext.item,
+                                                        version = jsContext.version,
+                                                        sectionStates = jsContext.sectionStates,
+                                                        updateSectionState = jsContext.updateSectionState,
+                                                        smfListOverride = item.smfList,
+                                                        source = "顶栏图标"
+                                                    )
+                                                } else {
+                                                    PvzToolJsEngine.executeScript(script, source = "顶栏图标")
+                                                }
+                                                        }
                                                         // 通知所有 {{js:...}} 复合文本重算，使 UI 随本次脚本改变的状态即时更新
                                                         JsRichTextRefresher.refresh()
                                                     }
@@ -2937,6 +2994,8 @@ fun Pvz2MainScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 CoreFunctionSection(
+                                    isStandaloneApp = isStandaloneApp,
+                                    onGoToIntegrator = onGoToIntegrator,
                                     onEnterGame = {
                                         val resourcesToExtract = mutableListOf<ResourcePair>()
 

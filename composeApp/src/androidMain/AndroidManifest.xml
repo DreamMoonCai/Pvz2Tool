@@ -46,6 +46,8 @@
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
 
     <application
@@ -112,6 +114,16 @@
             </intent-filter>
         </activity>
 
+        <!-- 工具箱集成器：独立的差异合并入口（源=本应用 assets，目标=工作目录/游戏 APK） -->
+        <activity
+            android:name=".ToolboxIntegratorActivity"
+            android:exported="true"
+            android:label="工具箱集成器"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="density|keyboardHidden|layoutDirection|navigation|orientation|screenLayout|screenSize|smallestScreenSize"
+            android:windowSoftInputMode="stateAlwaysHidden">
+        </activity>
+
         <service
             android:name=".service.LocalVpnService"
             android:permission="android.permission.BIND_VPN_SERVICE"
@@ -120,6 +132,16 @@
                 <action android:name="android.net.VpnService" />
             </intent-filter>
         </service>
+
+        <!-- 定时任务 JS 执行服务（后台前台 Service） -->
+        <service
+            android:name=".timer.TimerService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <receiver
+            android:name=".timer.TimerReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

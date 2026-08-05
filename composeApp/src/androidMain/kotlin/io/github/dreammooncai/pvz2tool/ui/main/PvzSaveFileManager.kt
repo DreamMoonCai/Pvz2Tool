@@ -241,7 +241,7 @@ object PvzSaveFileManager {
                         val saveDir = File(save.savePath)
                         if (saveDir.exists() && saveDir.isDirectory) {
                             try {
-                                val subDir = targetDoc.createDirectory(save.name ?: save.id)
+                                val subDir = targetDoc.createDirectory(save.name)
                                     ?: targetDoc.createDirectory(save.id)
                                 if (subDir != null) {
                                     copyFileToDocumentFile(context, saveDir, subDir)

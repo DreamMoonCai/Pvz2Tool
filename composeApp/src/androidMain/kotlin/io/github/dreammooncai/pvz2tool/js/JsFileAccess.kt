@@ -256,6 +256,9 @@ open class JsFileAccess(
      */
     fun resolveInput(placeholderPath: String, context: Context): InputFile? {
         val path = normalizePath(placeholderPath)
+        // 含扩展名的叶子视为文件；目录请求（如 $SMF 本身或子目录）的叶子无扩展名。
+        // 用于区分「文件请求却解析到目录」的情况，避免出现 EISDIR 读取失败。
+        val looksLikeFile = path.substringAfterLast('/').contains('.')
         // 绝对路径：直接使用 File
         if (path.startsWith("/")) {
             val file = File(path)
@@ -273,12 +276,14 @@ open class JsFileAccess(
 
         // 2. 尝试转换为普通 File
         val file = JsFileResolver.documentFileToFile(docFile)
-        if (file != null && file.canRead()) {
+        if (file != null && file.canRead() && (!looksLikeFile || !docFile.isDirectory)) {
             return InputFile(file, isCache = false, sourceDoc = docFile)
         }
 
         // 3. 目录：复制直接子文件到缓存目录（供 listFiles() 使用）
         if (docFile.isDirectory) {
+            // 文件请求却解析到目录 → 视为未找到，交由上层抛出清晰错误而非 EISDIR
+            if (looksLikeFile) return null
             return copyDirectoryToCache(docFile, context)
         }
 
@@ -492,33 +497,26 @@ open class JsFileAccess(
         val subPath = placeholderPath.removePrefix(basePlaceholder).trimStart('/').trimEnd('/')
 
         val fileName = subPath.ifEmpty { primaryPath }.substringAfterLast('/')
+        // 含扩展名的叶子（.smf/.obb/.rton 等）一定是文件，绝不可回退为目录解析，
+        // 否则会把「明明是文件」的路径当成目录，导致 EISDIR 读取失败。
+        val looksLikeFile = fileName.contains('.')
         val fullPrimaryPath = if (subPath.isEmpty()) primaryPath else if (primaryPath.isEmpty()) subPath else "$primaryPath/$subPath"
 
         // 构建 asset 绝对路径（用于 assets.list() / assets.open()）
         fun assetAbsolutePath(relPath: String) =
             if (relPath.isEmpty()) "pvz2tool" else "pvz2tool/$relPath"
 
-        // 尝试文件 → 失败则尝试目录 → 均失败则降级路径
-        var cacheFile = tryCopyAssetToCache(context, fullPrimaryPath, fileName)
-            ?: tryCopyAssetDirIfExists(context, assetAbsolutePath(fullPrimaryPath))
+        // 优先按文件解析；叶子为文件时绝不允许回退到目录解析
+        fun tryAt(relPath: String): InputFile? =
+            tryCopyAssetToCache(context, relPath, fileName)
+                ?: if (looksLikeFile) null else tryCopyAssetDirIfExists(context, assetAbsolutePath(relPath))
 
-        if (cacheFile != null) return cacheFile
-
+        // 主路径
+        tryAt(fullPrimaryPath)?.let { return it }
         // 降级到 fallbackPath
-        fallbackPath?.let { fbPath ->
-            val fullFallbackPath = if (subPath.isEmpty()) fbPath else "$fbPath/$subPath"
-            cacheFile = tryCopyAssetToCache(context, fullFallbackPath, fileName)
-                ?: tryCopyAssetDirIfExists(context, assetAbsolutePath(fullFallbackPath))
-            if (cacheFile != null) return cacheFile
-        }
-
+        fallbackPath?.let { tryAt(if (subPath.isEmpty()) it else "$it/$subPath")?.let { f -> return f } }
         // 降级到 fallbackRootPath
-        fallbackRootPath?.let { fbPath ->
-            val fullFallbackPath = if (subPath.isEmpty()) fbPath else "$fbPath/$subPath"
-            cacheFile = tryCopyAssetToCache(context, fullFallbackPath, fileName)
-                ?: tryCopyAssetDirIfExists(context, assetAbsolutePath(fullFallbackPath))
-            if (cacheFile != null) return cacheFile
-        }
+        fallbackRootPath?.let { tryAt(if (subPath.isEmpty()) it else "$it/$subPath")?.let { f -> return f } }
 
         return null
     }

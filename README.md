@@ -18,6 +18,7 @@ PVZ2Tool 提供了一套完整的内置游戏修改框架：
 | **游戏存档修改** | 直接读写 PvZ2 游戏存档，支持数值加密/解密 |
 | **动态版本管理** | 多版本区块隔离，每个版本独立 SMF 缓存和数据目录 |
 | **VPN 抓包** | 内置 LocalVpnService，支持拦截/修改游戏网络请求 |
+| **通知与定时器** | 支持系统通知发送 + AlarmManager 驱动的后台定时 JS 执行（cron 表达式） |
 
 **栏目（Section）支持的类型**：
 
@@ -205,6 +206,37 @@ rsb.pack("$WORK_DIR/modified/", "$WORK_DIR/output.rsb", {
 | `$ITEM` | 当前栏目项的资源目录 |
 | `$JS_DIR` | 当前 JS 脚本所在目录 |
 
+### 通知与定时器
+
+```javascript
+// notifications — 系统通知
+notifications.show("签到提醒", "今天记得签到哦！", {
+    icon: "images/my_icon.png",   // 可选：大图路径
+    autoCancel: true,             // 点击后自动消失
+    tapAction: "ui.alert('打开', '你点击了通知')" // 可选：点击通知时执行 JS
+});
+var nid = notifications.show("下载中", "正在下载...");
+notifications.cancel(nid);       // 按 ID 取消
+
+// timer — 定时任务管理（底层 AlarmManager）
+timer.schedule("daily_sign", "每日签到", "0 10 * * *",
+    "notifications.show('签到', '记得签到！'); timer.nextTrigger();"
+);
+
+// cron 格式支持：
+// "0 10 * * *"     每天 10:00
+// "every 30m"      每 30 分钟
+// "every 2h"       每 2 小时
+// "every 1d"       每天
+
+// 查询/删除定时器
+var list = timer.list();
+timer.cancel("daily_sign");
+timer.cancelAll();
+```
+
+> **注意**：定时脚本在后台 Service 中执行，无 UI 上下文（不能弹窗），可读写文件、发通知。脚本末尾必须调用 `timer.nextTrigger()` 续期。
+
 ---
 
 ## 全局对象速查
@@ -222,6 +254,8 @@ rsb.pack("$WORK_DIR/modified/", "$WORK_DIR/output.rsb", {
 | `zlib` | `zlib` | `unpack()` / `pack()` |
 | `ptx` | `ptx` | `decode()` / `encode()` / `format` |
 | `path` | `路径` | `resolve()` / `app` / `android` / `pvz` / `pvz2tool` |
+| `notifications` | `通知` | `show(title, message, options?)` / `cancel(id)` |
+| `timer` | `定时器` | `schedule(id, name, cron, script)` / `list()` / `cancel(id)` / `cancelAll()` |
 
 > 完整 JS API 文档参见项目中 `assets/pvz2tool/js_documentation.md`。
 
@@ -607,6 +641,15 @@ val jsContent = section.readJs(version)
     android:name="com.kdroid.androidcontextprovider.ContextInitProvider"
     android:exported="false"
     android:authorities="游戏包名.kmploginitprovider" />
+
+<service
+    android:name="io.github.dreammooncai.pvz2tool.timer.TimerService"
+    android:exported="false"
+    android:foregroundServiceType="dataSync" />
+
+<receiver
+    android:name="io.github.dreammooncai.pvz2tool.timer.TimerReceiver"
+    android:exported="false" />
 ```
 
 > **包名替换**：上述 XML 中所有 `游戏包名` 字符串需统一替换为目标游戏的实际包名（如 `com.ea.game.pvzfree_row`）。

@@ -79,6 +79,9 @@ object InitializePvz2 {
     // 最终合并后的配置
     lateinit var config: Pvz2ToolConfig
 
+    /** 判断 config 是否已成功初始化（规避 lateinit backing field 外部访问限制） */
+    fun isConfigReady(): Boolean = ::config.isInitialized
+
     // 精简配置（仅在 simplifiedLaunch=true 时有值）
     var simpleConfig: Pvz2ToolSimpleConfig? = null
         private set
@@ -98,7 +101,10 @@ object InitializePvz2 {
             input.reader().readText()
         }
         val baseYamlNode = yaml.parseToYamlNode(baseConfigContent)
-        val baseConfig = yaml.decodeFromString(Pvz2ToolConfig.serializer(), baseConfigContent)
+        var baseConfigError: Throwable? = null
+        val baseConfig = runCatching {
+            yaml.decodeFromString(Pvz2ToolConfig.serializer(), baseConfigContent)
+        }.onFailure { baseConfigError = it }.getOrNull()
 
         // 2. 合并本地配置（若存在）
         val mergedYamlNode = tryMergeLocalConfig(yaml, baseConfig, baseYamlNode)
@@ -113,6 +119,7 @@ object InitializePvz2 {
             this.simpleConfig = simpleConfig
             simpleConfig.toFullConfig()
         } else {
+            if (baseConfigError != null) throw baseConfigError
             // 正常模式：使用完整配置解码
             this.simpleConfig = null
             yaml.decodeFromYamlNode(Pvz2ToolConfig.serializer(), mergedYamlNode)
@@ -134,7 +141,7 @@ object InitializePvz2 {
      */
     private fun tryMergeLocalConfig(
         yaml: Yaml,
-        baseConfig: Pvz2ToolConfig,
+        baseConfig: Pvz2ToolConfig?,
         baseYamlNode: YamlNode
     ): YamlNode {
         return try {
@@ -147,7 +154,7 @@ object InitializePvz2 {
                 } ?: return baseYamlNode
             } else {
                 // 本地配置路径为空/文件不存在 → 返回基础配置
-                val localFile = File(baseConfig.localConfigFile ?: return baseYamlNode)
+                val localFile = File(baseConfig?.localConfigFile ?: return baseYamlNode)
                 if (!localFile.exists()) return baseYamlNode
                 localFile.readText()
             }

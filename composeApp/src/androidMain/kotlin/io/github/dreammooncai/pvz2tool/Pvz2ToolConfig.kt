@@ -12,8 +12,12 @@ import java.io.File
 @Serializable
 data class Pvz2ToolConfig(
     val gameActivity: String,
+    val localConfigFile: String? = null,
     val smfDirectory: String,
-    val sections: List<DynamicSection>,
+    /** 全局基础资源包路径（各版本 VersionDef.baseAssetPath 的默认值） */
+    val baseAssetPath: String? = null,
+    /** 精简模式：开启后跳过完整主界面，只解压 base 资源后直接进入游戏 */
+    val simplifiedLaunch: Boolean = false,
     val versions: List<VersionDef>,
     val isExpandedVersions: Boolean = false,
     /**
@@ -24,11 +28,11 @@ data class Pvz2ToolConfig(
      * "GOLD" | "GRAY" | "GRAY_BACKGROUND"
      */
     val versionsTheme: PvzCollapsiblePanelTheme = PvzCollapsiblePanelTheme.BROWN,
-    val announcement: List<Pvz2ToolConfigAnnouncement>,
+    val sections: List<DynamicSection>,
     val ui: Pvz2ToolConfigUI,
-    val localConfigFile: String? = null,
-    /** 精简模式：开启后跳过完整主界面，只解压 base 资源后直接进入游戏 */
-    val simplifiedLaunch: Boolean = false
+    val announcement: List<Pvz2ToolConfigAnnouncement>,
+    /** 定时任务列表（cron 表达式驱动，后台执行 JS） */
+    val schedules: List<ScheduleDef> = emptyList(),
 ) {
     companion object {
         const val PATH_NAME = "pvz2tool"
@@ -91,6 +95,15 @@ data class Pvz2ToolConfig(
  * ```
  */
 @Serializable
+data class FwItemSimple(
+    val id: String,
+    val name: String,
+    val buttonColor: String = "green",
+    val jsScript: String? = null,
+    val smfList: List<String> = emptyList(),
+)
+
+@Serializable
 data class Pvz2ToolSimpleConfig(
     val gameActivity: String,
     val smfDirectory: String = "files/",
@@ -100,8 +113,19 @@ data class Pvz2ToolSimpleConfig(
     val cgVideoPath: String = "opening.mp4",
     val cgVideoPoster: String? = null,
     val cgVideoLoadTimeout: Long = 5000L,
-    // 错误提示
-    val gameActivityInvalid: String = "设置的游戏Activity有误或不存在"
+    // 悬浮窗
+    val isShowFloatingWindow: Boolean = false,
+    // 退出确认
+    val isUseExitConfirm: Boolean = false,
+    // 自定义游戏画面
+    val isUseCustomGameDisplay: Boolean = false,
+    val displayMode: String = "ratio",
+    val windowRatio: Float = 1.5f,
+    val windowWidth: Int = 0,
+    val windowHeight: Int = 0,
+    val isAllowRotation: Boolean = false,
+    // 悬浮窗内容自定义
+    val floatingWindow: List<FwItemSimple> = emptyList(),
 ) {
     /**
      * 将精简配置转换为 Pvz2ToolConfig，填充必要的默认值。
@@ -167,10 +191,54 @@ data class Pvz2ToolSimpleConfig(
                     retryButtonText = empty,
                     operation = Pvz2ToolConfigOperation(empty, empty, empty, empty, empty, empty, empty)
                 ),
-                settings = Pvz2ToolConfigUISettings(empty, empty, empty, empty),
+                settings = Pvz2ToolConfigUISettings(
+                    title = empty,
+                    solidBackgroundMode = empty,
+                    changeTheProfileReadLocation = empty,
+                    reloadConfig = empty,
+                    playBackgroundMusic = empty,
+                    resetPacketDeepClearing = empty,
+                    showNotUpdate = empty,
+                    importSmfFile = empty,
+                    exitConfirm = empty,
+                    exitConfirmTitle = empty,
+                    exitConfirmMessage = empty,
+                    customGameDisplay = empty,
+                    customGameDisplayTitle = empty,
+                    gameDisplay = Pvz2ToolConfigGameDisplay(
+                        isUseCustomGameDisplay = isUseCustomGameDisplay,
+                        displayMode = displayMode,
+                        windowRatio = windowRatio,
+                        windowWidth = windowWidth,
+                        windowHeight = windowHeight,
+                        isAllowRotation = isAllowRotation,
+                    ),
+                    applyButtonText = empty,
+                    showFloatingWindow = if (floatingWindow.isNotEmpty()) "悬浮窗功能" else empty,
+                    isShowFloatingWindow = isShowFloatingWindow,
+                    isUseExitConfirm = isUseExitConfirm,
+                    exitConfirmButtonText = empty,
+                    floatingExitConfirmTitle = empty,
+                    floatingExitConfirmMessage = empty,
+                    floatingExitConfirmButtonText = empty,
+                ),
+                floatingWindow = Pvz2ToolConfigUIFloatingWindow(
+                    items = floatingWindow.map { fw ->
+                        FloatingWindowItem(
+                            id = fw.id,
+                            name = fw.name,
+                            buttonText = fw.name,
+                            buttonColor = fw.buttonColor,
+                            jsScript = fw.jsScript,
+                            smfList = fw.smfList,
+                        )
+                    },
+                    emptyTip = "",
+                    allHiddenTip = "",
+                ),
                 // CG 视频和错误提示使用精简配置中的值
                 assets = Pvz2ToolConfigUIAssets(cgVideoPath = cgVideoPath, cgVideoPoster = cgVideoPoster, cgVideoLoadTimeout = cgVideoLoadTimeout),
-                error = Pvz2ToolConfigUIError(gameActivityInvalid = gameActivityInvalid)
+                error = Pvz2ToolConfigUIError()
             ),
             simplifiedLaunch = true
         )
@@ -465,25 +533,25 @@ data class Pvz2ToolConfigUI(
     val title: Pvz2ToolConfigUITitle,
     val button: Pvz2ToolConfigUIButton,
     val extractor: Pvz2ToolConfigUIExtractor,
+    val save: Pvz2ToolConfigUISave,
+    val settings: Pvz2ToolConfigUISettings,
+    /** 悬浮窗面板内容配置 */
+    val floatingWindow: Pvz2ToolConfigUIFloatingWindow = Pvz2ToolConfigUIFloatingWindow(),
+    /** 顶栏由 yml 配置的可点击图标组 */
+    val topBarIcons: Pvz2ToolConfigUITopBarIcons = Pvz2ToolConfigUITopBarIcons(),
+    val log: Pvz2ToolConfigUILog = Pvz2ToolConfigUILog(),
+    val dialog: Pvz2ToolConfigUIDialog = Pvz2ToolConfigUIDialog(),
+    val error: Pvz2ToolConfigUIError = Pvz2ToolConfigUIError(),
+    val welcome: Pvz2ToolConfigUIWelcome = Pvz2ToolConfigUIWelcome(),
     val noValidDirTip: String,
+    /** 功能属性（背景/音乐/视频等）*/
+    val assets: Pvz2ToolConfigUIAssets = Pvz2ToolConfigUIAssets(),
+    /** 音效文件名映射 */
+    val sounds: Pvz2ToolConfigUISounds = Pvz2ToolConfigUISounds(),
     val versionLabel: String,
     val uiVersion: String,
     val authorInfo: String,
     val tutorial: String,
-    val save: Pvz2ToolConfigUISave, // 原有存档配置
-    val settings: Pvz2ToolConfigUISettings, // 设置弹窗
-    val log: Pvz2ToolConfigUILog = Pvz2ToolConfigUILog(), // JS 日志面板
-    val dialog: Pvz2ToolConfigUIDialog = Pvz2ToolConfigUIDialog(), // 通用对话框按钮
-    val error: Pvz2ToolConfigUIError = Pvz2ToolConfigUIError(), // 错误提示文案
-    val welcome: Pvz2ToolConfigUIWelcome = Pvz2ToolConfigUIWelcome(), // 欢迎用户组件
-    /** 功能属性（背景/音乐/视频/权限等路径与开关）*/
-    val assets: Pvz2ToolConfigUIAssets = Pvz2ToolConfigUIAssets(),
-    /** 音效文件名映射（相对于 assets/pvz2tool/sound/） */
-    val sounds: Pvz2ToolConfigUISounds = Pvz2ToolConfigUISounds(),
-    /** 悬浮窗面板内容配置（动态可配置按钮列表，与「栏目」BUTTON 项字段一致） */
-    val floatingWindow: Pvz2ToolConfigUIFloatingWindow = Pvz2ToolConfigUIFloatingWindow(),
-    /** 顶栏（设置图标左侧）由 yml 配置的可点击图标组 */
-    val topBarIcons: Pvz2ToolConfigUITopBarIcons = Pvz2ToolConfigUITopBarIcons(),
 )
 
 @Serializable
@@ -870,6 +938,7 @@ data class FloatingWindowItem(
     val jsPath: String? = null,
     val isShowFromJs: String? = null,
     val isShowFromJsPath: String? = null,
+    val smfList: List<String> = emptyList(),
 ) {
     /** 展示用文字：buttonText > name > id */
     val displayName get() = buttonText ?: name ?: id
@@ -913,4 +982,29 @@ data class TopBarIconItem(
     val isShowFromJsPath: String? = null,
     val pressSound: String? = null,
     val releaseSound: String? = null,
+    val smfList: List<String> = emptyList(),
+    /** 图标宽度（dp），为 null 时跟随顶栏默认尺寸 */
+    val width: Int? = null,
+    /** 图标高度（dp），为 null 时跟随顶栏默认尺寸 */
+    val height: Int? = null,
+)
+
+/**
+ * 定时任务定义。
+ *
+ * @param id        任务唯一标识
+ * @param name      任务名称（用于列表展示）
+ * @param cron      cron 表达式或间隔描述（如 "0 10 * * *" 或 "every 30m"）
+ * @param jsScript  定时执行的内联 JS 脚本（与 jsPath 二选一）
+ * @param jsPath    定时执行的 JS 文件路径（与 jsScript 二选一，路径解析同 [SectionItem.jsPath]）
+ * @param enabled   是否启用
+ */
+@Serializable
+data class ScheduleDef(
+    val id: String,
+    val name: String = "",
+    val cron: String = "",
+    val jsScript: String? = null,
+    val jsPath: String? = null,
+    val enabled: Boolean = true,
 )
