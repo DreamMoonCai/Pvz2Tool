@@ -2245,7 +2245,6 @@ fun ToolboxIntegratorScreen(
                 // ── UI设置子页面 ──
                 showUiSettings && step == 2 -> {
                 val ymlAssets = if (simplifiedLaunch) "" else "ui.assets."
-                val ymlError = if (simplifiedLaunch) "" else "ui.error."
 
                 Column(
                     Modifier
@@ -2306,56 +2305,94 @@ fun ToolboxIntegratorScreen(
                             .verticalScroll(rememberScrollState())
                     ) {
                         // §3 背景/图标（仅非简易）
-                        if (!simplifiedLaunch) {
-                            PvzDialogCard(title = null) {
-                                Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                    UiSectionHeader("背景/图标 (ui.assets)")
+                        PvzDialogCard(title = null) {
+                            Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                UiSectionHeader("背景/图标 (ui.assets)")
+                                if (!simplifiedLaunch) {
                                     UiInputCard("ui.assets.bgImage", "主界面背景图文件名或 URL。") {
-                                        FileInputRow(bgImage, "如 bg_main.jpg", "*/*", "bgImage", { bgImage = it }, selectedFile = selectedFiles["bgImage"], selectedFolder = selectedFolders["bgImage"], onImagePreview = openImagePreview, onPickFile = { label, mime -> pickAnyFile(label, mime) }, onPickFolder = { fk -> pickFolder(fk) }, onClearSelection = { clearFieldSelection("bgImage") })
+                                        FileInputRow(
+                                            bgImage,
+                                            "如 bg_main.jpg",
+                                            "*/*",
+                                            "bgImage",
+                                            { bgImage = it },
+                                            selectedFile = selectedFiles["bgImage"],
+                                            selectedFolder = selectedFolders["bgImage"],
+                                            onImagePreview = openImagePreview,
+                                            onPickFile = { label, mime -> pickAnyFile(label, mime) },
+                                            onPickFolder = { fk -> pickFolder(fk) },
+                                            onClearSelection = { clearFieldSelection("bgImage") })
                                     }
-                                    UiSwitchCard("ui.assets.isUseSolidColorBackground", "是否使用纯色背景（替代背景图）。") {
-                                        PvzCheckRow("纯色背景模式", isUseSolidColorBg) { isUseSolidColorBg = !isUseSolidColorBg }
+                                    UiSwitchCard(
+                                        "ui.assets.isUseSolidColorBackground",
+                                        "是否使用纯色背景（替代背景图）。"
+                                    ) {
+                                        PvzCheckRow("纯色背景模式", isUseSolidColorBg) {
+                                            isUseSolidColorBg = !isUseSolidColorBg
+                                        }
                                     }
                                     UiInputCard("ui.assets.sideBgImage", "侧边背景图文件名或 URL。") {
-                                        FileInputRow(sideBgImage, "如 game_side_bg.jpg", "*/*", "sideBgImage", { sideBgImage = it }, selectedFile = selectedFiles["sideBgImage"], selectedFolder = selectedFolders["sideBgImage"], onImagePreview = openImagePreview, onPickFile = { label, mime -> pickAnyFile(label, mime) }, onPickFolder = { fk -> pickFolder(fk) }, onClearSelection = { clearFieldSelection("sideBgImage") })
+                                        FileInputRow(
+                                            sideBgImage,
+                                            "如 game_side_bg.jpg",
+                                            "*/*",
+                                            "sideBgImage",
+                                            { sideBgImage = it },
+                                            selectedFile = selectedFiles["sideBgImage"],
+                                            selectedFolder = selectedFolders["sideBgImage"],
+                                            onImagePreview = openImagePreview,
+                                            onPickFile = { label, mime -> pickAnyFile(label, mime) },
+                                            onPickFolder = { fk -> pickFolder(fk) },
+                                            onClearSelection = { clearFieldSelection("sideBgImage") })
                                     }
                                     UiInputCard("ui.assets.floatingBallIcon", "悬浮球图标文件名。") {
-                                        FileInputRow(floatingBallIcon, "如 ic_floating_dave.png", "*/*", "floatingBallIcon", { floatingBallIcon = it }, selectedFile = selectedFiles["floatingBallIcon"], selectedFolder = selectedFolders["floatingBallIcon"], onImagePreview = openImagePreview, onPickFile = { label, mime -> pickAnyFile(label, mime) }, onPickFolder = { fk -> pickFolder(fk) }, onClearSelection = { clearFieldSelection("floatingBallIcon") })
+                                        FileInputRow(
+                                            floatingBallIcon,
+                                            "如 ic_floating_dave.png",
+                                            "*/*",
+                                            "floatingBallIcon",
+                                            { floatingBallIcon = it },
+                                            selectedFile = selectedFiles["floatingBallIcon"],
+                                            selectedFolder = selectedFolders["floatingBallIcon"],
+                                            onImagePreview = openImagePreview,
+                                            onPickFile = { label, mime -> pickAnyFile(label, mime) },
+                                            onPickFolder = { fk -> pickFolder(fk) },
+                                            onClearSelection = { clearFieldSelection("floatingBallIcon") })
                                     }
-                                    UiInputCard("ui.assets.bgFillImage (@mipmap/bg_fill_image)", "App 启动窗口背景图（windowBackground）。下方为当前默认背景，点「修改背景图」选本地图片替换即可；资源表固定为 .jpg，所选图片打包时会自动转为 JPEG。") {
-                                        val selectedBmp = remember(bgFillImageFile) {
-                                            bgFillImageFile?.let { BitmapFactory.decodeFile(it.absolutePath) }
-                                        }
-                                        if (selectedBmp != null) {
-                                            Image(
-                                                bitmap = selectedBmp.asImageBitmap(),
-                                                contentDescription = "已选背景图预览（点击大屏预览）",
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(140.dp)
-                                                    .clip(RoundedCornerShape(10.dp))
-                                                    .clickable { openImagePreview(selectedBmp.asImageBitmap()) },
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        } else {
-                                            Image(
-                                                painter = painterResource(R.mipmap.bg_fill_image),
-                                                contentDescription = "默认背景图（点击大屏预览）",
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(140.dp)
-                                                    .clip(RoundedCornerShape(10.dp))
-                                                    .clickable { openImagePreviewFromResource() },
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        }
-                                        Spacer(Modifier.height(8.dp))
-                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                                            PvzBlueButton("修改背景图", Modifier.height(36.dp)) { pickBgFillImage() }
-                                            if (bgFillImageFile != null) {
-                                                Spacer(Modifier.width(8.dp))
-                                                PvzRedButton("恢复默认", Modifier.height(36.dp)) { resetBgFillImage() }
-                                            }
+                                }
+                                UiInputCard("ui.assets.bgFillImage (@mipmap/bg_fill_image)", "App 启动窗口背景图（windowBackground）。下方为当前默认背景，点「修改背景图」选本地图片替换即可；资源表固定为 .jpg，所选图片打包时会自动转为 JPEG。") {
+                                    val selectedBmp = remember(bgFillImageFile) {
+                                        bgFillImageFile?.let { BitmapFactory.decodeFile(it.absolutePath) }
+                                    }
+                                    if (selectedBmp != null) {
+                                        Image(
+                                            bitmap = selectedBmp.asImageBitmap(),
+                                            contentDescription = "已选背景图预览（点击大屏预览）",
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(140.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .clickable { openImagePreview(selectedBmp.asImageBitmap()) },
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Image(
+                                            painter = painterResource(R.mipmap.bg_fill_image),
+                                            contentDescription = "默认背景图（点击大屏预览）",
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(140.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .clickable { openImagePreviewFromResource() },
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                                        PvzBlueButton("修改背景图", Modifier.height(36.dp)) { pickBgFillImage() }
+                                        if (bgFillImageFile != null) {
+                                            Spacer(Modifier.width(8.dp))
+                                            PvzRedButton("恢复默认", Modifier.height(36.dp)) { resetBgFillImage() }
                                         }
                                     }
                                 }
@@ -2390,16 +2427,20 @@ fun ToolboxIntegratorScreen(
                         }
 
                         // §6 错误提示
-                        Spacer(Modifier.height(10.dp))
-                        PvzDialogCard(title = null) {
-                            Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                UiSectionHeader("错误提示 (${ymlError})")
-                                UiInputCard("${ymlError}gameActivityInvalid", "游戏 Activity 设置有误时的提示文案。") {
-                                    IntegratorInputField(gameActivityInvalid, "如：设置的游戏Activity有误或不存在") { gameActivityInvalid = it }
+                        if (!simplifiedLaunch) {
+                            Spacer(Modifier.height(10.dp))
+                            PvzDialogCard(title = null) {
+                                Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                    UiSectionHeader("错误提示 (ui.error.)")
+                                    UiInputCard("ui.error.gameActivityInvalid", "游戏 Activity 设置有误时的提示文案。") {
+                                        IntegratorInputField(
+                                            gameActivityInvalid,
+                                            "如：设置的游戏Activity有误或不存在"
+                                        ) { gameActivityInvalid = it }
+                                    }
                                 }
                             }
                         }
-
 
                         // § 教程/按钮/对话框（仅非简易）
                         if (!simplifiedLaunch) {
@@ -3721,8 +3762,7 @@ private fun SmfResourceSettingsContent(
                                 .fillMaxWidth()
                                 .padding(vertical = 3.dp)
                                 .background(
-                                    if (excluded) Color(0xFFFFEBEE) else Color.Transparent,
-                                    RoundedCornerShape(6.dp)
+                                    if (excluded) Color(0xFFFFEBEE) else Color.Transparent, RoundedCornerShape(6.dp)
                                 )
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -4401,19 +4441,20 @@ private fun FloatingWindowSettingsContent(
             }
 
             // 占位提示文案
-            Spacer(Modifier.height(10.dp))
-            PvzDialogCard(title = null) {
-                Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    UiSectionHeader("占位提示文案 (ui.floatingWindow)")
-                    UiInputCard("emptyTip", "悬浮窗无内容时的占位提示。") {
-                        IntegratorInputField(fwEmptyTip, "如：（悬浮窗暂无内容...）") { onFwEmptyTip(it) }
-                    }
-                    UiInputCard("allHiddenTip", "悬浮窗所有项被隐藏时的提示。") {
-                        IntegratorInputField(fwAllHiddenTip, "如：（当前没有可用的功能）") { onFwAllHiddenTip(it) }
+            if (!simplifiedLaunch) {
+                Spacer(Modifier.height(10.dp))
+                PvzDialogCard(title = null) {
+                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        UiSectionHeader("占位提示文案 (ui.floatingWindow)")
+                        UiInputCard("emptyTip", "悬浮窗无内容时的占位提示。") {
+                            IntegratorInputField(fwEmptyTip, "如：（悬浮窗暂无内容...）") { onFwEmptyTip(it) }
+                        }
+                        UiInputCard("allHiddenTip", "悬浮窗所有项被隐藏时的提示。") {
+                            IntegratorInputField(fwAllHiddenTip, "如：（当前没有可用的功能）") { onFwAllHiddenTip(it) }
+                        }
                     }
                 }
             }
-
             // 按钮项列表
             Spacer(Modifier.height(10.dp))
             PvzDialogCard(title = null) {
