@@ -1933,7 +1933,7 @@ fun ToolboxIntegratorScreen(
                         fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Medium
                     )
                 }
-                if (showUiSettings && !showUiAdvancedSettings && !simplifiedLaunch) {
+                if (showUiSettings && !showUiAdvancedSettings) {
                     Box(
                         Modifier
                             .padding(end = 8.dp)
@@ -2125,8 +2125,9 @@ fun ToolboxIntegratorScreen(
                     )
                 }
                 // ── UI高级设置子页面 ──
-                showUiAdvancedSettings && step == 2 && !simplifiedLaunch -> {
+                showUiAdvancedSettings && step == 2 -> {
                     UiAdvancedSettingsContent(
+                        simplifiedLaunch = simplifiedLaunch,
                         onPickFile = ::pickAnyFile,
                         selectedFolders = selectedFolders,
                         onPickFolder = { pickFolder(it) },
@@ -5160,7 +5161,9 @@ private fun ItemSettingsContent(
     }
 }
 @Composable
-private fun UiAdvancedSettingsContent(onPickFile: (String, String) -> Unit,
+private fun UiAdvancedSettingsContent(
+    simplifiedLaunch: Boolean,
+    onPickFile: (String, String) -> Unit,
     selectedFolders: Map<String, File> = emptyMap(),
     onPickFolder: (fieldKey: String) -> Unit = {},
     onClearFieldSelection: (String) -> Unit = {},
@@ -5206,6 +5209,7 @@ private fun UiAdvancedSettingsContent(onPickFile: (String, String) -> Unit,
         Column(Modifier
             .weight(0.5f)
             .verticalScroll(rememberScrollState())) {
+        if (!simplifiedLaunch) {
         PvzDialogCard(title = null) {
             Column(Modifier.padding(12.dp)) {
                 PvzSectionTitle("资源更新弹窗文本 (ui.extractor)")
@@ -5301,9 +5305,11 @@ private fun UiAdvancedSettingsContent(onPickFile: (String, String) -> Unit,
         }
 
         }
+        }
         Column(Modifier
             .weight(0.5f)
             .verticalScroll(rememberScrollState())) {
+        if (!simplifiedLaunch) {
         Spacer(Modifier.height(10.dp))
         PvzDialogCard(title = null) {
             Column(Modifier.padding(12.dp)) {
@@ -5363,24 +5369,25 @@ private fun UiAdvancedSettingsContent(onPickFile: (String, String) -> Unit,
                 UiInputCard("ui.save.opSaveMeta", "操作-存档元数据") { IntegratorInputField(saveDraft.opSaveMeta, "操作-存档元数据") { onSaveDraft(saveDraft.copy(opSaveMeta = it)) } }
             }
         }
+        }
 
         Spacer(Modifier.height(10.dp))
         PvzDialogCard(title = null) {
             Column(Modifier.padding(12.dp)) {
                 PvzSectionTitle("游戏画面设置 (ui.settings.gameDisplay)")
                 UiSwitchCard("ui.settings.gameDisplay.isUseCustomGameDisplay", "默认启用自定义画面总开关") { PvzCheckRow("默认启用自定义画面总开关", gameDisplay.isUseCustomGameDisplay) { onGameDisplay(gameDisplay.copy(isUseCustomGameDisplay = !gameDisplay.isUseCustomGameDisplay)) } }
-                UiInputCard("ui.settings.gameDisplay.allowRotation", "允许翻转界面标签") { IntegratorInputField(gameDisplay.allowRotation, "允许翻转界面标签") { onGameDisplay(gameDisplay.copy(allowRotation = it)) } }
+                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.allowRotation", "允许翻转界面标签") { IntegratorInputField(gameDisplay.allowRotation, "允许翻转界面标签") { onGameDisplay(gameDisplay.copy(allowRotation = it)) } } }
                 UiSwitchCard("ui.settings.gameDisplay.isAllowRotation", "默认允许翻转") { PvzCheckRow("默认允许翻转", gameDisplay.isAllowRotation) { onGameDisplay(gameDisplay.copy(isAllowRotation = !gameDisplay.isAllowRotation)) } }
-                UiInputCard("ui.settings.gameDisplay.customWindowSize", "自定义窗口尺寸标签") { IntegratorInputField(gameDisplay.customWindowSize, "自定义窗口尺寸标签") { onGameDisplay(gameDisplay.copy(customWindowSize = it)) } }
-                UiInputCard("ui.settings.gameDisplay.customWindowRatio", "自定义窗口比例标签") { IntegratorInputField(gameDisplay.customWindowRatio, "自定义窗口比例标签") { onGameDisplay(gameDisplay.copy(customWindowRatio = it)) } }
-                UiInputCard("ui.settings.gameDisplay.fullscreen", "全屏标签") { IntegratorInputField(gameDisplay.fullscreen, "全屏标签") { onGameDisplay(gameDisplay.copy(fullscreen = it)) } }
+                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.customWindowSize", "自定义窗口尺寸标签") { IntegratorInputField(gameDisplay.customWindowSize, "自定义窗口尺寸标签") { onGameDisplay(gameDisplay.copy(customWindowSize = it)) } } }
+                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.customWindowRatio", "自定义窗口比例标签") { IntegratorInputField(gameDisplay.customWindowRatio, "自定义窗口比例标签") { onGameDisplay(gameDisplay.copy(customWindowRatio = it)) } } }
+                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.fullscreen", "全屏标签") { IntegratorInputField(gameDisplay.fullscreen, "全屏标签") { onGameDisplay(gameDisplay.copy(fullscreen = it)) } } }
                 UiInputCard("ui.settings.gameDisplay.displayMode", "显示模式(ratio/size/fullscreen)") { IntegratorInputField(gameDisplay.displayMode, "显示模式(ratio/size/fullscreen)") { onGameDisplay(gameDisplay.copy(displayMode = it)) } }
                 UiInputCard("ui.settings.gameDisplay.windowWidth", "窗口宽度(px,0=屏幕宽)") { IntegratorInputField(gameDisplay.windowWidth.toString(), "窗口宽度(px,0=屏幕宽)") { onGameDisplay(gameDisplay.copy(windowWidth = it.toIntOrNull() ?: 0)) } }
                 UiInputCard("ui.settings.gameDisplay.windowHeight", "窗口高度(px,0=屏幕高)") { IntegratorInputField(gameDisplay.windowHeight.toString(), "窗口高度(px,0=屏幕高)") { onGameDisplay(gameDisplay.copy(windowHeight = it.toIntOrNull() ?: 0)) } }
                 UiInputCard("ui.settings.gameDisplay.windowRatio", "窗口比例(宽/高)") { IntegratorInputField(gameDisplay.windowRatio.toString(), "窗口比例(宽/高)") { onGameDisplay(gameDisplay.copy(windowRatio = it.toFloatOrNull() ?: 1.5f)) } }
-                UiInputCard("ui.settings.gameDisplay.ratioHint", "比例输入提示") { IntegratorInputField(gameDisplay.ratioHint, "比例输入提示") { onGameDisplay(gameDisplay.copy(ratioHint = it)) } }
-                UiInputCard("ui.settings.gameDisplay.widthHint", "宽度输入提示") { IntegratorInputField(gameDisplay.widthHint, "宽度输入提示") { onGameDisplay(gameDisplay.copy(widthHint = it)) } }
-                UiInputCard("ui.settings.gameDisplay.heightHint", "高度输入提示") { IntegratorInputField(gameDisplay.heightHint, "高度输入提示") { onGameDisplay(gameDisplay.copy(heightHint = it)) } }
+                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.ratioHint", "比例输入提示") { IntegratorInputField(gameDisplay.ratioHint, "比例输入提示") { onGameDisplay(gameDisplay.copy(ratioHint = it)) } } }
+                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.widthHint", "宽度输入提示") { IntegratorInputField(gameDisplay.widthHint, "宽度输入提示") { onGameDisplay(gameDisplay.copy(widthHint = it)) } } }
+                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.heightHint", "高度输入提示") { IntegratorInputField(gameDisplay.heightHint, "高度输入提示") { onGameDisplay(gameDisplay.copy(heightHint = it)) } } }
             }
         }
 
