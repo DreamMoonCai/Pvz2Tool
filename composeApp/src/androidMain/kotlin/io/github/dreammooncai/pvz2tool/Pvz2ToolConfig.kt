@@ -84,6 +84,7 @@ data class Pvz2ToolConfig(
  * - gameActivity / smfDirectory / baseAssetPath — 启动与解压
  * - cgVideoPath / cgVideoPoster / cgVideoLoadTimeout — CG 开场视频
  * - gameActivityInvalid — 错误提示
+ * - floatingWindow — 悬浮窗条目（直接使用 FloatingWindowItem，与完整模式一致）
  *
  * 示例：
  * ```yaml
@@ -94,15 +95,6 @@ data class Pvz2ToolConfig(
  * # cgVideoLoadTimeout: 5000
  * ```
  */
-@Serializable
-data class FwItemSimple(
-    val id: String,
-    val name: String,
-    val buttonColor: String = "green",
-    val jsScript: String? = null,
-    val smfList: List<String> = emptyList(),
-)
-
 @Serializable
 data class Pvz2ToolSimpleConfig(
     val gameActivity: String,
@@ -125,7 +117,7 @@ data class Pvz2ToolSimpleConfig(
     val windowHeight: Int = 0,
     val isAllowRotation: Boolean = false,
     // 悬浮窗内容自定义
-    val floatingWindow: List<FwItemSimple> = emptyList(),
+    val floatingWindow: List<FloatingWindowItem> = emptyList(),
 ) {
     /**
      * 将精简配置转换为 Pvz2ToolConfig，填充必要的默认值。
@@ -148,63 +140,32 @@ data class Pvz2ToolSimpleConfig(
             announcement = emptyList(),
             ui = Pvz2ToolConfigUI(
                 title = Pvz2ToolConfigUITitle(empty, empty, empty, empty),
-                button = Pvz2ToolConfigUIButton(empty, false, empty, false, empty, false, empty, empty),
+                button = Pvz2ToolConfigUIButton(enterGame = empty, tutorial = empty, resetData = empty, confirmVersion = empty),
                 extractor = Pvz2ToolConfigUIExtractor(),
-                noValidDirTip = empty,
-                versionLabel = empty,
-                uiVersion = empty,
-                authorInfo = empty,
-                tutorial = empty,
+                noValidDirTip = empty, versionLabel = empty, uiVersion = empty, authorInfo = empty, tutorial = empty,
                 save = Pvz2ToolConfigUISave(
-                    presetConfirmTitle = empty,
-                    presetConfirmMessage = empty,
-                    deleteConfirmTitle = empty,
-                    deleteConfirmMessage = empty,
-                    coverConfirmTitle = empty,
-                    coverConfirmMessage = empty,
-                    saveInfoTitle = empty,
-                    saveNameLabel = empty,
-                    saveDescLabel = empty,
-                    cancelButton = empty,
-                    confirmButton = empty,
-                    exportButton = empty,
-                    importButton = empty,
-                    backupButton = empty,
-                    coverLocalButton = empty,
-                    coverPresetButton = empty,
-                    saveNameEmptyTip = empty,
-                    noLocalSaveTip = empty,
-                    selectLocalSaveTip = empty,
-                    backupSuccessTip = empty,
-                    backupFailTipPrefix = empty,
-                    exportSuccessTip = empty,
-                    exportFailTipPrefix = empty,
-                    importSuccessTip = empty,
-                    importFailTipPrefix = empty,
-                    deleteSuccessTip = empty,
-                    deleteFailTipPrefix = empty,
-                    coverSuccessTip = empty,
-                    coverFailTipPrefix = empty,
-                    defaultImportNamePrefix = empty,
-                    defaultBackupDesc = empty,
-                    defaultImportDesc = empty,
+                    presetConfirmTitle = empty, presetConfirmMessage = empty,
+                    deleteConfirmTitle = empty, deleteConfirmMessage = empty,
+                    coverConfirmTitle = empty, coverConfirmMessage = empty,
+                    saveInfoTitle = empty, saveNameLabel = empty, saveDescLabel = empty,
+                    cancelButton = empty, confirmButton = empty,
+                    exportButton = empty, importButton = empty,
+                    backupButton = empty, coverLocalButton = empty, coverPresetButton = empty,
+                    saveNameEmptyTip = empty, noLocalSaveTip = empty, selectLocalSaveTip = empty,
+                    backupSuccessTip = empty, backupFailTipPrefix = empty,
+                    exportSuccessTip = empty, exportFailTipPrefix = empty,
+                    importSuccessTip = empty, importFailTipPrefix = empty,
+                    deleteSuccessTip = empty, deleteFailTipPrefix = empty,
+                    coverSuccessTip = empty, coverFailTipPrefix = empty,
+                    defaultImportNamePrefix = empty, defaultBackupDesc = empty, defaultImportDesc = empty,
                     retryButtonText = empty,
-                    operation = Pvz2ToolConfigOperation(empty, empty, empty, empty, empty, empty, empty)
+                    operation = Pvz2ToolConfigOperation(empty, empty, empty, empty,cover = empty,saveMeta = empty),
                 ),
                 settings = Pvz2ToolConfigUISettings(
-                    title = empty,
-                    solidBackgroundMode = empty,
-                    changeTheProfileReadLocation = empty,
-                    reloadConfig = empty,
-                    playBackgroundMusic = empty,
-                    resetPacketDeepClearing = empty,
-                    showNotUpdate = empty,
-                    importSmfFile = empty,
-                    exitConfirm = empty,
-                    exitConfirmTitle = empty,
-                    exitConfirmMessage = empty,
-                    customGameDisplay = empty,
-                    customGameDisplayTitle = empty,
+                    title = empty, solidBackgroundMode = empty,
+                    changeTheProfileReadLocation = empty, reloadConfig = empty,
+                    isShowFloatingWindow = isShowFloatingWindow,
+                    isUseExitConfirm = isUseExitConfirm,
                     gameDisplay = Pvz2ToolConfigGameDisplay(
                         isUseCustomGameDisplay = isUseCustomGameDisplay,
                         displayMode = displayMode,
@@ -213,30 +174,10 @@ data class Pvz2ToolSimpleConfig(
                         windowHeight = windowHeight,
                         isAllowRotation = isAllowRotation,
                     ),
-                    applyButtonText = empty,
-                    showFloatingWindow = if (floatingWindow.isNotEmpty()) "悬浮窗功能" else empty,
-                    isShowFloatingWindow = isShowFloatingWindow,
-                    isUseExitConfirm = isUseExitConfirm,
-                    exitConfirmButtonText = empty,
-                    floatingExitConfirmTitle = empty,
-                    floatingExitConfirmMessage = empty,
-                    floatingExitConfirmButtonText = empty,
                 ),
                 floatingWindow = Pvz2ToolConfigUIFloatingWindow(
-                    items = floatingWindow.map { fw ->
-                        FloatingWindowItem(
-                            id = fw.id,
-                            name = fw.name,
-                            buttonText = fw.name,
-                            buttonColor = fw.buttonColor,
-                            jsScript = fw.jsScript,
-                            smfList = fw.smfList,
-                        )
-                    },
-                    emptyTip = "",
-                    allHiddenTip = "",
+                    items = floatingWindow,
                 ),
-                // CG 视频和错误提示使用精简配置中的值
                 assets = Pvz2ToolConfigUIAssets(cgVideoPath = cgVideoPath, cgVideoPoster = cgVideoPoster, cgVideoLoadTimeout = cgVideoLoadTimeout),
                 error = Pvz2ToolConfigUIError()
             ),
@@ -1002,8 +943,8 @@ data class TopBarIconItem(
 @Serializable
 data class ScheduleDef(
     val id: String,
-    val name: String = "",
-    val cron: String = "",
+    val name: String = "定时任务",
+    val cron: String = "every 1d",
     val jsScript: String? = null,
     val jsPath: String? = null,
     val enabled: Boolean = true,

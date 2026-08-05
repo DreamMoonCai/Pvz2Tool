@@ -35,17 +35,23 @@
 | `windowWidth` | Int | 否 | `0` | displayMode=size 时的窗口宽度 (px) |
 | `windowHeight` | Int | 否 | `0` | displayMode=size 时的窗口高度 (px) |
 | `isAllowRotation` | Boolean | 否 | `false` | 允许随意翻转界面 |
-| `floatingWindow` | Array | 否 | `[]` | 悬浮窗功能条目（见下方 `FwItemSimple`） |
-| `schedules` | Array | 否 | `[]` | 定时任务列表（见下方「定时任务配置」章节） |
+| `floatingWindow` | Array | 否 | `[]` | 悬浮窗按钮列表（直接使用 `FloatingWindowItem`，与完整模式 `ui.floatingWindow.items` 字段一致，见下方详解） |
+| `schedules` | Array | 否 | `[]` | 定时任务列表（见「定时任务配置」章节） |
 
-**`FwItemSimple` 悬浮窗条目**：
+**`FloatingWindowItem` 悬浮窗条目（精简/完整模式共用）**：
 
 | 属性 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `id` | String | 是 | 唯一标识 |
-| `name` | String | 是 | 显示名称 |
-| `buttonColor` | String | 否 | 按钮颜色：`red` / `green` / `blue`，默认 `green` |
-| `jsScript` | String | 否 | 点击执行的 JS 脚本 |
+| `name` | String | 否 | 显示名称（支持 `{{js:...}}` 复合文本） |
+| `desc` | String | 否 | 按钮下方描述文字 |
+| `icon` | String | 否 | 左侧图标资源名（相对于 `assets/pvz2tool/images/`） |
+| `buttonText` | String | 否 | 按钮文字（优先级高于 `name`） |
+| `buttonColor` | String | 否 | 按钮颜色：`blue` / `red` / `green` / `orange` / `purple`，默认 `blue` |
+| `jsScript` | String | 否 | 点击执行的 JS 内联脚本 |
+| `jsPath` | String | 否 | JS 脚本文件路径（`jsScript` 为空时生效） |
+| `isShowFromJs` | String | 否 | 可见性判定 JS 表达式 |
+| `isShowFromJsPath` | String | 否 | 可见性判定脚本路径 |
 | `smfList` | Array | 否 | 关联的 SMF 资源列表 |
 
 **精简配置示例**：
@@ -815,6 +821,7 @@ settings:
 | `items[].jsPath` | String | - | JS 脚本文件路径（`jsScript` 为空时从本地/APK 加载） |
 | `items[].isShowFromJs` | String | - | **可见性 JS 表达式**：返回 `true` 才渲染该按钮，不填 = 始终显示。会随复合文本一起自动重算，可实现运行时动态显隐 |
 | `items[].isShowFromJsPath` | String | - | **可见性脚本文件路径**（`isShowFromJs` 为空时生效）。路径规则同 `jsPath`（占位符展开 + 绝对路径/本地工作目录/APK Assets 三级查找）；文件读不到时判定为隐藏 |
+| `items[].smfList` | List | `[]` | 关联的 SMF 资源列表（用于 `JsSmfDataManager` 注入数据到 JS 执行上下文） |
 
 **floatingWindow 使用示例（默认展示断网与画面设置）：**
 ```yaml
@@ -876,6 +883,7 @@ ui:
 | `items[].isShowFromJsPath` | String | - | 可见性脚本文件路径（`isShowFromJs` 为空时生效），路径规则同 `jsPath`；文件读不到时判定为隐藏 |
 | `items[].pressSound` | String | - | 按下音效文件名（相对 `assets/pvz2tool/sound/`）；不填默认用设置按钮音效 |
 | `items[].releaseSound` | String | - | 释放音效文件名（同上）；不填默认用设置按钮音效 |
+| `items[].smfList` | List | `[]` | 关联的 SMF 资源列表（用于 `JsSmfDataManager` 注入数据到 JS 执行上下文） |
 
 > **点击执行逻辑**：与悬浮窗按钮一致 —— `jsScript` 优先，为空时回退 `jsPath`（占位符展开 + 三级查找后读取文件内容执行）。脚本执行完毕后广播一次「复合文本重算」信号，使 `isShowFromJs` 等动态显隐即时更新。
 > **显隐重算时机**：与 `{{js:...}}` 文案完全一致，任意用户交互脚本执行后自动重算。

@@ -144,7 +144,8 @@ data class FwItemDraft(
     val isShowFromJs: String = "",
     val isShowFromJsPath: String = "",
     val desc: String = "",
-    val icon: String = ""
+    val icon: String = "",
+    val smfList: List<String> = emptyList(),
 )
 
 data class TbiItemDraft(
@@ -157,7 +158,8 @@ data class TbiItemDraft(
     val isShowFromJs: String = "",
     val isShowFromJsPath: String = "",
     val pressSound: String = "",
-    val releaseSound: String = ""
+    val releaseSound: String = "",
+    val smfList: List<String> = emptyList(),
 )
 
 // ── 版本 / 栏目 / 功能项 数据模型 ────────────────────────────
@@ -615,27 +617,24 @@ private fun buildYamlFromWizard(
             windowWidth = gameDisplay.windowWidth,
             windowHeight = gameDisplay.windowHeight,
             isAllowRotation = gameDisplay.isAllowRotation,
-            floatingWindow = if (isShowFloatingWindowDefault) fwItems.map { fw ->
-                io.github.dreammooncai.pvz2tool.FwItemSimple(
+            floatingWindow = fwItems.map { fw ->
+                FloatingWindowItem(
                     id = fw.id,
-                    name = fw.name,
-                    buttonColor = fw.buttonColor,
-                    jsScript = fw.jsScript.takeIf { it.isNotBlank() },
-                    smfList = emptyList(),
+                    name = fw.name.ifBlank { null },
+                    desc = fw.desc.ifBlank { null },
+                    icon = fw.icon.ifBlank { null },
+                    buttonText = fw.buttonText.ifBlank { null },
+                    buttonColor = fw.buttonColor.ifBlank { null },
+                    jsScript = fw.jsScript.ifBlank { null },
+                    jsPath = packScriptAssetPath(fw.jsPath),
+                    isShowFromJs = fw.isShowFromJs.ifBlank { null },
+                    isShowFromJsPath = packScriptAssetPath(fw.isShowFromJsPath),
+                    smfList = fw.smfList
                 )
-            } else emptyList(),
+            },
         )
-        val yml = Yaml.default.encodeToString(Pvz2ToolSimpleConfig.serializer(), cfg)
-        var result = "# Pvz2Tool 简易模式配置（由集成器生成）\n" + yml.removePrefix("---\n")
-        // 附加定时任务（不归属 SimpleConfig）
-        if (schedules.isNotEmpty()) {
-            val schedulesYml = Yaml.default.encodeToString(
-                kotlinx.serialization.builtins.ListSerializer(io.github.dreammooncai.pvz2tool.ScheduleDef.serializer()),
-                schedules.map { ScheduleDef(it.id, it.name, it.cron, it.jsScript.ifBlank { null }, it.jsPath.ifBlank { null }, it.enabled) }
-            )
-            result += "\nschedules:\n" + schedulesYml.removePrefix("---\n").prependIndent("  ").removePrefix("  ")
-        }
-        return result
+        val yml = Yaml(configuration = YamlConfiguration(encodeDefaults = false, multiLineStringStyle = MultiLineStringStyle.Literal)).encodeToString(Pvz2ToolSimpleConfig.serializer(), cfg)
+        return "# Pvz2Tool 简易模式配置（由集成器生成）\n" + yml.removePrefix("---\n")
     }
 
     // 完整模式：解析模板 YAML 保留未编辑字段（title/button/extractor 等），只覆盖向导编辑的部分
@@ -743,7 +742,8 @@ private fun buildYamlFromWizard(
                         it.icon.ifBlank { null }, it.buttonText.ifBlank { null },
                         it.buttonColor.ifBlank { null },
                         it.jsScript.ifBlank { null }, packScriptAssetPath(it.jsPath),
-                        it.isShowFromJs.ifBlank { null }, packScriptAssetPath(it.isShowFromJsPath))
+                        it.isShowFromJs.ifBlank { null }, packScriptAssetPath(it.isShowFromJsPath),
+                        smfList = it.smfList)
                 }
             ),
             topBarIcons = template.ui.topBarIcons.copy(
@@ -752,7 +752,8 @@ private fun buildYamlFromWizard(
                         it.contentDescription.ifBlank { null },
                         it.jsScript.ifBlank { null }, packScriptAssetPath(it.jsPath),
                         it.isShowFromJs.ifBlank { null }, packScriptAssetPath(it.isShowFromJsPath),
-                        it.pressSound.ifBlank { null }, it.releaseSound.ifBlank { null })
+                        it.pressSound.ifBlank { null }, it.releaseSound.ifBlank { null },
+                        smfList = it.smfList)
                 }
             ),
             versionLabel = uiVersionLabel,
@@ -2035,7 +2036,9 @@ fun ToolboxIntegratorScreen(
                     )
                 } else Modifier)
         ) { innerPadding ->
-            Box(Modifier.padding(innerPadding).fillMaxSize()) {
+            Box(Modifier
+                .padding(innerPadding)
+                .fillMaxSize()) {
             when {
                 // ── 功能项设置子页面（栏目下） ──
                 editingSectionIndex >= 0 && step == 2 -> {
@@ -2117,7 +2120,8 @@ fun ToolboxIntegratorScreen(
                         onPickFile = ::pickAnyFile,
                         selectedFolders = selectedFolders,
                         onPickFolder = { pickFolder(it) },
-                        onClearFieldSelection = { clearFieldSelection(it) }
+                        onClearFieldSelection = { clearFieldSelection(it) },
+                        simplifiedLaunch = simplifiedLaunch
                     )
                 }
                 // ── UI高级设置子页面 ──
@@ -2326,14 +2330,22 @@ fun ToolboxIntegratorScreen(
                                             Image(
                                                 bitmap = selectedBmp.asImageBitmap(),
                                                 contentDescription = "已选背景图预览（点击大屏预览）",
-                                                modifier = Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(10.dp)).clickable { openImagePreview(selectedBmp.asImageBitmap()) },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(140.dp)
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .clickable { openImagePreview(selectedBmp.asImageBitmap()) },
                                                 contentScale = ContentScale.Crop
                                             )
                                         } else {
                                             Image(
                                                 painter = painterResource(R.mipmap.bg_fill_image),
                                                 contentDescription = "默认背景图（点击大屏预览）",
-                                                modifier = Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(10.dp)).clickable { openImagePreviewFromResource() },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(140.dp)
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .clickable { openImagePreviewFromResource() },
                                                 contentScale = ContentScale.Crop
                                             )
                                         }
@@ -2425,7 +2437,8 @@ fun ToolboxIntegratorScreen(
                     Column(Modifier.weight(0.48f)) {
                         PvzDialogCard(title = null) {
                             Column(
-                                Modifier.fillMaxSize()
+                                Modifier
+                                    .fillMaxSize()
                                     .padding(horizontal = 12.dp, vertical = 4.dp)
                                     .verticalScroll(rememberScrollState())
                             ) {
@@ -2457,7 +2470,8 @@ fun ToolboxIntegratorScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             Column(
-                                Modifier.fillMaxSize()
+                                Modifier
+                                    .fillMaxSize()
                                     .padding(horizontal = 12.dp, vertical = 4.dp)
                                     .verticalScroll(rememberScrollState())
                             ) {
@@ -2534,7 +2548,9 @@ fun ToolboxIntegratorScreen(
                 )
                 Text(
                     "点击任意处关闭",
-                    Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp),
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 32.dp),
                     color = Color.White,
                     fontSize = 13.sp
                 )
@@ -2566,13 +2582,17 @@ fun ToolboxIntegratorScreen(
             isVisible = true,
             titleText = "原版 APK 警告",
             onDismissRequest = { f.delete(); popCapWarningFile = null },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             bottomContent = {
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     PvzBodyText("检测到此 APK 为 PopCap Games 原版，签名校验未去除。")
                     PvzBodyText("请先在 MT 管理器使用「去除签名校验」功能，并关闭上面的「使用原版过签」开关后处理该 APK，处理完成后再重新选择。")
-                    PvzRedButton("我知道了", Modifier.fillMaxWidth().height(42.dp)) {
+                    PvzRedButton("我知道了", Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)) {
                         f.delete(); popCapWarningFile = null
                     }
                 }
@@ -2599,40 +2619,60 @@ private fun BottomNavRow(
     onRestart: () -> Unit
 ) {
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (result != null) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PvzGreenButton("再集成一个", Modifier.weight(1f).height(BUTTON_HEIGHT), onClick = onRestart)
-                PvzRedButton("返回", Modifier.weight(1f).height(BUTTON_HEIGHT), onClick = onBack)
+                PvzGreenButton("再集成一个", Modifier
+                    .weight(1f)
+                    .height(BUTTON_HEIGHT), onClick = onRestart)
+                PvzRedButton("返回", Modifier
+                    .weight(1f)
+                    .height(BUTTON_HEIGHT), onClick = onBack)
             }
         } else when (step) {
             1 -> {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PvzRedButton("返回", Modifier.weight(1f).height(BUTTON_HEIGHT), onClick = onBack)
-                    PvzGreenButton("下一步 →", Modifier.weight(1f).height(BUTTON_HEIGHT), onClick = onNext)
+                    PvzRedButton("返回", Modifier
+                        .weight(1f)
+                        .height(BUTTON_HEIGHT), onClick = onBack)
+                    PvzGreenButton("下一步 →", Modifier
+                        .weight(1f)
+                        .height(BUTTON_HEIGHT), onClick = onNext)
                 }
             }
             2 -> {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PvzRedButton("← 上一步", Modifier.weight(1f).height(BUTTON_HEIGHT), onClick = onPrev)
+                    PvzRedButton("← 上一步", Modifier
+                        .weight(1f)
+                        .height(BUTTON_HEIGHT), onClick = onPrev)
                     PvzGreenButton(
                         if (targetApk != null) "预览差异 →" else "请选择目标 APK",
-                        Modifier.weight(1f).height(BUTTON_HEIGHT),
+                        Modifier
+                            .weight(1f)
+                            .height(BUTTON_HEIGHT),
                         onClick = onNext
                     )
                 }
             }
             3 -> {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PvzRedButton("← 上一步", Modifier.weight(1f).height(BUTTON_HEIGHT), onClick = onPrev)
-                    PvzGreenButton("重新计算", Modifier.weight(1f).height(BUTTON_HEIGHT), onClick = onRecompute)
+                    PvzRedButton("← 上一步", Modifier
+                        .weight(1f)
+                        .height(BUTTON_HEIGHT), onClick = onPrev)
+                    PvzGreenButton("重新计算", Modifier
+                        .weight(1f)
+                        .height(BUTTON_HEIGHT), onClick = onRecompute)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PvzGreenButton(
                         "执行合并",
-                        Modifier.weight(1f).height(BUTTON_HEIGHT),
+                        Modifier
+                            .weight(1f)
+                            .height(BUTTON_HEIGHT),
                         backgroundColor = Color(0xFF2E7D32),
                         onClick = onApply
                     )
@@ -2684,7 +2724,9 @@ private fun StepTargetLeft(
     PvzInfoCard("选择目标游戏 APK") {
         PvzBodyText("选择一个未集成的目标游戏 APK。集成器将把工具箱注入其中。")
         Spacer(Modifier.height(8.dp))
-        PvzGreenButton("选择 APK 文件", Modifier.fillMaxWidth().height(BUTTON_HEIGHT), onClick = onPickApk)
+        PvzGreenButton("选择 APK 文件", Modifier
+            .fillMaxWidth()
+            .height(BUTTON_HEIGHT), onClick = onPickApk)
         targetApk?.let {
             Spacer(Modifier.height(8.dp))
             PvzHighlightText("✓ 已选：${it.name}")
@@ -2802,7 +2844,9 @@ private fun StepPreviewLeft(
     // 差异报告
     report?.let { r ->
         Row(
-            Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             PvzStatChip("dex ${r.sourceDexCount}+${r.targetDexCount}=${r.resultDexCount}")
@@ -2872,7 +2916,9 @@ private fun StepPreviewRight(
         PvzInfoCard("预览界面") {
             PvzGreenButton(
                 "预览界面效果",
-                Modifier.fillMaxWidth().height(BUTTON_HEIGHT),
+                Modifier
+                    .fillMaxWidth()
+                    .height(BUTTON_HEIGHT),
                 onClick = onPreviewUi
             )
             PvzBodyText("点击预览 dream.yml 在合并后的实际界面效果。")
@@ -3013,7 +3059,9 @@ private fun PvzStatChip(text: String) {
 @Composable
 private fun PvzStatChipRow(vararg texts: String) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         texts.forEach { PvzStatChip(it) }
@@ -3058,7 +3106,9 @@ private fun IntegratorInputField(value: String, placeholder: String, multiline: 
         BasicTextField(
             value = value,
             onValueChange = onValue,
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
             singleLine = !multiline,
             textStyle = LocalTextStyle.current.copy(color = Color.White, fontSize = 13.sp),
             decorationBox = { innerTextField ->
@@ -3148,7 +3198,9 @@ private fun buildCompositeText(
 @Composable
 private fun CtTypeSelector(selected: CtType, onSelect: (CtType) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         CtType.values().forEach { t ->
@@ -3259,17 +3311,23 @@ private fun CompositeTextToolDialog(onDismiss: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         bottomContent = {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 PvzRedButton(
                     text = "取消",
-                    modifier = Modifier.weight(1f).height(46.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp),
                     onClick = onDismiss
                 )
                 PvzGreenButton(
                     text = "复制",
-                    modifier = Modifier.weight(1f).height(46.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp),
                     onClick = {
                         scope.launch {
                             clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("composite_text", generated)))
@@ -3282,7 +3340,9 @@ private fun CompositeTextToolDialog(onDismiss: () -> Unit) {
         }
     ) {
         // 内容整体加边距（包住全部，避免类型以下顶格）
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
+        Column(Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp)) {
             // 文字内容
             Column(Modifier.fillMaxWidth()) {
                 PvzRichText(ctType.mainLabel, defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -3304,7 +3364,9 @@ private fun CompositeTextToolDialog(onDismiss: () -> Unit) {
             CtType.COLOR -> {
                 // 颜色模式切换
                 Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     CtColorMode.values().forEach { m ->
@@ -3371,7 +3433,9 @@ private fun CompositeTextToolDialog(onDismiss: () -> Unit) {
         PvzRichText("预览", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(6.dp))
         PvzSimpleCardGreen(borderColor = Color(0xFFD4E8A0), backgroundColor = Color(0xFFD4E8A0)) {
-            Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier
+                .fillMaxWidth()
+                .padding(12.dp), contentAlignment = Alignment.Center) {
                 PvzRichText(
                     if (generated.isBlank()) "（输出为空）" else generated,
                     defaultStyle = PvzTextOliveStyleNoShadow,
@@ -3430,7 +3494,9 @@ private fun UiSectionHeader(text: String) {
 /** Info 卡片（对标 Pvz2MainScreen 的 INFO 类型：浅绿底 + 自动对比度文字） */
 @Composable
 private fun UiInfoCard(label: String, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Column(Modifier
+        .fillMaxWidth()
+        .padding(vertical = 4.dp)) {
         PvzRichText(label, defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(2.dp))
         content()
@@ -3529,9 +3595,12 @@ private fun listSmfSourceEntries(apk: File, scope: String): List<SmfSourceEntry>
 @Composable
 private fun SmfScopeChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
-        Modifier.padding(end = 6.dp).clip(RoundedCornerShape(16.dp))
+        Modifier
+            .padding(end = 6.dp)
+            .clip(RoundedCornerShape(16.dp))
             .background(if (selected) Color(0xFF689F38) else Color(0xFFE8F5D0))
-            .clickable { onClick() }.padding(horizontal = 12.dp, vertical = 6.dp)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Text(label, fontSize = 12.sp, color = if (selected) Color.White else Color(0xFF33691E))
     }
@@ -3586,7 +3655,10 @@ private fun SmfResourceSettingsContent(
         loadingEntries = false
     }
 
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 10.dp)) {
+    Column(modifier
+        .fillMaxSize()
+        .verticalScroll(rememberScrollState())
+        .padding(horizontal = 10.dp, vertical = 10.dp)) {
         PvzDialogCard(title = null) {
             Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                 UiSectionHeader("SMF/资源设置")
@@ -3645,8 +3717,13 @@ private fun SmfResourceSettingsContent(
                     entries.forEach { e ->
                         val excluded = e.fullRel in excludedSmfAssets
                         Row(
-                            Modifier.fillMaxWidth().padding(vertical = 3.dp)
-                                .background(if (excluded) Color(0xFFFFEBEE) else Color.Transparent, RoundedCornerShape(6.dp))
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp)
+                                .background(
+                                    if (excluded) Color(0xFFFFEBEE) else Color.Transparent,
+                                    RoundedCornerShape(6.dp)
+                                )
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -3671,7 +3748,9 @@ private fun SmfResourceSettingsContent(
                         PvzGreenButton("从目标 APK 选择", Modifier.height(36.dp)) { onPickFromTargetApk(scopePath) }
                     } else {
                         Box(
-                            Modifier.height(36.dp).clip(RoundedCornerShape(6.dp))
+                            Modifier
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(6.dp))
                                 .background(Color(0xFFBDBDBD))
                                 .border(1.dp, Color(0xFF9E9E9E), RoundedCornerShape(6.dp))
                                 .padding(horizontal = 12.dp),
@@ -3689,7 +3768,10 @@ private fun SmfResourceSettingsContent(
                     Text("已追加文件（${addedFilesHere.size}）", fontSize = 12.sp, color = Color(0xFF33691E))
                     addedFilesHere.forEach { (key, _) ->
                         val name = key.removePrefix("$scopePath/")
-                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp)
+                            .padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(name, fontSize = 13.sp, color = Color(0xFF1B5E20), modifier = Modifier.weight(1f))
                             PvzRedButton("移除", Modifier.height(30.dp)) { onRemoveAdded(key) }
                         }
@@ -3701,7 +3783,10 @@ private fun SmfResourceSettingsContent(
                     Spacer(Modifier.height(6.dp))
                     Text("已追加文件夹（${addedFolderHere.size}）", fontSize = 12.sp, color = Color(0xFF33691E))
                     addedFolderHere.forEach { (key, folder) ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp)
+                            .padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("${folder.name}（${folder.walkTopDown().count { it.isFile }} 个文件）", fontSize = 13.sp, color = Color(0xFF1B5E20), modifier = Modifier.weight(1f))
                             PvzRedButton("移除", Modifier.height(30.dp)) { onRemoveAdded(key) }
                         }
@@ -3713,7 +3798,10 @@ private fun SmfResourceSettingsContent(
                     Spacer(Modifier.height(8.dp))
                     Text("打包时将删除的目标 APK 原条目（${removedTargetEntries.size}）", fontSize = 12.sp, color = Color(0xFFB71C1C), fontWeight = FontWeight.Bold)
                     removedTargetEntries.sorted().forEach { name ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp)
+                            .padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(name, fontSize = 11.sp, color = Color(0xFF8D4E00), modifier = Modifier.weight(1f))
                             PvzRedButton("撤销", Modifier.height(30.dp)) { onUndoRemoveTarget(name) }
                         }
@@ -3816,14 +3904,20 @@ private fun TargetApkBrowserDialog(
         titleText = "从目标 APK 选择（追加到 $assetScope）",
         onDismissRequest = onDismiss,
         dismissible = true,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
         bottomContent = {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PvzRedButton("关闭", Modifier.weight(1f).height(40.dp)) { onDismiss() }
+                PvzRedButton("关闭", Modifier
+                    .weight(1f)
+                    .height(40.dp)) { onDismiss() }
             }
         }
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)) {
             if (loading) {
                 Text("正在读取目标 APK 条目…", fontSize = 13.sp, color = Color.Gray, modifier = Modifier.padding(vertical = 8.dp))
             } else {
@@ -3847,7 +3941,9 @@ private fun TargetApkBrowserDialog(
                         } else {
                             matches.forEach { node ->
                                 Row(
-                                    Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 2.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     val special = isSpecialResourceName(node.name)
@@ -3879,7 +3975,9 @@ private fun ApkTreeNodes(
     nodes.forEach { node ->
         val indent = (depth * 14 + 4).dp
         Row(
-            Modifier.fillMaxWidth().padding(start = indent, top = 2.dp, bottom = 2.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(start = indent, top = 2.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (node.isDir) {
@@ -4038,7 +4136,9 @@ private fun FileInputRow(
             isVisible = showChoice,
             titleText = "选择打包内容",
             onDismissRequest = { showChoice = false },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             bottomContent = {
                 Column(
@@ -4047,12 +4147,16 @@ private fun FileInputRow(
                 ) {
                     PvzGreenButton(
                         text = pickFolderLabel,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
                         onClick = { showChoice = false; requestPick { onPickFolder(fieldKey) } }
                     )
                     PvzBlueButton(
                         text = pickFileLabel,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
                         onClick = { showChoice = false; requestPick { onPickFile(fieldKey, mimeType) } }
                     )
                 }
@@ -4066,7 +4170,9 @@ private fun FileInputRow(
             isVisible = showOverwriteConfirm,
             titleText = "覆盖确认",
             onDismissRequest = { showOverwriteConfirm = false; pendingPick = null },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             bottomContent = {
                 Column(
@@ -4078,11 +4184,15 @@ private fun FileInputRow(
                         fontSize = 13.sp, color = Color(0xFF8D4E00)
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        PvzRedButton("取消", Modifier.weight(1f).height(44.dp)) {
+                        PvzRedButton("取消", Modifier
+                            .weight(1f)
+                            .height(44.dp)) {
                             showOverwriteConfirm = false
                             pendingPick = null
                         }
-                        PvzGreenButton("继续", Modifier.weight(1f).height(44.dp)) {
+                        PvzGreenButton("继续", Modifier
+                            .weight(1f)
+                            .height(44.dp)) {
                             showOverwriteConfirm = false
                             pendingPick?.invoke()
                             pendingPick = null
@@ -4103,11 +4213,15 @@ private fun AnnouncementSettingsContent(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 10.dp),
+        modifier
+            .fillMaxSize()
+            .padding(horizontal = 10.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // 左栏：公告列表
-        Column(Modifier.weight(0.5f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.5f)
+            .verticalScroll(rememberScrollState())) {
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     UiSectionHeader("公告列表 (announcement)")
@@ -4144,7 +4258,9 @@ private fun AnnouncementSettingsContent(
                     }
 
                     Spacer(Modifier.height(10.dp))
-                    PvzGreenButton("＋ 添加公告", Modifier.fillMaxWidth().height(42.dp)) {
+                    PvzGreenButton("＋ 添加公告", Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)) {
                         onUpdate(announcements + AnnouncementDraft())
                     }
                 }
@@ -4152,7 +4268,9 @@ private fun AnnouncementSettingsContent(
         }
 
         // 右栏：预览与说明
-        Column(Modifier.weight(0.5f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.5f)
+            .verticalScroll(rememberScrollState())) {
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     UiSectionHeader("配置说明")
@@ -4175,6 +4293,7 @@ private val FW_COLORS = listOf("blue", "red", "green", "orange", "purple")
 
 @Composable
 private fun FloatingWindowSettingsContent(
+    simplifiedLaunch: Boolean,
     showFloatingWindowLabel: String,
     onShowFloatingWindowLabel: (String) -> Unit,
     isShowFloatingWindowDefault: Boolean,
@@ -4206,20 +4325,25 @@ private fun FloatingWindowSettingsContent(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 10.dp),
+        modifier
+            .fillMaxSize()
+            .padding(horizontal = 10.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         fun clearFieldSelection(fieldKey: String) = onClearFieldSelection(fieldKey)
         // 左栏：基础设置 + 按钮项列表
-        Column(Modifier.weight(0.5f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.5f)
+            .verticalScroll(rememberScrollState())) {
             // 基础设置
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     UiSectionHeader("悬浮窗基础设置 (ui.settings)")
-                    UiInputCard("showFloatingWindow", "「是否开启悬浮窗」开关标签文本。") {
-                        IntegratorInputField(showFloatingWindowLabel, "如：是否开启悬浮窗") { onShowFloatingWindowLabel(it) }
-                    }
-                    UiSwitchCard("isShowFloatingWindow", "是否默认开启悬浮窗。") {
+                    if (simplifiedLaunch)
+                        UiInputCard("showFloatingWindow", "「开启悬浮窗」开关标签文本。") {
+                            IntegratorInputField(showFloatingWindowLabel, "如：是否开启悬浮窗") { onShowFloatingWindowLabel(it) }
+                        }
+                    UiSwitchCard("isShowFloatingWindow", "默认是否开启悬浮窗（仅影响首次启动）。") {
                         PvzCheckRow("默认开启悬浮窗", isShowFloatingWindowDefault) { onIsShowFloatingWindowDefault(!isShowFloatingWindowDefault) }
                     }
                 }
@@ -4230,10 +4354,10 @@ private fun FloatingWindowSettingsContent(
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     UiSectionHeader("退出确认 (ui.settings)")
-                    UiSwitchCard("isUseExitConfirm", "是否启用「退出游戏二次确认」弹窗。") {
-                        PvzCheckRow("启用退出确认", isUseExitConfirm) { onIsUseExitConfirm(!isUseExitConfirm) }
+                    UiSwitchCard("isUseExitConfirm", "默认是否启用退出确认（仅影响首次启动）。") {
+                        PvzCheckRow("默认启用退出确认", isUseExitConfirm) { onIsUseExitConfirm(!isUseExitConfirm) }
                     }
-                    if (isUseExitConfirm) {
+                    if (simplifiedLaunch) {
                         UiInputCard("exitConfirmTitle", "退出确认弹窗标题。") {
                             IntegratorInputField(exitConfirmTitle, "如：退出游戏") { onExitConfirmTitle(it) }
                         }
@@ -4248,18 +4372,30 @@ private fun FloatingWindowSettingsContent(
             }
 
             // 悬浮球退出确认
-            Spacer(Modifier.height(10.dp))
-            PvzDialogCard(title = null) {
-                Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    UiSectionHeader("悬浮球退出确认 (ui.settings)")
-                    UiInputCard("floatingExitConfirmTitle", "关闭悬浮球时确认弹窗标题。") {
-                        IntegratorInputField(floatingExitConfirmTitle, "如：确认退出") { onFloatingExitConfirmTitle(it) }
-                    }
-                    UiInputCard("floatingExitConfirmMessage", "关闭悬浮球时确认弹窗内容。") {
-                        IntegratorInputField(floatingExitConfirmMessage, "如：确定要退出悬浮窗吗...") { onFloatingExitConfirmMessage(it) }
-                    }
-                    UiInputCard("floatingExitConfirmButtonText", "关闭悬浮球时确认按钮文字。") {
-                        IntegratorInputField(floatingExitConfirmButtonText, "如：确认") { onFloatingExitConfirmButtonText(it) }
+            if (simplifiedLaunch) {
+                Spacer(Modifier.height(10.dp))
+                PvzDialogCard(title = null) {
+                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        UiSectionHeader("悬浮球退出确认 (ui.settings)")
+                        UiInputCard("floatingExitConfirmTitle", "关闭悬浮球时确认弹窗标题。") {
+                            IntegratorInputField(floatingExitConfirmTitle, "如：确认退出") {
+                                onFloatingExitConfirmTitle(
+                                    it
+                                )
+                            }
+                        }
+                        UiInputCard("floatingExitConfirmMessage", "关闭悬浮球时确认弹窗内容。") {
+                            IntegratorInputField(
+                                floatingExitConfirmMessage,
+                                "如：确定要退出悬浮窗吗..."
+                            ) { onFloatingExitConfirmMessage(it) }
+                        }
+                        UiInputCard("floatingExitConfirmButtonText", "关闭悬浮球时确认按钮文字。") {
+                            IntegratorInputField(
+                                floatingExitConfirmButtonText,
+                                "如：确认"
+                            ) { onFloatingExitConfirmButtonText(it) }
+                        }
                     }
                 }
             }
@@ -4291,7 +4427,9 @@ private fun FloatingWindowSettingsContent(
                     }
 
                     Spacer(Modifier.height(10.dp))
-                    PvzGreenButton("＋ 添加按钮项", Modifier.fillMaxWidth().height(42.dp)) {
+                    PvzGreenButton("＋ 添加按钮项", Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)) {
                         onFwItems(fwItems + FwItemDraft())
                     }
                 }
@@ -4299,7 +4437,9 @@ private fun FloatingWindowSettingsContent(
         }
 
         // 右栏：说明
-        Column(Modifier.weight(0.5f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.5f)
+            .verticalScroll(rememberScrollState())) {
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     UiSectionHeader("悬浮窗配置说明")
@@ -4375,7 +4515,9 @@ private fun FwItemEditor(
             IntegratorInputField(item.desc, "如 VPN 开关说明", multiline = true) { v -> update { it.copy(desc = v) } }
         }
         // buttonColor 选择
-        Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Column(Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)) {
             PvzRichText("buttonColor", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(2.dp))
             Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
@@ -4399,6 +4541,11 @@ private fun FwItemEditor(
         }
         UiInputCard("jsPath", "脚本文件路径（jsScript 为空时生效）") {
             FileInputRow(item.jsPath, "如 script/fw_vpn.js", "*/*", "fw_item_${index}_jsPath", { v -> update { it.copy(jsPath = v) } }, onPickFile, selectedFolder = selectedFolders["fw_item_${index}_jsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("fw_item_${index}_jsPath") })
+        }
+        UiInputCard("smfList", "关联的 SMF 资源列表（逗号分隔）") {
+            IntegratorInputField(item.smfList.joinToString(", "), "如 activityconfig, dailyreward") { v ->
+                update { it.copy(smfList = v.split(",", "，").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }) }
+            }
         }
         UiInputCard("isShowFromJs", "可见性判定 JS 表达式") {
             IntegratorInputField(item.isShowFromJs, "如 vpn.isPrepared()", multiline = true) { v -> update { it.copy(isShowFromJs = v) } }
@@ -4424,12 +4571,16 @@ private fun TopBarIconSettingsContent(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 10.dp),
+        modifier
+            .fillMaxSize()
+            .padding(horizontal = 10.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         fun clearFieldSelection(fieldKey: String) = onClearFieldSelection(fieldKey)
         // 左栏：图标项列表
-        Column(Modifier.weight(0.5f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.5f)
+            .verticalScroll(rememberScrollState())) {
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     UiSectionHeader("顶栏图标列表 (ui.topBarIcons.items)")
@@ -4441,7 +4592,9 @@ private fun TopBarIconSettingsContent(
                     }
 
                     Spacer(Modifier.height(10.dp))
-                    PvzGreenButton("＋ 添加图标项", Modifier.fillMaxWidth().height(42.dp)) {
+                    PvzGreenButton("＋ 添加图标项", Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)) {
                         onUpdate(tbiItems + TbiItemDraft())
                     }
                 }
@@ -4449,7 +4602,9 @@ private fun TopBarIconSettingsContent(
         }
 
         // 右栏：说明
-        Column(Modifier.weight(0.5f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.5f)
+            .verticalScroll(rememberScrollState())) {
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     UiSectionHeader("顶栏图标配置说明")
@@ -4535,6 +4690,11 @@ private fun TbiItemEditor(
         UiInputCard("releaseSound", "释放音效文件名（可选）") {
             FileInputRow(item.releaseSound, "如 ui_click_release.wav", "*/*", "tbi_item_${index}_releaseSound", { v -> update { it.copy(releaseSound = v) } }, onPickFile, selectedFolder = selectedFolders["tbi_item_${index}_releaseSound"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${index}_releaseSound") })
         }
+        UiInputCard("smfList", "关联的 SMF 资源列表（逗号分隔）") {
+            IntegratorInputField(item.smfList.joinToString(", "), "如 activityconfig, dailyreward") { v ->
+                update { it.copy(smfList = v.split(",", "，").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }) }
+            }
+        }
     }
 }
 
@@ -4555,10 +4715,14 @@ private fun VersionSettingsContent(
     onPickFolder: (fieldKey: String) -> Unit = {},
     onClearFieldSelection: (String) -> Unit = {}
 ) {
-    Row(Modifier.fillMaxSize().padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(Modifier
+        .fillMaxSize()
+        .padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         fun clearFieldSelection(fieldKey: String) = onClearFieldSelection(fieldKey)
         // 左栏：版本列表
-        Column(Modifier.weight(0.6f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.6f)
+            .verticalScroll(rememberScrollState())) {
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(12.dp)) {
                     PvzSectionTitle("版本列表")
@@ -4607,14 +4771,18 @@ private fun VersionSettingsContent(
                                 onUpdate(versions.toMutableList().also { it[i] = it[i].copy(enterGamePath = v2) })
                             }, onPickFile, selectedFolder = selectedFolders["ver_${i}_enterGamePath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("ver_${i}_enterGamePath") })
                             Spacer(Modifier.height(4.dp))
-                            PvzRedButton("删除", Modifier.fillMaxWidth().height(36.dp)) {
+                            PvzRedButton("删除", Modifier
+                                .fillMaxWidth()
+                                .height(36.dp)) {
                                 onUpdate(versions.toMutableList().also { it.removeAt(i) })
                             }
                         }
                         Spacer(Modifier.height(6.dp))
                     }
 
-                    PvzGreenButton("+ 添加版本", Modifier.fillMaxWidth().height(BUTTON_HEIGHT)) {
+                    PvzGreenButton("+ 添加版本", Modifier
+                        .fillMaxWidth()
+                        .height(BUTTON_HEIGHT)) {
                         onUpdate(versions + VersionDraft(id = "v${versions.size + 1}", name = "版本 ${versions.size + 1}"))
                     }
                 }
@@ -4622,7 +4790,9 @@ private fun VersionSettingsContent(
         }
 
         // 右栏：说明 + 外观设置
-        Column(Modifier.weight(0.4f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.4f)
+            .verticalScroll(rememberScrollState())) {
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(12.dp)) {
                     PvzSectionTitle("版本说明")
@@ -4655,10 +4825,14 @@ private fun SectionSettingsContent(
     onPickFolder: (fieldKey: String) -> Unit = {},
     onClearFieldSelection: (String) -> Unit = {}
 ) {
-    Row(Modifier.fillMaxSize().padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(Modifier
+        .fillMaxSize()
+        .padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         fun clearFieldSelection(fieldKey: String) = onClearFieldSelection(fieldKey)
         // 左栏：栏目列表
-        Column(Modifier.weight(0.6f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.6f)
+            .verticalScroll(rememberScrollState())) {
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(12.dp)) {
                     PvzSectionTitle("栏目列表")
@@ -4715,8 +4889,12 @@ private fun SectionSettingsContent(
                             }, onPickFile, selectedFolder = selectedFolders["section_${i}_jsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("section_${i}_jsPath") })
                             Spacer(Modifier.height(6.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                PvzGreenButton("编辑功能项 →", Modifier.weight(1f).height(36.dp)) { onEditItems(i) }
-                                PvzRedButton("删除", Modifier.weight(1f).height(36.dp)) {
+                                PvzGreenButton("编辑功能项 →", Modifier
+                                    .weight(1f)
+                                    .height(36.dp)) { onEditItems(i) }
+                                PvzRedButton("删除", Modifier
+                                    .weight(1f)
+                                    .height(36.dp)) {
                                     onUpdate(sections.toMutableList().also { it.removeAt(i) })
                                 }
                             }
@@ -4724,7 +4902,9 @@ private fun SectionSettingsContent(
                         Spacer(Modifier.height(6.dp))
                     }
 
-                    PvzGreenButton("+ 添加栏目", Modifier.fillMaxWidth().height(BUTTON_HEIGHT)) {
+                    PvzGreenButton("+ 添加栏目", Modifier
+                        .fillMaxWidth()
+                        .height(BUTTON_HEIGHT)) {
                         onUpdate(sections + SectionDraft(id = "section_${sections.size + 1}", isExpanded = true))
                     }
                 }
@@ -4732,7 +4912,9 @@ private fun SectionSettingsContent(
         }
 
         // 右栏：说明
-        Column(Modifier.weight(0.4f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.4f)
+            .verticalScroll(rememberScrollState())) {
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(12.dp)) {
                     PvzSectionTitle("栏目说明")
@@ -4765,9 +4947,13 @@ private fun ItemSettingsContent(
 ) {
     fun clearFieldSelection(fieldKey: String) = onClearFieldSelection(fieldKey)
     val items = section.items
-    Row(Modifier.fillMaxSize().padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(Modifier
+        .fillMaxSize()
+        .padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         // 左栏：功能项列表
-        Column(Modifier.weight(0.6f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.6f)
+            .verticalScroll(rememberScrollState())) {
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(12.dp)) {
                     PvzSectionTitle("「${section.title.ifBlank { section.id }}」的功能项")
@@ -4893,14 +5079,18 @@ private fun ItemSettingsContent(
                                 }
                             }
                             Spacer(Modifier.height(4.dp))
-                            PvzRedButton("删除", Modifier.fillMaxWidth().height(36.dp)) {
+                            PvzRedButton("删除", Modifier
+                                .fillMaxWidth()
+                                .height(36.dp)) {
                                 onUpdate(section.copy(items = items.toMutableList().also { it.removeAt(i) }))
                             }
                         }
                         Spacer(Modifier.height(6.dp))
                     }
 
-                    PvzGreenButton("+ 添加功能项", Modifier.fillMaxWidth().height(BUTTON_HEIGHT)) {
+                    PvzGreenButton("+ 添加功能项", Modifier
+                        .fillMaxWidth()
+                        .height(BUTTON_HEIGHT)) {
                         onUpdate(section.copy(items = items + SectionItemDraft(id = "item_${items.size + 1}", type = "DESCRIPTION")))
                     }
                 }
@@ -4908,7 +5098,9 @@ private fun ItemSettingsContent(
         }
 
         // 右栏：类型说明
-        Column(Modifier.weight(0.4f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.4f)
+            .verticalScroll(rememberScrollState())) {
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(12.dp)) {
                     PvzSectionTitle("功能项类型")
@@ -4967,8 +5159,12 @@ private fun UiAdvancedSettingsContent(onPickFile: (String, String) -> Unit,
     onUiSetChangeProfile: (String) -> Unit, onUiSetShowNotUpdate: (String) -> Unit, onUiSetExitConfirm: (String) -> Unit,     onUiSndSwitchClick: (String) -> Unit
 ) {
     fun clearFieldSelection(fieldKey: String) = onClearFieldSelection(fieldKey)
-    Row(Modifier.fillMaxSize().padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Column(Modifier.weight(0.5f).verticalScroll(rememberScrollState())) {
+    Row(Modifier
+        .fillMaxSize()
+        .padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier
+            .weight(0.5f)
+            .verticalScroll(rememberScrollState())) {
         PvzDialogCard(title = null) {
             Column(Modifier.padding(12.dp)) {
                 PvzSectionTitle("资源更新弹窗文本 (ui.extractor)")
@@ -5064,7 +5260,9 @@ private fun UiAdvancedSettingsContent(onPickFile: (String, String) -> Unit,
         }
 
         }
-        Column(Modifier.weight(0.5f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.5f)
+            .verticalScroll(rememberScrollState())) {
         Spacer(Modifier.height(10.dp))
         PvzDialogCard(title = null) {
             Column(Modifier.padding(12.dp)) {
@@ -5129,7 +5327,7 @@ private fun UiAdvancedSettingsContent(onPickFile: (String, String) -> Unit,
         PvzDialogCard(title = null) {
             Column(Modifier.padding(12.dp)) {
                 PvzSectionTitle("游戏画面设置 (ui.settings.gameDisplay)")
-                UiSwitchCard("ui.settings.gameDisplay.isUseCustomGameDisplay", "启用自定义画面总开关") { PvzCheckRow("启用自定义画面总开关", gameDisplay.isUseCustomGameDisplay) { onGameDisplay(gameDisplay.copy(isUseCustomGameDisplay = !gameDisplay.isUseCustomGameDisplay)) } }
+                UiSwitchCard("ui.settings.gameDisplay.isUseCustomGameDisplay", "默认启用自定义画面总开关") { PvzCheckRow("默认启用自定义画面总开关", gameDisplay.isUseCustomGameDisplay) { onGameDisplay(gameDisplay.copy(isUseCustomGameDisplay = !gameDisplay.isUseCustomGameDisplay)) } }
                 UiInputCard("ui.settings.gameDisplay.allowRotation", "允许翻转界面标签") { IntegratorInputField(gameDisplay.allowRotation, "允许翻转界面标签") { onGameDisplay(gameDisplay.copy(allowRotation = it)) } }
                 UiSwitchCard("ui.settings.gameDisplay.isAllowRotation", "默认允许翻转") { PvzCheckRow("默认允许翻转", gameDisplay.isAllowRotation) { onGameDisplay(gameDisplay.copy(isAllowRotation = !gameDisplay.isAllowRotation)) } }
                 UiInputCard("ui.settings.gameDisplay.customWindowSize", "自定义窗口尺寸标签") { IntegratorInputField(gameDisplay.customWindowSize, "自定义窗口尺寸标签") { onGameDisplay(gameDisplay.copy(customWindowSize = it)) } }
@@ -5168,11 +5366,15 @@ private fun ScheduleSettingsContent(
     )
 
     Row(
-        Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 10.dp),
+        Modifier
+            .fillMaxSize()
+            .padding(horizontal = 10.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // 左栏：定时任务列表
-        Column(Modifier.weight(0.55f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.55f)
+            .verticalScroll(rememberScrollState())) {
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     UiSectionHeader("定时任务列表 (schedules)")
@@ -5181,7 +5383,9 @@ private fun ScheduleSettingsContent(
                     items.forEachIndexed { i, item ->
                         Spacer(Modifier.height(8.dp))
                         Column(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(Color(0xFFF0ECD0))
                                 .border(1.dp, Color(0xFFAA9A5F), RoundedCornerShape(8.dp))
                                 .padding(10.dp)
@@ -5209,31 +5413,47 @@ private fun ScheduleSettingsContent(
                                 IntegratorInputField(item.name, "如 每日签到提醒") { v -> update { it.copy(name = v) } }
                             }
                             // cron 预设选择
-                            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Column(Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)) {
                                 PvzRichText("触发规则 (cron)", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.height(2.dp))
                                 val preset = cronPresets.firstOrNull { it.second == item.cron }
                                 val showCustom = item.cron.isNotBlank() && preset == null
-                                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), Arrangement.spacedBy(4.dp)) {
+                                Row(Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()), Arrangement.spacedBy(4.dp)) {
                                     cronPresets.take(4).forEach { (label, value) ->
                                         val sel = item.cron == value
                                         Box(
-                                            Modifier.clip(RoundedCornerShape(6.dp))
+                                            Modifier
+                                                .clip(RoundedCornerShape(6.dp))
                                                 .background(if (sel) Color(0xFFE8F5D0) else Color.Transparent)
-                                                .border(1.dp, if (sel) Color(0xFF689F38) else Color(0xFFD5CFA0), RoundedCornerShape(6.dp))
+                                                .border(
+                                                    1.dp,
+                                                    if (sel) Color(0xFF689F38) else Color(0xFFD5CFA0),
+                                                    RoundedCornerShape(6.dp)
+                                                )
                                                 .clickable { update { it.copy(cron = if (sel) "" else value) } }
                                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                                         ) { Text(label, fontSize = 11.sp, color = if (sel) Color(0xFF33691E) else Color(0xFFAA9A5F)) }
                                     }
                                 }
                                 Spacer(Modifier.height(4.dp))
-                                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), Arrangement.spacedBy(4.dp)) {
+                                Row(Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()), Arrangement.spacedBy(4.dp)) {
                                     cronPresets.drop(4).forEach { (label, value) ->
                                         val sel = item.cron == value
                                         Box(
-                                            Modifier.clip(RoundedCornerShape(6.dp))
+                                            Modifier
+                                                .clip(RoundedCornerShape(6.dp))
                                                 .background(if (sel) Color(0xFFE8F5D0) else Color.Transparent)
-                                                .border(1.dp, if (sel) Color(0xFF689F38) else Color(0xFFD5CFA0), RoundedCornerShape(6.dp))
+                                                .border(
+                                                    1.dp,
+                                                    if (sel) Color(0xFF689F38) else Color(0xFFD5CFA0),
+                                                    RoundedCornerShape(6.dp)
+                                                )
                                                 .clickable { update { it.copy(cron = if (sel) "" else value) } }
                                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                                         ) { Text(label, fontSize = 11.sp, color = if (sel) Color(0xFF33691E) else Color(0xFFAA9A5F)) }
@@ -5241,9 +5461,14 @@ private fun ScheduleSettingsContent(
                                     // 自定义入口
                                     val customSel = showCustom || item.cron.isBlank()
                                     Box(
-                                        Modifier.clip(RoundedCornerShape(6.dp))
+                                        Modifier
+                                            .clip(RoundedCornerShape(6.dp))
                                             .background(if (customSel) Color(0xFFE8F5D0) else Color.Transparent)
-                                            .border(1.dp, if (customSel) Color(0xFF689F38) else Color(0xFFD5CFA0), RoundedCornerShape(6.dp))
+                                            .border(
+                                                1.dp,
+                                                if (customSel) Color(0xFF689F38) else Color(0xFFD5CFA0),
+                                                RoundedCornerShape(6.dp)
+                                            )
                                             .clickable { update { it.copy(cron = "") } }
                                             .padding(horizontal = 8.dp, vertical = 4.dp)
                                     ) { Text("自定义", fontSize = 11.sp, color = if (customSel) Color(0xFF33691E) else Color(0xFFAA9A5F)) }
@@ -5266,7 +5491,9 @@ private fun ScheduleSettingsContent(
                     }
 
                     Spacer(Modifier.height(10.dp))
-                    PvzGreenButton("＋ 添加定时任务", Modifier.fillMaxWidth().height(42.dp)) {
+                    PvzGreenButton("＋ 添加定时任务", Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)) {
                         onUpdate(items + ScheduleDraft(id = "timer_${items.size + 1}"))
                     }
                 }
@@ -5274,7 +5501,9 @@ private fun ScheduleSettingsContent(
         }
 
         // 右栏：说明
-        Column(Modifier.weight(0.45f).verticalScroll(rememberScrollState())) {
+        Column(Modifier
+            .weight(0.45f)
+            .verticalScroll(rememberScrollState())) {
             PvzDialogCard(title = null) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     UiSectionHeader("定时任务说明")

@@ -72,6 +72,7 @@ import kotlin.coroutines.resume
 import kotlin.system.exitProcess
 import com.highcapable.yukireflection.factory.field
 import io.github.dreammooncai.pvz2tool.controller.GeneralFloatingDialogController
+import io.github.dreammooncai.pvz2tool.service.RequestPermissionsVpn
 import io.github.dreammooncai.pvz2tool.timer.TimerManager
 import io.github.dreammooncai.pvz2tool.view.AsyncImageFromAssets
 import java.io.File
@@ -620,6 +621,16 @@ private fun SimplifiedLaunchScreen(
                 gotoGameOnce()
             }
         }
+    }
+
+    // VPN 权限请求（与完整模式 Pvz2MainScreen 一致）
+    if (SettingsDialogState.isShowFloatingWindow) {
+        RequestPermissionsVpn({
+            Toast.makeText(
+                InitializePvz2.context, "未同意VPN权限，无法显示断网功能.",
+                Toast.LENGTH_SHORT
+            ).show()
+        })
     }
 
     PvzExtractorDialog(
