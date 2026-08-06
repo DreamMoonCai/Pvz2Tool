@@ -292,6 +292,7 @@
 | `app` | 应用 | 应用进程控制（restart/重启/重启应用、restartGame/重启游戏、exit/退出/退出应用/退出APP）；冷重启、退出进程、重启后自动进入游戏 | 全局 |
 | `dex` | dex加载 | DEX 加载（load/加载、loadFromAsset/从资源加载、loadFromUrl/从网络加载），把外部 .dex/.apk/.jar 加载到独立 DexClassLoader 并返回句柄 | 全局 |
 | `reflect` | 反射 | 反射（findClass/查找类 及 YukiReflection 风格的类/方法/字段/构造器/实例链式操作，活对象以 `Wrapper<T>` 子类句柄（携带原始对象）形式往返 JS） | 全局 |
+| `native` | 原生 | SO 原生库加载（load/加载/loadSo、loadLibrary/按名称加载、isLoaded/是否已加载、loadedLibraries/已加载列表、clearCache/清理缓存），基于 System.load/System.loadLibrary 把 .so 加载进进程，供之后 dex 加载的 DEX 中 external fun 调用 | 全局 |
 | `device` | 设备 | 当前安卓设备信息（系统 / 屏幕 / 内存 / 存储 / 电池 / 网络 / 应用 / CPU / Root） | 全局 |
 | `rton` | RTON | RTON 文件编解码 | 局部 |
 | `rsb` | RSB | RSB 资源包解包/打包 | 局部 |
@@ -4105,6 +4106,61 @@ for (var t of list) {
 
 ---
 
+## 24. native - SO 原生库加载
+
+全局对象 `native`（中文别名 `原生` / `so加载`），用于在脚本运行时把外部的 `.so` 二进制动态库加载进当前进程，从而让之后 `dex`（`dex.load`）加载的 DEX 中声明的 `external fun`（JNI 原生方法）能够获得实现。
+
+加载为进程级全局操作：`native.load` 先于 `dex.load` 执行即可打通 JNI 调用链。所有失败均记日志并向上抛出（脚本中止），请根据日志排查（常见于 ABI 不匹配、路径不存在）。
+
+### native.load / native.加载 / native.loadSo
+
+统一加载入口，**路径规则与项目其余文件 API 完全一致**（基于 `JsFileAccess`）：
+
+- **绝对路径**（`/` 开头）→ 直接作为本地文件加载；
+- **相对路径 / `$WORK_DIR` 等占位符** → 走 `JsFileAccess.resolveInput`：**工作目录优先，无则回退 `assets/pvz2tool/`**；
+- **`http(s)://` URL** → 先下载到缓存再加载。
+
+加载前会按路径中的 ABI 目录名（`arm64-v8a` / `armeabi-v7a` / `x86_64` / `x86`）与设备 `Build.SUPPORTED_ABIS` 比对，完全无交集时给出 ABI 警告（仍会尝试加载）。同一文件重复加载会跳过（已加载提示），不重复 dlopen。
+
+**参数**：
+- `path`（string，必填）：`.so` 文件的绝对路径、工作目录相对路径、`$WORK_DIR` 占位符，或 `http(s)://` URL。
+
+**返回**：句柄对象（含 `path`/`路径`、`name`/`名称`、`loaded`/`已加载`=true），失败（路径不存在 / 解析失败 / ABI 不支持 / dlopen 失败）抛异常。
+
+### native.loadLibrary / native.按名称加载
+
+按库名加载，等价 `System.loadLibrary(name)`（加载 `lib<name>.so`，从应用原生库目录或 `java.library.path` 查找，适用于 APK 内置库）。
+
+**参数**：`name`（string，必填，不含 `lib` 前缀与 `.so` 后缀）。
+
+**返回**：句柄对象（含 `name`/`名称`、`loaded`/`已加载`=true）。
+
+### native.isLoaded / native.是否已加载
+
+查询某路径或库名是否已加载。
+
+**参数**：`path`（string，路径或库名）。**返回**：boolean。
+
+### native.loadedLibraries / native.已加载列表
+
+返回本次进程内已加载的动态库清单（绝对路径 + 库名）数组。
+
+### native.clearCache / native.清理缓存
+
+清理 `.so` 加载缓存（`cache/native_load/`、`native_url_*.so`）与加载状态跟踪。已 dlopen 进进程的库无法在运行时卸载，真正卸载需重启应用。
+
+**示例**：
+```javascript
+// 先加载原生库，再加载依赖该库的 DEX
+let lib = native.load("$WORK_DIR/libs/arm64-v8a/libfoo.so");
+console.log("已加载:", lib.name, lib.loaded);     // 已加载: libfoo.so true
+let loader = dex.load("/sdcard/plugins/my.dex");  // DEX 内 external fun 可调用 libfoo.so 的符号
+let Cls = loader.findClass("com.example.Plugin");
+Cls.newInstance().call("nativeMethod");
+```
+
+---
+
 *文档版本: 2.1*
 *最后更新: 2026-07-17*
 *新增：ui 系列弹窗通用可定制化——所有弹窗（alert/confirm/prompt/select/multiSelect/actionSheet/slider/loading）新增按钮文字（confirmText/cancelText）、按钮背景色（confirmColor/cancelColor，支持命名色与 #RRGGBB/#AARRGGBB 十六进制）、可关闭性（dismissible/可关闭，alert/confirm/prompt/slider/loading 用此名；select/multiSelect/actionSheet 沿用 cancelable），以及事件回调（onConfirm/onCancel/onSelect/onChange/onDismiss，均为 function(value) 形式、异步触发且不阻塞 await）。slider 另增 decimals（小数位）/showValue（是否显示大字体数值）与实时 onChange 回调；loading 另增 update()/更新() 实时刷新文字。详见各弹窗小节与开头「通用选项与回调」*
@@ -4142,6 +4198,7 @@ for (var t of list) {
 *修正：app 第 18 节说明——主线程切换已由 Handler(Looper.getMainLooper()) 改为协程 Dispatchers.Main（与 JsToast/toast 一致）*
 *新增：dex DEX 加载对象（load/加载/loadDex、loadFromAsset/从资源加载、loadFromUrl/从网络加载；基于 DexClassLoader 加载 .dex/.apk/.jar 到独立类加载器并返回句柄，句柄可传给 reflect.findClass 反射 DEX 内类）。参见新增第 19 节*
 *新增：reflect 反射对象（findClass/查找类/反射 及 YukiReflection 风格的 Class/Method/Field/Constructor/Instance 链式操作；活对象以「`Wrapper<T>` 子类句柄」（JsClassWrapper/JsInstanceWrapper/JsLoaderWrapper，均实现 Wrapper 并 override toKotlin 还原原始对象）在 JS 间往返，支持实例方法调用、字段读写、实例作为方法参数，无需 id 注册表）。参见新增第 20 节*
+*新增：native SO 原生库加载对象（load/加载/loadSo、loadLibrary/按名称加载、isLoaded/是否已加载、loadedLibraries/已加载列表、clearCache/清理缓存；基于 System.load/System.loadLibrary 把 .so 加载进进程，供之后 dex 加载的 DEX 中 external fun 调用；含 ABI 预检警告、重复加载跳过、加载缓存清理与完整执行日志）。参见新增第 24 节*
 *修正：dex/reflect 句柄机制由「id 注册表 + 句柄」重构为 keight 原生 `Wrapper<T>` 子类（消除全局注册表与所有 `.id` 属性，`convertArg` 退化为 `arg.toKotlin(runtime)`）；并移除 `dex.of/取加载器` 与 `reflect.of/取类` 两个按 id 取回的方法（句柄本身即携带原始对象，无需按 id 找回）*
 *新增：notifications 通知对象（show/显示、cancel/取消）+ timer 定时器对象（schedule/注册、list/列表、cancel/取消、cancelAll/全部取消、nextTrigger/下次）。参见新增第 21、22 节*
 *新增：schedules 定时任务配置（dream.yml 顶层 schedules 列表，支持 cron 表达式或 "every Xh/Xm/Xd" 间隔描述，远程回调 JS 触发 notification 等）。参见 config_documentation.md*

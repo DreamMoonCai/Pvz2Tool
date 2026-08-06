@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -39,6 +40,7 @@ fun PvzButton(
     modifier: Modifier = Modifier,
     highlightColor: Color, // 新增：允许自定义光团颜色
     backgroundColor: Color? = null, // JS UI 自定义按钮底色（传入时覆盖默认渐变）
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     val interactionSource = if (InitializePvz2.isConfigReady()) {
@@ -73,6 +75,7 @@ fun PvzButton(
 
     Box(
         modifier = modifier
+            .then(if (!enabled) Modifier.alpha(0.45f) else Modifier)
             .clip(RoundedCornerShape(6.dp))
             .background(brush = currentBrush)
             .padding(2.dp)
@@ -90,6 +93,7 @@ fun PvzButton(
                 }
             }
             .clickable(
+                enabled = enabled,
                 interactionSource = interactionSource, indication = ripple(), role = Role.Button, onClick = { onClick() }),
         contentAlignment = Alignment.Center
     ) {
@@ -168,6 +172,7 @@ fun PvzRedButton(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     backgroundColor: Color? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) = PvzButton(
     text = text,
@@ -186,6 +191,7 @@ fun PvzRedButton(
     ),
     highlightColor = Color(0xFFFFEBEE),
     backgroundColor = backgroundColor,
+    enabled = enabled,
     modifier = modifier,
     onClick = onClick
 )
@@ -197,6 +203,7 @@ fun PvzGreenButton(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     backgroundColor: Color? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) = PvzButton(
     text = text,
@@ -215,6 +222,7 @@ fun PvzGreenButton(
     ),
     highlightColor = Color(0xFFF1F8E9), // 淡绿光团
     backgroundColor = backgroundColor,
+    enabled = enabled,
     modifier = modifier,
     onClick = onClick
 )
@@ -224,6 +232,7 @@ fun PvzBlueButton(
     text: String,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) = PvzButton(
     text = text,
@@ -241,6 +250,7 @@ fun PvzBlueButton(
         colors = listOf(Color(0xFF1565C0), Color(0xFF64B5F6))
     ),
     highlightColor = Color(0xFFE3F2FD), // 淡蓝光团，匹配整体视觉风格
+    enabled = enabled,
     modifier = modifier,
     onClick = onClick
 )

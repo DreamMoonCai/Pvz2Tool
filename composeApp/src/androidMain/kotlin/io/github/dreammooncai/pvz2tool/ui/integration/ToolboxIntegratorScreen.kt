@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.documentfile.provider.DocumentFile
+import androidx.core.content.FileProvider
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -16,6 +17,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -103,6 +105,7 @@ import io.github.dreammooncai.pvz2tool.view.PvzCollapsiblePanelTheme
 import io.github.dreammooncai.pvz2tool.view.PvzGreenButton
 import io.github.dreammooncai.pvz2tool.view.PvzRedButton
 import android.content.Context
+import android.content.Intent
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.res.painterResource
@@ -120,6 +123,76 @@ import android.net.Uri
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import kotlinx.coroutines.launch
 import java.io.File
+
+// ── PVZ 主题色板（集中定义，避免在列表中散落大量魔数） ──────────
+private val PvzGreen = Color(0xFF689F38)        // PVZ 主绿（边框/文字）
+private val PvzGreenSurface = Color(0xFFE8F5D0) // 浅绿面（选中态/卡片底）
+private val PvzGreenBright = Color(0xFF8ED229)  // 高亮绿（选中态）
+private val PvzBorderBrown = Color(0xFFAA9A5F)  // 卡片描边棕
+private val PvzCreamCard = Color(0xFFF0ECD0)    // 奶油卡片底
+private val PvzCream = Color(0xFFFCF9E8)        // 奶油面
+
+// 列表中单条 item 的奶油色圆角卡片容器（统一边框/内边距），替代散落的重复布局
+@Composable
+private fun PvzItemCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(PvzCreamCard)
+            .border(1.dp, PvzBorderBrown, RoundedCornerShape(8.dp))
+            .padding(10.dp),
+        content = content
+    )
+}
+
+// 打包完成后：把合并产物 APK 分享到其他软件（复制进 cacheDir 走 FileProvider，避免裸 file:// 在 7.0+ 被拦）
+private fun shareMergedApk(context: Context, apk: File) {
+    try {
+        val shareFile = File(context.cacheDir, "pvz2tool_share_${System.currentTimeMillis()}.apk")
+        apk.inputStream().use { input -> shareFile.outputStream().use { input.copyTo(it) } }
+        val authority = "${context.packageName}.fileprovider"
+        val uri = FileProvider.getUriForFile(context, authority, shareFile)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/vnd.android.package-archive"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "分享 APK"))
+    } catch (e: Exception) {
+        e.printStackTrace()
+        Toast.makeText(context, "分享失败：${e.message}", Toast.LENGTH_LONG).show()
+    }
+}
+
+// 打包完成后：把合并产物 APK 导出到本地（通过 SAF 选择目标目录）
+private fun exportMergedApkToLocal(context: Context, filePickerManager: FilePickerManager, apk: File) {
+    filePickerManager.launch(isDirectory = true, fileMimeType = "*/*") { uri, doc ->
+        val dir = doc?.takeIf { it.isDirectory }
+        if (uri != null && dir != null) {
+            try {
+                val name = "${apk.nameWithoutExtension}_${System.currentTimeMillis()}.apk"
+                val target = dir.createFile("application/vnd.android.package-archive", name)
+                if (target != null) {
+                    context.contentResolver.openOutputStream(target.uri)?.use { out ->
+                        apk.inputStream().use { it.copyTo(out) }
+                    }
+                    Toast.makeText(context, "已导出到所选目录：$name", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(context, "导出失败：目标目录不可写", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(context, "导出失败：${e.message}", Toast.LENGTH_LONG).show()
+            }
+        } else {
+            Toast.makeText(context, "未选择有效目录", Toast.LENGTH_SHORT).show()
+        }
+    }
+}
 
 // ── 子页面数据模型 ──────────────────────────────────────────────
 
@@ -161,6 +234,38 @@ data class TbiItemDraft(
     val releaseSound: String = "",
     val smfList: List<String> = emptyList(),
 )
+
+// ── 列表排序辅助 ─────────────────────────────────────────
+// 列表元素移动到新位置（保序），用于集成器列表的上移 / 下移 / 置顶 / 置底。
+// 越界或同位置返回原列表；沿用本项目「拷贝-修改-整体回写」的列表编辑范式。
+private fun <T> List<T>.moveTo(from: Int, to: Int): List<T> {
+    if (from == to || from !in indices || to !in indices) return this
+    return toMutableList().also { it.add(to, it.removeAt(from)) }
+}
+
+// 上移 / 下移 / 置顶 / 置底 按钮组（位于边界时对应按钮自动禁用）
+@Composable
+private fun <T> ReorderButtons(
+    list: List<T>,
+    index: Int,
+    onUpdate: (List<T>) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(modifier, Arrangement.spacedBy(4.dp, Alignment.End), Alignment.CenterVertically) {
+        PvzBlueButton("上移", Modifier.height(32.dp), enabled = index > 0) {
+            onUpdate(list.moveTo(index, index - 1))
+        }
+        PvzBlueButton("下移", Modifier.height(32.dp), enabled = index < list.lastIndex) {
+            onUpdate(list.moveTo(index, index + 1))
+        }
+        PvzBlueButton("置顶", Modifier.height(32.dp), enabled = index > 0) {
+            onUpdate(list.moveTo(index, 0))
+        }
+        PvzBlueButton("置底", Modifier.height(32.dp), enabled = index < list.lastIndex) {
+            onUpdate(list.moveTo(index, list.lastIndex))
+        }
+    }
+}
 
 // ── 版本 / 栏目 / 功能项 数据模型 ────────────────────────────
 
@@ -1906,14 +2011,20 @@ fun ToolboxIntegratorScreen(
                                 showSmfResourceSettings -> showSmfResourceSettings = false
                                 showScheduleSettings -> showScheduleSettings = false
                                 showUiSettings -> showUiSettings = false
-                                step > 1 -> step--
-                                else -> onBack()
+                                result != null -> onBack()      // 打包完成后退出
+                                step > 1 -> step--              // 正常：上一步
+                                else -> onBack()                // 第 1 步：返回
                             }
                         }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        if (editingSectionIndex >= 0 || showVersionSettings || showSectionSettings || showAnnouncementSettings || showFloatingWindowSettings || showTopBarIconSettings || showUiSettings || showUiAdvancedSettings || showSmfResourceSettings || showScheduleSettings) "← 返回" else if (step > 1) "← 上一步" else "← 返回",
+                        when {
+                            editingSectionIndex >= 0 || showVersionSettings || showSectionSettings || showAnnouncementSettings || showFloatingWindowSettings || showTopBarIconSettings || showUiSettings || showUiAdvancedSettings || showSmfResourceSettings || showScheduleSettings -> "← 返回"
+                            result != null -> "← 退出"
+                            step > 1 -> "← 上一步"
+                            else -> "← 退出"
+                        },
                         fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Medium
                     )
                 }
@@ -2007,7 +2118,7 @@ fun ToolboxIntegratorScreen(
                 || showAnnouncementSettings || showFloatingWindowSettings
                 || showTopBarIconSettings || showUiSettings || showUiAdvancedSettings || showSmfResourceSettings
                 || showScheduleSettings
-        BackHandler(enabled = inSubPage || step > 1) {
+        BackHandler(enabled = inSubPage || step > 1 || result != null) {
             when {
                 editingSectionIndex >= 0 -> editingSectionIndex = -1
                 showVersionSettings -> showVersionSettings = false
@@ -2019,7 +2130,9 @@ fun ToolboxIntegratorScreen(
                 showSmfResourceSettings -> showSmfResourceSettings = false
                 showScheduleSettings -> showScheduleSettings = false
                 showUiSettings -> showUiSettings = false
-                step > 1 -> step--
+                result != null -> onBack()      // 打包完成后物理返回键 = 退出
+                step > 1 -> step--              // 正常：上一步
+                else -> onBack()                // 第 1 步：返回
             }
         }
         Scaffold(
@@ -2561,7 +2674,8 @@ fun ToolboxIntegratorScreen(
                             },
                             onApply = { doApply() },
                             onRecompute = { computePreview() },
-                            onRestart = { restart() }
+                            onRestart = { restart() },
+                            filePickerManager = filePickerManager
                         )
                     }
                 }
@@ -2658,27 +2772,44 @@ private fun BottomNavRow(
     onNext: () -> Unit,
     onApply: () -> Unit,
     onRecompute: () -> Unit,
-    onRestart: () -> Unit
+    onRestart: () -> Unit,
+    filePickerManager: FilePickerManager
 ) {
+    val ctx = LocalContext.current
     Column(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // 打包完成后：导出 / 分享按钮置于「集成 / 退出」上方
+        result?.let { merged ->
+            Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp)) {
+                PvzGreenButton(
+                    "导出到本地",
+                    Modifier.weight(1f).height(BUTTON_HEIGHT),
+                    onClick = { exportMergedApkToLocal(ctx, filePickerManager, merged.outputApk) }
+                )
+                PvzBlueButton(
+                    "分享到其他软件",
+                    Modifier.weight(1f).height(BUTTON_HEIGHT),
+                    onClick = { shareMergedApk(ctx, merged.outputApk) }
+                )
+            }
+        }
         if (result != null) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PvzGreenButton("再集成一个", Modifier
                     .weight(1f)
                     .height(BUTTON_HEIGHT), onClick = onRestart)
-                PvzRedButton("返回", Modifier
+                PvzRedButton("退出", Modifier
                     .weight(1f)
                     .height(BUTTON_HEIGHT), onClick = onBack)
             }
         } else when (step) {
             1 -> {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PvzRedButton("返回", Modifier
+                    PvzRedButton("退出", Modifier
                         .weight(1f)
                         .height(BUTTON_HEIGHT), onClick = onBack)
                     PvzGreenButton("下一步 →", Modifier
@@ -2991,7 +3122,7 @@ private fun PvzInfoCard(title: String, content: @Composable () -> Unit) {
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(Color(0xFFF8F4D5))
-            .border(1.dp, Color(0xFFAA9A5F), RoundedCornerShape(8.dp))
+            .border(1.dp, PvzBorderBrown, RoundedCornerShape(8.dp))
             .padding(10.dp)
     ) {
         PvzRichText(title, defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -3043,8 +3174,8 @@ private fun PvzChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) 
             .fillMaxWidth()
             .padding(vertical = 3.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(if (selected) Color(0xFFE8F5D0) else Color.Transparent)
-            .border(1.dp, if (selected) Color(0xFF689F38) else Color(0xFFD5CFA0), RoundedCornerShape(6.dp))
+            .background(if (selected) PvzGreenSurface else Color.Transparent)
+            .border(1.dp, if (selected) PvzGreen else Color(0xFFD5CFA0), RoundedCornerShape(6.dp))
             .clickable { onClick() }
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -3052,7 +3183,7 @@ private fun PvzChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) 
         Text(
             if (selected) "●" else "○",
             fontSize = 14.sp,
-            color = if (selected) Color(0xFF689F38) else Color(0xFFAA9A5F)
+            color = if (selected) PvzGreen else PvzBorderBrown
         )
         Spacer(Modifier.width(8.dp))
         PvzRichText(label, defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp)
@@ -3090,8 +3221,8 @@ private fun PvzStatChip(text: String) {
         Modifier
             .padding(vertical = 2.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFFE8F5D0))
-            .border(1.dp, Color(0xFF689F38), RoundedCornerShape(6.dp))
+            .background(PvzGreenSurface)
+            .border(1.dp, PvzGreen, RoundedCornerShape(6.dp))
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Text(text, fontSize = 11.sp, color = Color(0xFF33691E))
@@ -3117,7 +3248,7 @@ private fun PvzSuccessCard(path: String, sizeMb: String, notes: List<String>) {
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFE8F5D0))
+            .background(PvzGreenSurface)
             .border(1.5.dp, Color(0xFF558B2F), RoundedCornerShape(8.dp))
             .padding(12.dp)
     ) {
@@ -3250,8 +3381,8 @@ private fun CtTypeSelector(selected: CtType, onSelect: (CtType) -> Unit) {
             Box(
                 Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (sel) Color(0xFF8ED229) else Color(0xFFE8F5D0))
-                    .border(1.dp, Color(0xFF689F38), RoundedCornerShape(8.dp))
+                    .background(if (sel) PvzGreenBright else PvzGreenSurface)
+                    .border(1.dp, PvzGreen, RoundedCornerShape(8.dp))
                     .clickable { onSelect(t) }
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
@@ -3282,8 +3413,8 @@ private fun CtSpinner(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFFE8F5D0))
-                .border(1.dp, Color(0xFF689F38), RoundedCornerShape(8.dp))
+                .background(PvzGreenSurface)
+                .border(1.dp, PvzGreen, RoundedCornerShape(8.dp))
                 .clickable { expanded = !expanded }
                 .padding(12.dp)
         ) {
@@ -3302,7 +3433,7 @@ private fun CtSpinner(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color.White)
-                    .border(1.dp, Color(0xFF689F38), RoundedCornerShape(8.dp))
+                    .border(1.dp, PvzGreen, RoundedCornerShape(8.dp))
             ) {
                 options.forEach { opt ->
                     Box(
@@ -3416,8 +3547,8 @@ private fun CompositeTextToolDialog(onDismiss: () -> Unit) {
                         Box(
                             Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (sel) Color(0xFF8ED229) else Color(0xFFE8F5D0))
-                                .border(1.dp, Color(0xFF689F38), RoundedCornerShape(8.dp))
+                                .background(if (sel) PvzGreenBright else PvzGreenSurface)
+                                .border(1.dp, PvzGreen, RoundedCornerShape(8.dp))
                                 .clickable { ctColorMode = m }
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
@@ -3503,8 +3634,8 @@ private fun PvzRowLink(label: String, onClick: () -> Unit) {
             .fillMaxWidth()
             .padding(vertical = 3.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFFE8F5D0))
-            .border(1.dp, Color(0xFF689F38), RoundedCornerShape(6.dp))
+            .background(PvzGreenSurface)
+            .border(1.dp, PvzGreen, RoundedCornerShape(6.dp))
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -3573,7 +3704,7 @@ private fun UiInputCard(label: String, desc: String, content: @Composable () -> 
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFFCF9E8))
+            .background(PvzCream)
             .border(1.dp, Color(0xFFD5CFA0), RoundedCornerShape(8.dp))
             .padding(10.dp)
     ) {
@@ -3592,7 +3723,7 @@ private fun UiSwitchCard(label: String, desc: String, content: @Composable () ->
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFFCF9E8))
+            .background(PvzCream)
             .border(1.dp, Color(0xFFD5CFA0), RoundedCornerShape(8.dp))
             .padding(10.dp)
     ) {
@@ -3640,7 +3771,7 @@ private fun SmfScopeChip(label: String, selected: Boolean, onClick: () -> Unit) 
         Modifier
             .padding(end = 6.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(if (selected) Color(0xFF689F38) else Color(0xFFE8F5D0))
+            .background(if (selected) PvzGreen else PvzGreenSurface)
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
@@ -4148,8 +4279,8 @@ private fun FileInputRow(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFE8F5D0))
-                    .border(1.dp, Color(0xFF689F38), RoundedCornerShape(8.dp))
+                    .background(PvzGreenSurface)
+                    .border(1.dp, PvzGreen, RoundedCornerShape(8.dp))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -4271,20 +4402,15 @@ private fun AnnouncementSettingsContent(
                     announcements.forEachIndexed { i, a ->
                         Spacer(Modifier.height(8.dp))
                         // 每条公告卡片
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFFF0ECD0))
-                                .border(1.dp, Color(0xFFAA9A5F), RoundedCornerShape(8.dp))
-                                .padding(10.dp)
-                        ) {
+                        PvzItemCard {
                             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                                 PvzRichText("公告 #${i + 1}", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 PvzRedButton("删除", Modifier.height(32.dp)) {
                                     onUpdate(announcements.toMutableList().also { it.removeAt(i) })
                                 }
                             }
+                            Spacer(Modifier.height(6.dp))
+                            ReorderButtons(announcements, i, onUpdate, Modifier.fillMaxWidth())
                             Spacer(Modifier.height(6.dp))
                             PvzRichText("标题", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 12.sp)
                             IntegratorInputField(a.title, "公告标题") { v ->
@@ -4521,20 +4647,15 @@ private fun FwItemEditor(
     fun clearFieldSelection(fieldKey: String) = onClearFieldSelection(fieldKey)
     val colorOptions = FW_COLORS
 
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFF0ECD0))
-            .border(1.dp, Color(0xFFAA9A5F), RoundedCornerShape(8.dp))
-            .padding(10.dp)
-    ) {
+    PvzItemCard {
         Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
             PvzRichText("按钮项 #${index + 1}", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             PvzRedButton("删除", Modifier.height(32.dp)) {
                 onFwItems(fwItems.toMutableList().also { it.removeAt(index) })
             }
         }
+        Spacer(Modifier.height(4.dp))
+        ReorderButtons(fwItems, index, onFwItems, Modifier.fillMaxWidth())
         Spacer(Modifier.height(6.dp))
 
         fun update(fw: (FwItemDraft) -> FwItemDraft) {
@@ -4568,12 +4689,12 @@ private fun FwItemEditor(
                     Box(
                         Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(if (sel) Color(0xFFE8F5D0) else Color.Transparent)
-                            .border(1.dp, if (sel) Color(0xFF689F38) else Color(0xFFD5CFA0), RoundedCornerShape(6.dp))
+                            .background(if (sel) PvzGreenSurface else Color.Transparent)
+                            .border(1.dp, if (sel) PvzGreen else Color(0xFFD5CFA0), RoundedCornerShape(6.dp))
                             .clickable { update { it.copy(buttonColor = c) } }
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Text(c, fontSize = 11.sp, color = if (sel) Color(0xFF33691E) else Color(0xFFAA9A5F))
+                        Text(c, fontSize = 11.sp, color = if (sel) Color(0xFF33691E) else PvzBorderBrown)
                     }
                 }
             }
@@ -4582,7 +4703,7 @@ private fun FwItemEditor(
             IntegratorInputField(item.jsScript, "如 vpn.disconnect()", multiline = true) { v -> update { it.copy(jsScript = v) } }
         }
         UiInputCard("jsPath", "脚本文件路径（jsScript 为空时生效）") {
-            FileInputRow(item.jsPath, "如 script/fw_vpn.js", "*/*", "fw_item_${index}_jsPath", { v -> update { it.copy(jsPath = v) } }, onPickFile, selectedFolder = selectedFolders["fw_item_${index}_jsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("fw_item_${index}_jsPath") })
+            FileInputRow(item.jsPath, "如 script/fw_vpn.js", "*/*", "fw_item_${item.id}_jsPath", { v -> update { it.copy(jsPath = v) } }, onPickFile, selectedFolder = selectedFolders["fw_item_${item.id}_jsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("fw_item_${item.id}_jsPath") })
         }
         UiInputCard("smfList", "关联的 SMF 资源列表（逗号分隔）") {
             IntegratorInputField(item.smfList.joinToString(", "), "如 activityconfig, dailyreward") { v ->
@@ -4593,7 +4714,7 @@ private fun FwItemEditor(
             IntegratorInputField(item.isShowFromJs, "如 vpn.isPrepared()", multiline = true) { v -> update { it.copy(isShowFromJs = v) } }
         }
         UiInputCard("isShowFromJsPath", "可见性判定脚本路径") {
-            FileInputRow(item.isShowFromJsPath, "如 script/fw_show.js", "*/*", "fw_item_${index}_isShowFromJsPath", { v -> update { it.copy(isShowFromJsPath = v) } }, onPickFile, selectedFolder = selectedFolders["fw_item_${index}_isShowFromJsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("fw_item_${index}_isShowFromJsPath") })
+            FileInputRow(item.isShowFromJsPath, "如 script/fw_show.js", "*/*", "fw_item_${item.id}_isShowFromJsPath", { v -> update { it.copy(isShowFromJsPath = v) } }, onPickFile, selectedFolder = selectedFolders["fw_item_${item.id}_isShowFromJsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("fw_item_${item.id}_isShowFromJsPath") })
         }
     }
 }
@@ -4682,20 +4803,15 @@ private fun TbiItemEditor(
     onClearFieldSelection: (String) -> Unit = {}
 ) {
     fun clearFieldSelection(fieldKey: String) = onClearFieldSelection(fieldKey)
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFF0ECD0))
-            .border(1.dp, Color(0xFFAA9A5F), RoundedCornerShape(8.dp))
-            .padding(10.dp)
-    ) {
+    PvzItemCard {
         Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
             PvzRichText("图标项 #${index + 1}", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             PvzRedButton("删除", Modifier.height(32.dp)) {
                 onUpdate(tbiItems.toMutableList().also { it.removeAt(index) })
             }
         }
+        Spacer(Modifier.height(4.dp))
+        ReorderButtons(tbiItems, index, onUpdate, Modifier.fillMaxWidth())
         Spacer(Modifier.height(6.dp))
 
         fun update(fw: (TbiItemDraft) -> TbiItemDraft) {
@@ -4706,10 +4822,10 @@ private fun TbiItemEditor(
             IntegratorInputField(item.id, "如 refresh_top") { v -> update { it.copy(id = v) } }
         }
         UiInputCard("icon", "正常态图标资源路径") {
-            FileInputRow(item.icon, "如 icons/refresh.png", "*/*", "tbi_item_${index}_icon", { v -> update { it.copy(icon = v) } }, selectedFile = selectedFiles["tbi_item_${index}_icon"], onImagePreview = onImagePreview, onPickFile = onPickFile, selectedFolder = selectedFolders["tbi_item_${index}_icon"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${index}_icon") })
+            FileInputRow(item.icon, "如 icons/refresh.png", "*/*", "tbi_item_${item.id}_icon", { v -> update { it.copy(icon = v) } }, selectedFile = selectedFiles["tbi_item_${item.id}_icon"], onImagePreview = onImagePreview, onPickFile = onPickFile, selectedFolder = selectedFolders["tbi_item_${item.id}_icon"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${item.id}_icon") })
         }
         UiInputCard("iconPress", "按下态图标（可选，回退到 icon）") {
-            FileInputRow(item.iconPress, "如 icons/refresh_press.png", "*/*", "tbi_item_${index}_iconPress", { v -> update { it.copy(iconPress = v) } }, selectedFile = selectedFiles["tbi_item_${index}_iconPress"], onImagePreview = onImagePreview, onPickFile = onPickFile, selectedFolder = selectedFolders["tbi_item_${index}_iconPress"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${index}_iconPress") })
+            FileInputRow(item.iconPress, "如 icons/refresh_press.png", "*/*", "tbi_item_${item.id}_iconPress", { v -> update { it.copy(iconPress = v) } }, selectedFile = selectedFiles["tbi_item_${item.id}_iconPress"], onImagePreview = onImagePreview, onPickFile = onPickFile, selectedFolder = selectedFolders["tbi_item_${item.id}_iconPress"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${item.id}_iconPress") })
         }
         UiInputCard("contentDescription", "无障碍描述（可选）") {
             IntegratorInputField(item.contentDescription, "如 刷新配置") { v -> update { it.copy(contentDescription = v) } }
@@ -4718,19 +4834,19 @@ private fun TbiItemEditor(
             IntegratorInputField(item.jsScript, "如 native.reloadConfig()", multiline = true) { v -> update { it.copy(jsScript = v) } }
         }
         UiInputCard("jsPath", "脚本文件路径（jsScript 为空时生效）") {
-            FileInputRow(item.jsPath, "如 script/topbar_refresh.js", "*/*", "tbi_item_${index}_jsPath", { v -> update { it.copy(jsPath = v) } }, onPickFile, selectedFolder = selectedFolders["tbi_item_${index}_jsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${index}_jsPath") })
+            FileInputRow(item.jsPath, "如 script/topbar_refresh.js", "*/*", "tbi_item_${item.id}_jsPath", { v -> update { it.copy(jsPath = v) } }, onPickFile, selectedFolder = selectedFolders["tbi_item_${item.id}_jsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${item.id}_jsPath") })
         }
         UiInputCard("isShowFromJs", "可见性判定 JS 表达式") {
             IntegratorInputField(item.isShowFromJs, "如 !!prepareVpn", multiline = true) { v -> update { it.copy(isShowFromJs = v) } }
         }
         UiInputCard("isShowFromJsPath", "可见性判定脚本路径") {
-            FileInputRow(item.isShowFromJsPath, "如 script/topbar_show.js", "*/*", "tbi_item_${index}_isShowFromJsPath", { v -> update { it.copy(isShowFromJsPath = v) } }, onPickFile, selectedFolder = selectedFolders["tbi_item_${index}_isShowFromJsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${index}_isShowFromJsPath") })
+            FileInputRow(item.isShowFromJsPath, "如 script/topbar_show.js", "*/*", "tbi_item_${item.id}_isShowFromJsPath", { v -> update { it.copy(isShowFromJsPath = v) } }, onPickFile, selectedFolder = selectedFolders["tbi_item_${item.id}_isShowFromJsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${item.id}_isShowFromJsPath") })
         }
         UiInputCard("pressSound", "按下音效文件名（可选）") {
-            FileInputRow(item.pressSound, "如 ui_click_press.wav", "*/*", "tbi_item_${index}_pressSound", { v -> update { it.copy(pressSound = v) } }, onPickFile, selectedFolder = selectedFolders["tbi_item_${index}_pressSound"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${index}_pressSound") })
+            FileInputRow(item.pressSound, "如 ui_click_press.wav", "*/*", "tbi_item_${item.id}_pressSound", { v -> update { it.copy(pressSound = v) } }, onPickFile, selectedFolder = selectedFolders["tbi_item_${item.id}_pressSound"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${item.id}_pressSound") })
         }
         UiInputCard("releaseSound", "释放音效文件名（可选）") {
-            FileInputRow(item.releaseSound, "如 ui_click_release.wav", "*/*", "tbi_item_${index}_releaseSound", { v -> update { it.copy(releaseSound = v) } }, onPickFile, selectedFolder = selectedFolders["tbi_item_${index}_releaseSound"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${index}_releaseSound") })
+            FileInputRow(item.releaseSound, "如 ui_click_release.wav", "*/*", "tbi_item_${item.id}_releaseSound", { v -> update { it.copy(releaseSound = v) } }, onPickFile, selectedFolder = selectedFolders["tbi_item_${item.id}_releaseSound"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${item.id}_releaseSound") })
         }
         UiInputCard("smfList", "关联的 SMF 资源列表（逗号分隔）") {
             IntegratorInputField(item.smfList.joinToString(", "), "如 activityconfig, dailyreward") { v ->
@@ -4812,6 +4928,8 @@ private fun VersionSettingsContent(
                             FileInputRow(v.enterGamePath, "进入游戏 JS 文件路径（可选）", "*/*", "ver_${i}_enterGamePath", { v2 ->
                                 onUpdate(versions.toMutableList().also { it[i] = it[i].copy(enterGamePath = v2) })
                             }, onPickFile, selectedFolder = selectedFolders["ver_${i}_enterGamePath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("ver_${i}_enterGamePath") })
+                            Spacer(Modifier.height(4.dp))
+                            ReorderButtons(versions, i, onUpdate, Modifier.fillMaxWidth())
                             Spacer(Modifier.height(4.dp))
                             PvzRedButton("删除", Modifier
                                 .fillMaxWidth()
@@ -4930,6 +5048,8 @@ private fun SectionSettingsContent(
                                 onUpdate(sections.toMutableList().also { it[i] = it[i].copy(jsPath = v) })
                             }, onPickFile, selectedFolder = selectedFolders["section_${i}_jsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("section_${i}_jsPath") })
                             Spacer(Modifier.height(6.dp))
+                            ReorderButtons(sections, i, onUpdate, Modifier.fillMaxWidth())
+                            Spacer(Modifier.height(6.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 PvzGreenButton("编辑功能项 →", Modifier
                                     .weight(1f)
@@ -5005,6 +5125,8 @@ private fun ItemSettingsContent(
                     items.forEachIndexed { i, item ->
                         val itemLabel = item.name.ifBlank { item.id.ifBlank { "#${i + 1}" } }
                         PvzInfoCard("[$item.type] $itemLabel") {
+                            ReorderButtons(items, i, onUpdate = { newItems -> onUpdate(section.copy(items = newItems)) }, Modifier.fillMaxWidth())
+                            Spacer(Modifier.height(6.dp))
                             IntegratorInputField(item.id, "ID（必填）") { v ->
                                 onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(id = v) }))
                             }
@@ -5154,7 +5276,7 @@ private fun ItemSettingsContent(
                     Text("INPUT - 文本输入框", fontSize = 12.sp, color = Color(0xFF5D4E37))
                     Text("INFO - 信息展示（infoValue + jsScript 动态值）", fontSize = 12.sp, color = Color(0xFF5D4E37))
                     Spacer(Modifier.height(12.dp))
-                    Text("name 和 desc 字段支持 {{red:}} {{green:}} 等复合颜色文本标记。", fontSize = 11.sp, color = Color(0xFFAA9A5F))
+                    Text("name 和 desc 字段支持 {{red:}} {{green:}} 等复合颜色文本标记。", fontSize = 11.sp, color = PvzBorderBrown)
                 }
             }
         }
@@ -5430,14 +5552,7 @@ private fun ScheduleSettingsContent(
 
                     items.forEachIndexed { i, item ->
                         Spacer(Modifier.height(8.dp))
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFFF0ECD0))
-                                .border(1.dp, Color(0xFFAA9A5F), RoundedCornerShape(8.dp))
-                                .padding(10.dp)
-                        ) {
+                        PvzItemCard {
                             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                                 PvzRichText(item.name.ifBlank { item.id }.ifBlank { "定时任务 #${i + 1}" },
                                     defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -5450,6 +5565,8 @@ private fun ScheduleSettingsContent(
                                     }
                                 }
                             }
+                            Spacer(Modifier.height(4.dp))
+                            ReorderButtons(items, i, onUpdate, Modifier.fillMaxWidth())
                             Spacer(Modifier.height(6.dp))
                             fun update(fn: (ScheduleDraft) -> ScheduleDraft) {
                                 onUpdate(items.toMutableList().also { it[i] = fn(it[i]) })
@@ -5476,15 +5593,15 @@ private fun ScheduleSettingsContent(
                                         Box(
                                             Modifier
                                                 .clip(RoundedCornerShape(6.dp))
-                                                .background(if (sel) Color(0xFFE8F5D0) else Color.Transparent)
+                                                .background(if (sel) PvzGreenSurface else Color.Transparent)
                                                 .border(
                                                     1.dp,
-                                                    if (sel) Color(0xFF689F38) else Color(0xFFD5CFA0),
+                                                    if (sel) PvzGreen else Color(0xFFD5CFA0),
                                                     RoundedCornerShape(6.dp)
                                                 )
                                                 .clickable { update { it.copy(cron = if (sel) "" else value) } }
                                                 .padding(horizontal = 8.dp, vertical = 4.dp)
-                                        ) { Text(label, fontSize = 11.sp, color = if (sel) Color(0xFF33691E) else Color(0xFFAA9A5F)) }
+                                        ) { Text(label, fontSize = 11.sp, color = if (sel) Color(0xFF33691E) else PvzBorderBrown) }
                                     }
                                 }
                                 Spacer(Modifier.height(4.dp))
@@ -5496,30 +5613,30 @@ private fun ScheduleSettingsContent(
                                         Box(
                                             Modifier
                                                 .clip(RoundedCornerShape(6.dp))
-                                                .background(if (sel) Color(0xFFE8F5D0) else Color.Transparent)
+                                                .background(if (sel) PvzGreenSurface else Color.Transparent)
                                                 .border(
                                                     1.dp,
-                                                    if (sel) Color(0xFF689F38) else Color(0xFFD5CFA0),
+                                                    if (sel) PvzGreen else Color(0xFFD5CFA0),
                                                     RoundedCornerShape(6.dp)
                                                 )
                                                 .clickable { update { it.copy(cron = if (sel) "" else value) } }
                                                 .padding(horizontal = 8.dp, vertical = 4.dp)
-                                        ) { Text(label, fontSize = 11.sp, color = if (sel) Color(0xFF33691E) else Color(0xFFAA9A5F)) }
+                                        ) { Text(label, fontSize = 11.sp, color = if (sel) Color(0xFF33691E) else PvzBorderBrown) }
                                     }
                                     // 自定义入口
                                     val customSel = showCustom || item.cron.isBlank()
                                     Box(
                                         Modifier
                                             .clip(RoundedCornerShape(6.dp))
-                                            .background(if (customSel) Color(0xFFE8F5D0) else Color.Transparent)
+                                            .background(if (customSel) PvzGreenSurface else Color.Transparent)
                                             .border(
                                                 1.dp,
-                                                if (customSel) Color(0xFF689F38) else Color(0xFFD5CFA0),
+                                                if (customSel) PvzGreen else Color(0xFFD5CFA0),
                                                 RoundedCornerShape(6.dp)
                                             )
                                             .clickable { update { it.copy(cron = "") } }
                                             .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) { Text("自定义", fontSize = 11.sp, color = if (customSel) Color(0xFF33691E) else Color(0xFFAA9A5F)) }
+                                    ) { Text("自定义", fontSize = 11.sp, color = if (customSel) Color(0xFF33691E) else PvzBorderBrown) }
                                 }
                                 if (showCustom || item.cron.isBlank()) {
                                     Spacer(Modifier.height(4.dp))

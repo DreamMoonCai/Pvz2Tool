@@ -17,6 +17,7 @@ import io.github.dreammooncai.pvz2tool.controller.SoundController
 import io.github.dreammooncai.pvz2tool.js.JsConsole
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.js.code.JsDevice
+import io.github.dreammooncai.pvz2tool.js.code.JsNative
 import io.github.dreammooncai.pvz2tool.js.code.JsApp
 import io.github.dreammooncai.pvz2tool.js.code.JsDex
 import io.github.dreammooncai.pvz2tool.js.code.JsReflect
@@ -728,6 +729,9 @@ object PvzToolGlobals {
         }
         listOf("reflect".js, "反射".js).forEach { key ->
             runtime.set(key, JsReflect.js, VariableType.Global)
+        }
+        listOf("native".js, "原生".js, "so加载".js).forEach { key ->
+            runtime.set(key, JsNative.js, VariableType.Global)
         }
         listOf("vpn".js, "虚拟专网".js, "VPN".js).forEach { key ->
             runtime.set(key, vpn, VariableType.Global)

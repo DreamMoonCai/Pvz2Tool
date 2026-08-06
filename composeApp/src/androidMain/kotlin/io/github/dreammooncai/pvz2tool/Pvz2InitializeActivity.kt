@@ -56,6 +56,7 @@ import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.js.JsSmfDataManager
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.code.JsDex
+import io.github.dreammooncai.pvz2tool.js.code.JsNative
 import io.github.dreammooncai.pvz2tool.js.code.JsPvz
 import io.github.dreammooncai.pvz2tool.js.code.PvzToolGlobals
 import io.github.dreammooncai.pvz2tool.ui.main.*
@@ -483,6 +484,7 @@ class Pvz2InitializeActivity : ComponentActivity() {
         JsSmfDataManager.clearCache()
         JsPvz.clearCache()
         JsDex.clearCache() // 同步清理 DEX 加载产生的临时缓存（dex_load/、dex_opt_*、dex_url_*）
+        JsNative.clearCache() // 同步清理 .so 加载产生的临时缓存（native_load/、native_url_*）与加载状态跟踪
         // 保留当前版本，避免重置后版本跳变导致存档迁移到错误目录
         val currentVersion = InitializePvz2.mPvz2ScreenStateFlow.value.selectedVersion
         InitializePvz2.updateScreenState {
