@@ -53,6 +53,46 @@ object ToolboxApkMerger {
         val hasKotlin: Boolean
     )
 
+    /**
+     * 集成描述文件（assets/pvz2tool/integrator_info.txt）解析结果。
+     * 每次集成/更新都会在产物 APK 内写入该文件，记录：
+     *  - 本次工具箱版本（用于下次更新时识别「旧版工具箱 DEX」所在范围）
+     *  - 工具箱 DEX 在最终 APK 中的索引区间 [dexStart, dexEnd]（含端点）
+     *  - insertMode：新工具箱 DEX 相对「剩余目标 DEX」的插入位置（before=之前 / after=之后）
+     * 下次以「更新模式」集成时，依据该文件删除旧范围并替换，保证可反复迭代更新。
+     */
+    data class IntegratorInfo(
+        val version: String,
+        val dexStart: Int,
+        val dexEnd: Int,
+        val insertMode: String,   // "before" | "after"
+        val includeExamples: Boolean = true,
+        val simplifiedLaunch: Boolean = false
+    )
+
+    /** 从目标 APK 读取集成描述文件（无则返回 null）。 */
+    fun detectIntegratorInfo(targetApk: File): IntegratorInfo? = runCatching {
+        ApkModule.loadApkFile(targetApk).use { readIntegratorInfo(it) }
+    }.getOrNull()
+
+    /** 从已加载的 ApkModule 读取集成描述文件（无则返回 null）。 */
+    private fun readIntegratorInfo(target: ApkModule): IntegratorInfo? {
+        val raw = target.getInputSource("assets/pvz2tool/integrator_info.txt")?.openStream()?.readBytes()
+            ?: return null
+        val map = raw.toString(Charsets.UTF_8).lineSequence()
+            .mapNotNull { line ->
+                val idx = line.indexOf('=')
+                if (idx <= 0) null else line.substring(0, idx).trim() to line.substring(idx + 1).trim()
+            }.toMap()
+        val version = map["version"] ?: return null
+        val dexStart = map["dexStart"]?.toIntOrNull() ?: return null
+        val dexEnd = map["dexEnd"]?.toIntOrNull() ?: return null
+        val insertMode = map["insertMode"] ?: "before"
+        val includeExamples = map["includeExamples"]?.toBooleanStrictOrNull() ?: true
+        val simplifiedLaunch = map["simplifiedLaunch"]?.toBooleanStrictOrNull() ?: false
+        return IntegratorInfo(version, dexStart, dexEnd, insertMode, includeExamples, simplifiedLaunch)
+    }
+
     data class IntegrateReport(
         val sourceLabel: String,
         val targetLabel: String,
@@ -134,12 +174,30 @@ object ToolboxApkMerger {
         /** 用户排除（不打包）的 SMF/资源条目，相对 assets/pvz2tool/ 的路径集合 */
         excludedSmfAssets: Set<String> = emptySet(),
         /** 用户勾选「选择后删除」的目标 APK 原始条目（APK 内完整路径），打包时从产物中移除 */
-        removedTargetEntries: Set<String> = emptySet()
+        removedTargetEntries: Set<String> = emptySet(),
+        /** 集成描述文件版本号（预览仅用于报告展示） */
+        version: String = "?",
+        /** 更新模式开关 */
+        updateMode: Boolean = false,
+        /** 更新模式：旧版工具箱 DEX 起始索引 */
+        dexStart: Int = 0,
+        /** 更新模式：旧版工具箱 DEX 结束索引（<0 表示覆盖到本版本所有 DEX） */
+        dexEnd: Int = -1,
+        /** 实际写入的 dream.yml 文本（向导生成的完整配置）；为空则回退为源 APK 的 dream.yml。用于报告差异统计 */
+        overrideDreamYml: String? = null,
+        /** 更新模式：保留目标 APK 现有 res 条目（源 APK 不覆盖），如 bg_fill_image */
+        preserveTargetResEntries: Set<String> = emptySet(),
+        /** 保留目标已有 assets/pvz2tool 文件 */
+        preserveTargetAssets: Boolean = false,
+        /** 附加目标未包含的源文件 */
+        appendUnreferenced: Boolean = true
     ): IntegrateReport {
         val source = ApkModule.loadApkFile(sourceApk)
         val target = ApkModule.loadApkFile(targetApk)
         return try {
-            computeReport(source, target, dexStrategy, sourceApk.name, targetApk.name, extraResources, extraResResources, excludedSmfAssets, removedTargetEntries)
+            computeReport(source, target, dexStrategy, sourceApk.name, targetApk.name, extraResources, extraResResources, excludedSmfAssets, removedTargetEntries,
+                updateMode, dexStart, dexEnd, overrideDreamYml = overrideDreamYml,
+                preserveTargetAssets = preserveTargetAssets, appendUnreferenced = appendUnreferenced)
         } finally {
             source.close()
             target.close()
@@ -161,14 +219,31 @@ object ToolboxApkMerger {
         /** 用户排除（不打包）的 SMF/资源条目，相对 assets/pvz2tool/ 的路径集合 */
         excludedSmfAssets: Set<String> = emptySet(),
         /** 用户勾选「选择后删除」的目标 APK 原始条目（APK 内完整路径），打包时从产物中移除 */
-        removedTargetEntries: Set<String> = emptySet()
+        removedTargetEntries: Set<String> = emptySet(),
+        /** 集成描述文件版本号（当前工具箱版本，运行时传入 BuildConfig.VERSION_NAME） */
+        version: String = "?",
+        /** 更新模式开关 */
+        updateMode: Boolean = false,
+        /** 更新模式：旧版工具箱 DEX 起始索引 */
+        dexStart: Int = 0,
+        /** 更新模式：旧版工具箱 DEX 结束索引（<0 表示覆盖到本版本所有 DEX） */
+        dexEnd: Int = -1,
+        /** 更新模式：新工具箱 DEX 插入策略 */
+        insertMode: DexStrategy = DexStrategy.INSERT_BEFORE,
+        /** 更新模式：保留目标 APK 现有 res 条目（源 APK 不覆盖），如 bg_fill_image */
+        preserveTargetResEntries: Set<String> = emptySet(),
+        /** 简易模式开关（写入描述文件，供下次更新识别） */
+        simplifiedLaunch: Boolean = false,
+        preserveTargetAssets: Boolean = false,
+        appendUnreferenced: Boolean = true
     ): MergeResult {
         val source = ApkModule.loadApkFile(sourceApk)
         val target = ApkModule.loadApkFile(targetApk)
         val report: IntegrateReport
         source.use { source ->
-            report = computeReport(source, target, dexStrategy, sourceApk.name, targetApk.name, extraResources, extraResResources, excludedSmfAssets, removedTargetEntries)
-            doMerge(source, target, dexStrategy, report.targetPackage, includeExamples, overrideDreamYml, extraResources, extraResResources, excludedSmfAssets, removedTargetEntries)
+            report = computeReport(source, target, dexStrategy, sourceApk.name, targetApk.name, extraResources, extraResResources, excludedSmfAssets, removedTargetEntries, overrideDreamYml = overrideDreamYml)
+            doMerge(source, target, dexStrategy, report.targetPackage, includeExamples, overrideDreamYml, extraResources, extraResResources, excludedSmfAssets, removedTargetEntries,
+                version, updateMode, dexStart, dexEnd, insertMode, simplifiedLaunch = simplifiedLaunch, preserveTargetAssets = preserveTargetAssets, appendUnreferenced = appendUnreferenced)
         }
         target.use {
             outApk.parentFile?.mkdirs()
@@ -188,7 +263,15 @@ object ToolboxApkMerger {
         extraResources: Map<String, File> = emptyMap(),
         extraResResources: Map<String, File> = emptyMap(),
         excludedSmfAssets: Set<String> = emptySet(),
-        removedTargetEntries: Set<String> = emptySet()
+        removedTargetEntries: Set<String> = emptySet(),
+        /** 更新模式：报告中的 resultDexCount 需扣除被替换的旧工具箱 DEX 数 */
+        updateMode: Boolean = false,
+        dexStart: Int = 0,
+        dexEnd: Int = -1,
+        /** 实际写入的 dream.yml 文本（向导生成的完整配置）；为空则回退为源 APK 的 dream.yml。用于报告差异统计 */
+        overrideDreamYml: String? = null,
+        preserveTargetAssets: Boolean = false,
+        appendUnreferenced: Boolean = true
     ): IntegrateReport {
         val srcDex = source.listDexFiles().size
         val tgtDex = target.listDexFiles().size
@@ -208,23 +291,29 @@ object ToolboxApkMerger {
             .filter { it.name.startsWith("assets/pvz2tool/") }
             .map { it.name.removePrefix("assets/pvz2tool/").trimStart('/') }
             .filter { it in excludedSmfAssets }
+        // 与 mergeAssetsPvz2tool 同步：首次集成时忽略 appendUnreferenced=false 的限制
+        val firstIntegrate = target.listInputSources().none { it.name.startsWith("assets/pvz2tool/") }
+        val effectiveAppendUnreferenced = appendUnreferenced || firstIntegrate
         var assetsAdded = 0
         source.listInputSources().filter { it.name.startsWith("assets/pvz2tool/") }.forEach { ins ->
             val rel = ins.name.removePrefix("assets/pvz2tool/").trimStart('/')
-            if (rel !in excludedSmfAssets && !target.containsFile(ins.name)) assetsAdded++
+            if (rel !in excludedSmfAssets && !target.containsFile(ins.name)) {
+                // 与 mergeAssetsPvz2tool 使用相同的跳过逻辑
+                if (preserveTargetAssets && target.getInputSource(ins.name) != null) {
+                    val always = ins.name.endsWith("/config_documentation.md") || ins.name.endsWith("/js_documentation.md")
+                        || ins.name == "assets/pvz2tool/dream.yml" || ins.name == "assets/pvz2tool/integrator_info.txt"
+                    if (!always) return@forEach
+                }
+                if (!effectiveAppendUnreferenced && target.getInputSource(ins.name) == null) return@forEach
+                assetsAdded++
+            }
         }
-        // dream.yml 差异统计
+        // dream.yml 差异统计：基于「实际写入内容（overrideDreamYml）」vs「目标已有 dream.yml」
         val (dreamAdd, dreamSkip) = run {
-            val s = source.getInputSource("assets/pvz2tool/dream.yml")?.openStream()?.readBytes()?.toString(Charsets.UTF_8)
-            val t = target.getInputSource("assets/pvz2tool/dream.yml")?.openStream()?.readBytes()?.toString(Charsets.UTF_8)
-            if (s != null && t != null) {
-                val (_, entries) = YamlTextMerger.merge(s, t)
-                val add = entries.count { it.op == DiffOp.ADD }
-                val skip = entries.count { it.op == DiffOp.SKIP }
-                add to skip
-            } else if (s != null) {
-                1 to 0
-            } else 0 to 0
+            val writeText = overrideDreamYml
+                ?: source.getInputSource("assets/pvz2tool/dream.yml")?.openStream()?.readBytes()?.toString(Charsets.UTF_8)
+            val targetText = target.getInputSource("assets/pvz2tool/dream.yml")?.openStream()?.readBytes()?.toString(Charsets.UTF_8)
+            if (writeText != null) countDreamYmlDiff(writeText, targetText) else 0 to 0
         }
         val targetPkg = target.androidManifest.packageName ?: ""
         val manifestChanges = buildList {
@@ -251,7 +340,10 @@ object ToolboxApkMerger {
             dexStrategy = dexStrategy,
             sourceDexCount = srcDex,
             targetDexCount = tgtDex,
-            resultDexCount = srcDex + tgtDex,
+            resultDexCount = if (updateMode) {
+                val removed = if (dexEnd >= dexStart) (dexEnd - dexStart + 1) else 0
+                (tgtDex - removed + srcDex).coerceAtLeast(0)
+            } else srcDex + tgtDex,
             arscTargetPackagesAfter = arscAfter,
             manifestChanges = manifestChanges,
             resAdded = resAdded,
@@ -271,9 +363,168 @@ object ToolboxApkMerger {
         )
     }
 
+    // ---- dream.yml 轻量差异统计（仅 key 级集合差，不做文本写回） ----
+
+    private fun lineIndent(line: String): Int = line.length - line.takeWhile { it == ' ' }.length
+
+    private fun isIgnorable(line: String): Boolean {
+        val s = line.trim()
+        return s.isEmpty() || s.startsWith("#")
+    }
+
+    /** 返回 block 的独占结束行号（下一个 indent<=indent 的非忽略行，或 EOF）。 */
+    private fun blockEnd(lines: List<String>, start: Int, indent: Int): Int {
+        var i = start + 1
+        val n = lines.size
+        while (i < n) {
+            val l = lines[i]
+            if (isIgnorable(l)) { i++; continue }
+            if (lineIndent(l) <= indent) break
+            i++
+        }
+        return i
+    }
+
+    private fun findTopKey(lines: List<String>, key: String): Int {
+        for (i in lines.indices) {
+            if (lines[i].trim().startsWith("$key:") && lineIndent(lines[i]) == 0) return i
+        }
+        return -1
+    }
+
+    /** 在 [headerLine] 指向的列表（如 sections:/versions:/items:）中按 id 找一个 list item。 */
+    private fun findListItem(lines: List<String>, headerLine: Int, itemId: String, itemIndent: Int): IntRange? {
+        if (headerLine < 0) return null
+        var i = headerLine + 1
+        val n = lines.size
+        while (i < n) {
+            val l = lines[i]
+            if (isIgnorable(l)) { i++; continue }
+            val ind = lineIndent(l)
+            if (ind < itemIndent) break
+            if (ind == itemIndent && l.trim().startsWith("- id:")) {
+                val m = """- id:\s*["']?([^"']+)["']?""".toRegex().find(l.trim())
+                if (m != null && m.groupValues[1] == itemId) {
+                    return i until blockEnd(lines, i, itemIndent)
+                }
+            }
+            i++
+        }
+        return null
+    }
+
+    private fun idsOfList(lines: List<String>, headerLine: Int, itemIndent: Int): List<String> {
+        if (headerLine < 0) return emptyList()
+        val out = mutableListOf<String>()
+        var i = headerLine + 1
+        val n = lines.size
+        while (i < n) {
+            val l = lines[i]
+            if (isIgnorable(l)) { i++; continue }
+            val ind = lineIndent(l)
+            if (ind < itemIndent) break
+            if (ind == itemIndent && l.trim().startsWith("- id:")) {
+                val m = """- id:\s*["']?([^"']+)["']?""".toRegex().find(l.trim())
+                if (m != null) out.add(m.groupValues[1])
+            }
+            i++
+        }
+        return out
+    }
+
+    /** 在 header 指向的 block 内查找某个子 key（如 items:）的行号。 */
+    private fun subHeader(lines: List<String>, parentRange: IntRange, key: String, indent: Int): Int? {
+        for (i in parentRange) {
+            if (lines[i].trim().startsWith("$key:") && lineIndent(lines[i]) == indent) return i
+        }
+        return null
+    }
+
+    private fun topKeys(lines: List<String>): Set<String> {
+        val out = mutableSetOf<String>()
+        for (l in lines) {
+            if (lineIndent(l) == 0 && !isIgnorable(l)) {
+                val m = """^([A-Za-z_][\w-]*)\s*:""".toRegex().find(l.trim())
+                if (m != null) out.add(m.groupValues[1])
+            }
+        }
+        return out
+    }
+
+    /**
+     * 统计实际写入的 dream.yml（writeText）相对目标已有 dream.yml（targetText）的差异条目数。
+     * 仅做 key 级集合差（sections/versions 顶层 id，及 section 内 items 的 id，及其余顶层 key），
+     * 不做文本写回。返回 Pair(ADD 数, SKIP 数)：
+     * - ADD = 目标没有的新增栏目/版本/项/顶层配置（将被追加或覆盖式写入）
+     * - SKIP = 目标已存在（将被覆盖式保留，不删除）
+     */
+    private fun countDreamYmlDiff(writeText: String, targetText: String?): Pair<Int, Int> {
+        val w = writeText.split("\n")
+        val t = targetText?.split("\n") ?: emptyList()
+        var add = 0
+        var skip = 0
+
+        // ---------- versions ----------
+        val wVer = idsOfList(w, findTopKey(w, "versions"), 2)
+        val tVer = if (t.isNotEmpty()) idsOfList(t, findTopKey(t, "versions"), 2) else emptyList()
+        add += (wVer - tVer).size
+        skip += (wVer intersect tVer).size
+
+        // ---------- sections + 其内部 items ----------
+        val wSecHeader = findTopKey(w, "sections")
+        if (wSecHeader >= 0) {
+            val wSecs = idsOfList(w, wSecHeader, 2)
+            val tSecHeader = if (t.isNotEmpty()) findTopKey(t, "sections") else -1
+            for (sid in wSecs) {
+                val wRange = findListItem(w, wSecHeader, sid, 2) ?: continue
+                val tRange = if (tSecHeader >= 0) findListItem(t, tSecHeader, sid, 2) else null
+                if (tRange == null) {
+                    add++ // 整个 section 新增
+                    val wItemsHeader = subHeader(w, wRange, "items", 4)
+                    if (wItemsHeader != null) add += idsOfList(w, wItemsHeader, 6).size
+                } else {
+                    skip++ // section 已存在（覆盖式保留）
+                    val wItemsHeader = subHeader(w, wRange, "items", 4)
+                    val tItemsHeader = subHeader(t, tRange, "items", 4)
+                    if (wItemsHeader != null && tItemsHeader != null) {
+                        val wItems = idsOfList(w, wItemsHeader, 6)
+                        val tItems = idsOfList(t, tItemsHeader, 6)
+                        add += (wItems - tItems).size
+                        skip += (wItems intersect tItems).size
+                    }
+                }
+            }
+        }
+
+        // ---------- 其余顶层 key（gameActivity/smfDirectory 等） ----------
+        val ignore = setOf("sections", "versions")
+        val wTop = topKeys(w) - ignore
+        val tTop = if (t.isNotEmpty()) topKeys(t) - ignore else emptySet()
+        add += (wTop - tTop).size
+        skip += (wTop intersect tTop).size
+
+        return add to skip
+    }
+
     // ---- 实际合并（修改 target 模块） ----
 
-    private fun doMerge(source: ApkModule, target: ApkModule, dexStrategy: DexStrategy, targetPackage: String, includeExamples: Boolean, overrideDreamYml: String?, extraResources: Map<String, File>, extraResResources: Map<String, File> = emptyMap(), excludedSmfAssets: Set<String> = emptySet(), removedTargetEntries: Set<String> = emptySet()) {
+    private fun doMerge(source: ApkModule, target: ApkModule, dexStrategy: DexStrategy, targetPackage: String, includeExamples: Boolean, overrideDreamYml: String?, extraResources: Map<String, File>, extraResResources: Map<String, File> = emptyMap(), excludedSmfAssets: Set<String> = emptySet(), removedTargetEntries: Set<String> = emptySet(),
+                  /** 集成描述文件写入用：当前工具箱版本（运行时传入 BuildConfig.VERSION_NAME） */
+                  version: String = "?",
+                  /** 更新模式：删除目标 APK 中旧版工具箱 DEX 区间并替换，而非普通插入 */
+                  updateMode: Boolean = false,
+                  /** 更新模式：旧版工具箱 DEX 起始索引（含） */
+                  dexStart: Int = 0,
+                  /** 更新模式：旧版工具箱 DEX 结束索引（含）；<0 表示覆盖到本版本所有 DEX */
+                  dexEnd: Int = -1,
+                  /** 更新模式：新工具箱 DEX 插入到剩余目标 DEX 之前/之后 */
+                  insertMode: DexStrategy = DexStrategy.INSERT_BEFORE,
+                  /** 更新模式：保留目标 APK 现有 res 条目（源 APK 不覆盖），如 bg_fill_image。键为 res/ 下的完整路径 */
+                  preserveTargetResEntries: Set<String> = emptySet(),
+                  /** 简易模式开关（写入描述文件，供下次更新识别） */
+                  simplifiedLaunch: Boolean = false,
+                  preserveTargetAssets: Boolean = false,
+                  appendUnreferenced: Boolean = true) {
         // 1. 「选择后删除」：先移除目标 APK 中被用户勾选的原始条目。
         //    放在所有注入之前 —— 若某条目既被勾选删除又被重新注入，则以注入为准（用户明确选择的资源保留）。
         //    受保护条目（manifest/arsc/dex/res/META-INF/assets/pvz2tool）在此静默跳过，UI 侧也已拦截。
@@ -289,6 +540,8 @@ object ToolboxApkMerger {
         // 4. manifest
         val tm: AndroidManifestBlock = target.androidManifest
         removeGameLauncher(tm)
+        // 更新模式：先清除旧版工具箱的 manifest 条目（避免重复/冲突）
+        if (updateMode) removePreviousToolboxEntries(tm, targetPackage)
         appendLauncherBlock(tm, source, target, targetPackage)
         // appendLauncherBlock 在原地修改 tm（目标原本的 manifest 对象，根元素 <manifest> 不变），
         // 因此 targetSdkVersion 直接作用在 tm 上；最后 setManifest 固化（覆盖 getter 可能返回副本的情况）。
@@ -297,10 +550,28 @@ object ToolboxApkMerger {
         target.setManifest(tm)
 
         // 3. dex
-        renumberDex(source, target, dexStrategy)
+        val toolboxRange: Pair<Int, Int> = if (updateMode) {
+            // 更新模式：删除旧版工具箱 DEX 区间；结束索引缺省时覆盖到本版本所有 DEX
+            val end = if (dexEnd < dexStart) dexStart + source.listDexFiles().size - 1 else dexEnd
+            replaceToolboxDex(source, target, dexStart, end, insertMode)
+        } else {
+            renumberDex(source, target, dexStrategy)
+        }
 
         // 5. res 覆盖替换
-        copyDir(source, target, "res/")
+        // 更新模式：res 全部覆盖替换为新版工具箱资源（含游戏自有资源），仅保留用户自定义背景图 bg_fill_image；
+        // 用户若通过向导显式重选背景图，则由下方 extraResResources 注入覆盖。（首次集成则按 preserveTargetResEntries 处理。）
+        val resSkip = (if (updateMode) {
+            val userRes = extraResResources.keys.map { "res/$it" }.toSet()
+            source.listInputSources().filter { ins ->
+                ins.name.startsWith("res/") && ins.name.contains("bg_fill_image") && ins.name !in userRes
+            }.map { it.name }.toSet()
+        } else preserveTargetResEntries).toMutableSet()
+        // 始终排除工具箱自身的图标资源（ic_launcher），避免覆盖目标 APK 的桌面图标
+        source.listInputSources().filter {
+            it.name.startsWith("res/") && it.name.contains("ic_launcher")
+        }.forEach { resSkip.add(it.name) }
+        copyDir(source, target, "res/", skip = resSkip)
 
         // 1. 其余资源合并
         copyDir(source, target, "kotlin/")
@@ -308,7 +579,7 @@ object ToolboxApkMerger {
         copyDir(source, target, "META-INF/")
         copyFile(source, target, "DebugProbesKt.bin")
         copyFile(source, target, "kotlin-tooling-metadata.json")
-        mergeAssetsPvz2tool(source, target, targetPackage, includeExamples, overrideDreamYml, excludedSmfAssets)
+        mergeAssetsPvz2tool(source, target, targetPackage, includeExamples, overrideDreamYml, excludedSmfAssets, preserveTargetAssets, appendUnreferenced)
 
         // 注入向导中选择的额外文件到 APK
         for ((apkPath, localFile) in extraResources) {
@@ -327,6 +598,20 @@ object ToolboxApkMerger {
 
         // 6. lib 按 ABI 合并
         mergeLib(source, target)
+
+        // 7. 写入集成描述文件（记录版本 + 工具箱 DEX 所在范围，供下次更新模式识别旧区间）
+        val infoMode = if (updateMode) insertMode else dexStrategy
+        val infoInsert = if (infoMode == DexStrategy.INSERT_BEFORE) "before" else "after"
+        val infoText = buildString {
+            appendLine("version=$version")
+            appendLine("dexStart=${toolboxRange.first}")
+            appendLine("dexEnd=${toolboxRange.second}")
+            appendLine("insertMode=$infoInsert")
+            appendLine("includeExamples=$includeExamples")
+            appendLine("simplifiedLaunch=$simplifiedLaunch")
+        }
+        target.removeInputSource("assets/pvz2tool/integrator_info.txt")
+        target.add(ByteInputSource(infoText.toByteArray(Charsets.UTF_8), "assets/pvz2tool/integrator_info.txt"))
     }
 
     // ---- arsc / 包 ----
@@ -340,7 +625,11 @@ object ToolboxApkMerger {
      */
     private val STRIP_DEX_PACKAGE_PREFIXES = listOf("Landroidx/constraintlayout/")
 
-    private fun renumberDex(source: ApkModule, target: ApkModule, dexStrategy: DexStrategy) {
+    /**
+     * 普通（首次集成）DEX 合并：把工具箱 DEX 按策略插入/追加到目标。
+     * 返回工具箱 DEX 在最终 APK 中的索引区间 [start, end]（含端点），用于写入描述文件。
+     */
+    private fun renumberDex(source: ApkModule, target: ApkModule, dexStrategy: DexStrategy): Pair<Int, Int> {
         val srcDex = source.listDexFiles().sortedBy { it.name }
         val tgtDex = target.listDexFiles().sortedBy { it.name }
         val ordered = if (dexStrategy == DexStrategy.INSERT_BEFORE) srcDex + tgtDex else tgtDex + srcDex
@@ -363,6 +652,62 @@ object ToolboxApkMerger {
             }
             target.add(renamed)
         }
+        // 工具箱 DEX 的索引区间
+        val start = if (dexStrategy == DexStrategy.INSERT_BEFORE) 0 else tgtDex.size
+        val end = (start + srcDex.size - 1).coerceAtLeast(start)
+        return start to end
+    }
+
+    /**
+     * 更新模式 DEX 合并：删除目标 APK 中旧版工具箱 DEX 所在区间 [dexStart, dexEnd]，
+     * 将剩余目标 DEX 顺序重排后，把新工具箱 DEX 按 insertMode 插入到其之前或之后。
+     * 返回新工具箱 DEX 在最终 APK 中的索引区间 [start, end]（含端点），用于更新描述文件。
+     */
+    private fun replaceToolboxDex(
+        source: ApkModule,
+        target: ApkModule,
+        dexStart: Int,
+        dexEnd: Int,
+        insertMode: DexStrategy
+    ): Pair<Int, Int> {
+        val srcDex = source.listDexFiles().sortedBy { it.name }
+        val tgtDex = target.listDexFiles().sortedBy { it.name }
+        val count = tgtDex.size
+        if (count == 0) {
+            // 目标没有任何 DEX，退化为普通插入
+            return renumberDex(source, target, insertMode)
+        }
+        val start = dexStart.coerceIn(0, count - 1)
+        val end = dexEnd.coerceIn(start, count - 1)
+        // 1. 删除旧版工具箱 DEX 区间
+        tgtDex.filterIndexed { i, _ -> i in start..end }.forEach { target.removeInputSource(it.name) }
+        // 2. 顺序重排剩余目标 DEX
+        val remaining = target.listDexFiles().sortedBy { it.name }
+        val ordered = if (insertMode == DexStrategy.INSERT_BEFORE) srcDex + remaining else remaining + srcDex
+        target.listDexFiles().forEach { target.removeInputSource(it.name) }
+        // 3. 重新编号写入（仅 INSERT_BEFORE 时对工具箱 DEX 做 constraintlayout 剥离）
+        val strip = insertMode == DexStrategy.INSERT_BEFORE
+        val tempDir = File(System.getProperty("java.io.tmpdir"), "dex_strip").apply { mkdirs() }
+        ordered.forEachIndexed { idx, dex ->
+            val isSourceDex = srcDex.any { it === dex }
+            val renamed = if (strip && isSourceDex && dexContainsAnyPackage(dex)) {
+                val stripped = runCatching { stripPackagesToFile(dex, tempDir) }
+                    .onFailure { it.printStackTrace() }
+                if (stripped.isSuccess)
+                    com.reandroid.archive.FileInputSource(stripped.getOrThrow(), dexName(idx))
+                else
+                    RenamedInputSource(dexName(idx), dex)
+            } else {
+                RenamedInputSource(dexName(idx), dex)
+            }
+            target.add(renamed)
+        }
+        // 4. 新工具箱 DEX 区间
+        val srcCount = srcDex.size
+        val remainingCount = remaining.size
+        val newStart = if (insertMode == DexStrategy.INSERT_BEFORE) 0 else remainingCount
+        val newEnd = (newStart + srcCount - 1).coerceAtLeast(newStart)
+        return newStart to newEnd
     }
 
     /** 目标原 DEX 是否包含任一需剔除包下的类。
@@ -421,80 +766,86 @@ object ToolboxApkMerger {
         }
     }
 
-    /** 纯字节级 dex 类剥离：移除所有 type descriptor 以 prefixes 中任一开头的 class_def。
-     *  swap-and-pop 原地移除，不动 data 区避免内部偏移量失效。完全不依赖 ARSCLib。 */
+    /** 从工具箱 DEX 中剔除需剥离包下的类定义。
+     *  改用 ARSCLib DexFile 对象模型进行剥离（而非手写字节级编辑）：
+     *  - removeClassesWithKeys 删除 class_def 及其关联数据；
+     *  - shrink()/clearUnused() 清理被删类遗留的 class_data_item / code_item / 字段 / 方法，
+     *    彻底消除手写编辑无法根除的 "Could not find declaring class for non-empty class data item" 损坏；
+     *  - refresh() 自动重算 section 偏移、adler32 校验和与 SHA-1 签名，并写回合法零填充。
+     *  手写字节级方案曾连续暴露 4 层损坏（map offset / checksum / padding / 孤立 class_data），
+     *  故此处改用库自身的 proven 路径。为避免在 Android 上为每个 dex 都构建完整对象树（OOM 风险），
+     *  先做一次廉价的前缀字节扫描，仅当 dex 确实含待剥离包名时才加载 DexFile。 */
     internal fun stripClassesFromDexBytes(bytes: ByteArray, prefixes: List<String>): ByteArray {
         if (prefixes.isEmpty()) return bytes
+        // 廉价预判：原始字节中是否存在任一待剥离包名前缀；不存在则直接原样返回，避免构建对象树。
+        if (!prefixes.any { bytes.searchBytes(it.encodeToByteArray(), 0, bytes.size) >= 0 }) return bytes
 
-        fun readU32(off: Int): Int {
-            var v = 0
-            for (i in 0..3) v = v or ((bytes[off + i].toInt() and 0xFF) shl (i * 8))
-            return v
-        }
-        fun writeU32(off: Int, v: Int) {
-            for (i in 0..3) bytes[off + i] = (v shr (i * 8) and 0xFF).toByte()
-        }
-
-        val strsSize = readU32(0x38); val strsOff = readU32(0x3C)
-        val typsSize = readU32(0x40); val typsOff = readU32(0x44)
-        val clDefSize = readU32(0x60); val clDefOff = readU32(0x64)
-
-        // 1. 读取 type descriptor 字符串
-        val stringCache = mutableMapOf<Int, String>()
-        fun getString(idx: Int): String = stringCache.getOrPut(idx) {
-            val off = readU32(strsOff + idx * 4)
-            var p = off; while ((bytes[p].toInt() and 0x80) != 0) p++; p++
-            val s = p; while (bytes[p] != 0.toByte()) p++
-            bytes.decodeToString(s, p)
-        }
-
-        // 2. 标记要移除的 type_id
-        var hasMatch = false
-        val removeType = BooleanArray(typsSize)
-        for (i in 0 until typsSize) {
-            if (prefixes.any { getString(readU32(typsOff + i * 4)).startsWith(it) }) {
-                removeType[i] = true; hasMatch = true
+        val dexFile = DexFile.read(bytes)
+        try {
+            // 删除所有 type descriptor 以任一前缀开头的 class_def（及 DexClass 关联数据）。
+            dexFile.removeClassesWithKeys { typeKey ->
+                prefixes.any { typeKey.typeName.startsWith(it) }
             }
+            // 清理被删类遗留的 class_data_item / code_item / 字段 / 方法等孤立数据。
+            dexFile.shrink()
+            dexFile.clearEmptySections()
+            // 重算 section 偏移 + adler32 校验和 + SHA-1 签名（库内部会迭代重算以保证一致），
+            // 并自动写回合法的对齐零填充。
+            dexFile.refresh()
+            return dexFile.getBytes()
+        } finally {
+            dexFile.close()
         }
-        if (!hasMatch) return bytes
-
-        // 3. swap-and-pop 原地移除
-        var tail = clDefSize - 1
-        for (i in 0..tail) {
-            val classIdx = readU32(clDefOff + i * 32)
-            if (removeType[classIdx]) {
-                // 用尾部非移除 entry 覆盖当前
-                while (tail > i && removeType[readU32(clDefOff + tail * 32)]) tail--
-                if (tail > i) {
-                    System.arraycopy(bytes, clDefOff + tail * 32, bytes, clDefOff + i * 32, 32)
-                    tail--
-                }
-            }
-        }
-        val kept = tail + 1
-        if (kept == clDefSize) return bytes
-
-        // 4. 更新 header
-        writeU32(0x60, kept)
-
-        // 5. 更新 map_list 中 TYPE_CLASS_DEF_ITEM 的 size
-        val mapOff = readU32(0x34)
-        val mapSize = readU32(mapOff)
-        var pos = mapOff + 4
-        for (m in 0 until mapSize) {
-            val type = (bytes[pos].toInt() and 0xFF) or ((bytes[pos + 1].toInt() and 0xFF) shl 8)
-            if (type == 0x0006) { // TYPE_CLASS_DEF_ITEM
-                writeU32(pos + 6, kept)
-            }
-            pos += 12
-        }
-        return bytes
     }
 
     private fun dexName(index: Int): String =
         if (index == 0) "classes.dex" else "classes${index + 1}.dex"
 
     // ---- manifest ----
+
+    /** 更新模式：移除目标 APK 中旧版工具箱已注入的 manifest 条目，避免 appendLauncherBlock 追加时重复。 */
+    private fun removePreviousToolboxEntries(tm: AndroidManifestBlock, targetPackage: String) {
+        val toRemove = mutableListOf<ResXmlElement>()
+        val toolboxClasses = setOf(
+            "io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity",
+            "io.github.dreammooncai.pvz2tool.service.LocalVpnService",
+            "io.github.dreammooncai.pvz2tool.timer.TimerService",
+            "io.github.dreammooncai.pvz2tool.timer.TimerReceiver",
+            "io.github.dreammooncai.pvz2tool.RestartPhoenixActivity",
+            "com.petterp.floatingx.assist.FxContentProvider",
+        )
+        val app = tm.applicationElement ?: return
+
+        // 移除旧版 Activity
+        tm.getActivities(true).forEach { act ->
+            val name = act.attr("name") ?: ""
+            if (name == "io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity"
+                || name == "io.github.dreammooncai.pvz2tool.RestartPhoenixActivity") toRemove.add(act)
+        }
+
+        // 移除旧版 Service / Receiver / Provider（均在 <application> 下）
+        for (tag in listOf("service", "receiver", "provider")) {
+            tm.listApplicationElementsByTag(tag).forEach { el ->
+                val name = el.attr("name") ?: ""
+                if (name in toolboxClasses) {
+                    toRemove.add(el)
+                } else if (tag == "provider" && name == "androidx.core.content.FileProvider") {
+                    val authority = el.attr("authorities") ?: ""
+                    if (authority.startsWith(targetPackage)) toRemove.add(el)
+                }
+            }
+        }
+
+        // 移除 uses-library（引用 OUR_PKG_NAME）
+        app.getElements().forEach { child ->
+            if (child.name == "uses-library") {
+                val libName = child.attr("name") ?: ""
+                if (libName.startsWith(OUR_PKG_NAME)) toRemove.add(child)
+            }
+        }
+
+        toRemove.forEach { it.removeSelf() }
+    }
 
     private fun removeGameLauncher(tm: AndroidManifestBlock) {
         val toRemove = mutableListOf<ResXmlElement>()
@@ -658,8 +1009,8 @@ object ToolboxApkMerger {
 
     // ---- 通用拷贝（流式：直接复用 source 的 InputSource，writeApk 时从 zip 流式读取，零内存拷贝） ----
 
-    private fun copyDir(source: ApkModule, target: ApkModule, prefix: String) {
-        source.listInputSources().filter { it.name.startsWith(prefix) }.forEach { ins ->
+    private fun copyDir(source: ApkModule, target: ApkModule, prefix: String, skip: Set<String> = emptySet()) {
+        source.listInputSources().filter { it.name.startsWith(prefix) && it.name !in skip }.forEach { ins ->
             target.removeInputSource(ins.name)
             target.add(ins)
         }
@@ -671,7 +1022,11 @@ object ToolboxApkMerger {
         target.add(ins)
     }
 
-    private fun mergeAssetsPvz2tool(source: ApkModule, target: ApkModule, targetPackage: String, includeExamples: Boolean, overrideDreamYml: String?, excludedSmfAssets: Set<String> = emptySet()) {
+    private fun mergeAssetsPvz2tool(source: ApkModule, target: ApkModule, targetPackage: String, includeExamples: Boolean, overrideDreamYml: String?, excludedSmfAssets: Set<String> = emptySet(),
+                                  /** 保留目标已有文件：目标已存在的 assets/pvz2tool 文件不覆盖（文档 md 除外） */
+                                  preserveTargetAssets: Boolean = false,
+                                  /** 附加目标未包含的源文件：源有目标没有的文件是否写入 */
+                                  appendUnreferenced: Boolean = true) {
         val prefix = "assets/pvz2tool/"
         val alwaysExclude = setOf(
             "assets/pvz2tool/parse_pvz_data.py",
@@ -679,6 +1034,11 @@ object ToolboxApkMerger {
         )
         val dirExcludePrefixes = mutableListOf("assets/pvz2tool/素材/")
         if (!includeExamples) dirExcludePrefixes.add("assets/pvz2tool/example/")
+
+        // 首次集成（目标 APK 尚未含任何 assets/pvz2tool 内容）：必须完整写入工具箱资源，
+        // 否则非更新模式下目标「没有的」文件会被 appendUnreferenced=false 全跳过（pvz2tool 内容几乎为空）。
+        val firstIntegrate = target.listInputSources().none { it.name.startsWith(prefix) }
+        val effectiveAppendUnreferenced = appendUnreferenced || firstIntegrate
 
         source.listInputSources().filter { ins ->
             ins.name.startsWith(prefix) &&
@@ -688,19 +1048,28 @@ object ToolboxApkMerger {
             ins.name.removePrefix(prefix).trimStart('/') !in excludedSmfAssets
         }.forEach { ins ->
             val rel = ins.name
+            // 保留目标资源：目标已有的文件不覆盖（以下三类无条件覆盖：文档 md、dream.yml、integrator_info.txt）
+            val alwaysOverwrite = rel.endsWith("/config_documentation.md") || rel.endsWith("/js_documentation.md")
+                || rel == "assets/pvz2tool/dream.yml" || rel == "assets/pvz2tool/integrator_info.txt"
+            if (preserveTargetAssets && target.getInputSource(rel) != null && !alwaysOverwrite) return@forEach
+            // 开关关：源有目标没有的新文件也不写入（首次集成时强制覆盖此限制，保证完整集成）
+            if (!effectiveAppendUnreferenced && target.getInputSource(rel) == null) return@forEach
+            // 更新模式同样采用「来源/向导」的 assets/pvz2tool 内容：用户自定义资源应走向导的额外文件注入通道，
+            // 新版工具箱的脚本/媒体/图标等默认覆盖目标 APK，确保新功能与修复能落地；dream.yml 已由 overrideDreamYml 处理。
             if (rel == "assets/pvz2tool/dream.yml") {
                 // 优先使用外部提供的完整 YAML（集成器向导生成的配置）
                 val finalText: String
                 if (overrideDreamYml != null) {
+                    // 集成器向导已基于「目标 APK 的 dream.yml 作为默认值源」生成完整配置，直接采用（已是合并结果）
                     finalText = overrideDreamYml
                 } else {
-                    val srcText = ins.openStream().readBytes().toString(Charsets.UTF_8)
                     val tgtBytes = target.getInputSource(rel)?.openStream()?.readBytes()
                     finalText = if (tgtBytes != null) {
-                        // 目标已有 dream.yml：差异合并（保留目标既有 gameActivity）
-                        YamlTextMerger.merge(srcText, tgtBytes.toString(Charsets.UTF_8)).first
+                        // 目标 APK 已内置上次集成产物：其 dream.yml 即为已合并内容，直接沿用，不再做文本 merge
+                        tgtBytes.toString(Charsets.UTF_8)
                     } else {
                         // 首次内置工具箱：动态确定 gameActivity
+                        val srcText = ins.openStream().readBytes().toString(Charsets.UTF_8)
                         val ga = findGameActivity(target, targetPackage)
                         val updated = if (ga.isNotEmpty()) {
                             srcText.replace(Regex("^gameActivity:\\s*.+", RegexOption.MULTILINE), "gameActivity: $ga")
@@ -874,6 +1243,15 @@ object ToolboxApkMerger {
 
     <receiver
         android:name="io.github.dreammooncai.pvz2tool.timer.TimerReceiver"
+        android:exported="false" />
+
+    <!-- 冷重启专用：独立 :phoenix 进程透明 Activity（参照 ProcessPhoenix）。主进程被杀后仍存活，
+         在 :phoenix 进程内拉起入口 Activity 到前台。主题指向源包 0x66 的 Pvz2ToolPhoenixTheme。 -->
+    <activity
+        android:name="io.github.dreammooncai.pvz2tool.RestartPhoenixActivity"
+        android:process=":phoenix"
+        android:excludeFromRecents="true"
+        android:theme="@%PKG66%:style/Pvz2ToolPhoenixTheme"
         android:exported="false" />
 
     <provider

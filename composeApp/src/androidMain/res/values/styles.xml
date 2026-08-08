@@ -20,4 +20,16 @@
     <style name="Theme.DreamPvzApp.DrawsSystemBar" parent="Theme.DreamPvzApp">
         <item name="android:windowDrawsSystemBarBackgrounds">false</item>
     </style>
+
+    <!-- 冷重启专用：独立进程 :phoenix 透明/无界面 Activity（参照 ProcessPhoenix 的 trampoline Activity）。
+         不依赖父主题，直接设置半透明+透明背景，避免在本 ROM 上引用不到的 Theme.Transparent。 -->
+    <style name="Pvz2ToolPhoenixTheme">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>

@@ -1,14 +1,10 @@
 package io.github.dreammooncai.pvz2tool.js.code
 
-import android.app.AlarmManager
-import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
 import android.os.Process
 import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.InitializePvz2
-import io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity
+import io.github.dreammooncai.pvz2tool.RestartPhoenixActivity
 import io.github.dreammooncai.pvz2tool.js.func
 import io.github.dreammooncai.util.ContextUtil
 import kotlinx.coroutines.Dispatchers
@@ -24,22 +20,24 @@ import kotlin.system.exitProcess
  * - 退出应用（`exit`）：结束所有 Activity 并终止进程。
  *
  * 实现说明：
- * - 通过 `ContextUtil.getCurrentActivity()` 获取当前前台 Activity（拿不到则回退到全局 Context）。
- * - 重启采用「真正冷重启」：以 `AlarmManager` 在极短延迟后由**系统进程**派发 LAUNCHER Intent
- *   （附加 `FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TASK`，以及可选的
- *   [Pvz2InitializeActivity.EXTRA_AUTO_ENTER_GAME]），随后立即 `killProcess` / `exitProcess`
- *   终止当前进程。新 Activity 在全新进程中创建，所有全局状态归零。
+ * - 退出采用 `ContextUtil.getCurrentActivity()?.finishAffinity()` 结束当前任务栈，再终止进程。
+ * - 重启采用「真正冷重启」，机制参照 JakeWharton/ProcessPhoenix：由 [RestartPhoenixActivity]
+ *   （运行在独立的 `:phoenix` 进程）拉起 LAUNCHER Activity 并带到前台，随后立即 `killProcess` /
+ *   `exitProcess` 终止**主进程**；`:phoenix` 进程独立存活、不受主进程被杀影响，新 Activity 在全新主进程中
+ *   创建，全局状态归零。
+ * - 之所以用「独立进程 Activity」而非「独立进程 Service 直接 startActivity」或「精确闹钟」：
+ *   实测 targetSdk 36 / 本 ROM 上，后台 Service（含前台 Service + `MODE_BACKGROUND_ACTIVITY_START_ALLOWED`）
+ *   拉起的 Activity 只能进入后台任务栈、无法带到前台（用户停在桌面）；而 `setAlarmClock` 等精确闹钟又要求
+ *   `SCHEDULE_EXACT_ALARM` / `USE_EXACT_ALARM` 权限（本 ROM 未授予/未自动授予）。独立进程的 **Activity**
+ *   被系统拉起瞬间即为前台/可见组件，由它再 `startActivity` 属前台上下文，目标 Activity 可靠带到前台——
+ *   这是 ProcessPhoenix 在海量 App 上验证可靠的核心。
  * - 之所以必须杀进程（而非仅 finish Activity）：若只 finish 当前 Activity 而保留进程，游戏
  *   Activity 会在「未清零」的旧进程状态中被二次启动，触发其内部的 Activity 恢复逻辑失败，
  *   表现为黑屏随后闪退；同时 Pvz2Tool 的全局单例（InitializePvz2.*、各 Controller、
  *   ActivityLifecycleCallbacks、mGLView 引用等）也会残留，再次进入游戏时重复注册监听、
  *   重复调用游戏私有 GL 方法。杀进程后由 AMS 在全新进程中创建入口，游戏干净冷启动。
- * - 之所以用 `AlarmManager` 而非直接 `startActivity` 后杀进程：单进程应用直接 `startActivity`
- *   会在同一进程内创建新 Activity，随即 kill 会连新 Activity 一起杀掉。改由系统进程延迟派发
- *   启动 Intent，可确保旧进程退出后新实例在全新进程中拉起。
  * - 所有对 Activity / 任务的变更均切到 `Dispatchers.Main`（协程主线程上下文）执行，避免跨线程操作窗口。
  * - 退出时直接 `finishAffinity` 后立即 `killProcess` / `exitProcess` 终止进程。
- * - 任何异常均静默吞掉（`runCatching`），不影响脚本后续执行。
  *
  * 用法：
  * ```js
@@ -72,41 +70,22 @@ object JsApp {
     /**
      * 重启应用（可选自动进入游戏）。
      *
-     * 采用「真正冷重启」：通过系统 [AlarmManager] 在极短延迟后由系统进程拉起
-     * LAUNCHER Intent（附带 [Pvz2InitializeActivity.EXTRA_AUTO_ENTER_GAME]），随后立即
-     * [Process.killProcess] / [exitProcess] 终止当前进程。
+     * 采用「真正冷重启」，机制参照 JakeWharton/ProcessPhoenix：
+     * - 由 [RestartPhoenixActivity]（运行在独立的 `:phoenix` 进程）在自身 `onCreate` 中构造
+     *   直接指向 LAUNCHER 的 `PendingIntent`（`NEW_TASK|CLEAR_TASK`，可选
+     *   [Pvz2InitializeActivity.EXTRA_AUTO_ENTER_GAME]）并 `startActivity`；
+     * - 该 `:phoenix` Activity 被系统拉起时即为前台/可见组件，其 `startActivity` 属前台上下文，
+     *   目标 LAUNCHER Activity 能可靠**带到前台**；随后 `:phoenix` 进程自尽；
+     * - 主进程在触发后已被 [RestartPhoenixActivity.triggerRebirth] 杀掉，新主进程由 AMS 创建，全局状态归零。
+     * - 此方案不依赖精确闹钟权限，也不依赖后台启动豁免，是本 ROM 上唯一验证可靠的冷重启路径。
      *
-     * @param autoEnterGame 为 true 时在重启后的 LAUNCHER Intent 中附带
-     *        [Pvz2InitializeActivity.EXTRA_AUTO_ENTER_GAME]，由入口 Activity 在启动后
-     *        自动触发「进入游戏」逻辑。
+     * @param autoEnterGame 为 true 时重启后由入口 Activity 自动触发「进入游戏」逻辑。
      */
     private suspend fun restartApp(autoEnterGame: Boolean) {
         withContext(Dispatchers.Main) {
-            runCatching {
-                val ctx = InitializePvz2.context.applicationContext
-                val intent = (ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
-                    ?: Intent(ctx, Pvz2InitializeActivity::class.java)).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                    if (autoEnterGame) {
-                        putExtra(Pvz2InitializeActivity.EXTRA_AUTO_ENTER_GAME, true)
-                    }
-                }
-                val pendingIntent = PendingIntent.getActivity(
-                    ctx,
-                    0,
-                    intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                val alarmManager = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                // 极短延迟后由系统进程拉起入口 Activity，随后终止当前进程
-                alarmManager.set(
-                    AlarmManager.RTC_WAKEUP,
-                    System.currentTimeMillis() + 80,
-                    pendingIntent
-                )
-                Process.killProcess(Process.myPid())
-                exitProcess(0)
-            }
+            val ctx = InitializePvz2.context.applicationContext
+            // 启动 :phoenix 独立进程 Activity 并立即杀主进程；真正的拉起/带前台在 :phoenix 进程内完成。
+            RestartPhoenixActivity.triggerRebirth(ctx, autoEnterGame)
         }
     }
 

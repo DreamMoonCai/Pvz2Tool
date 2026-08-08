@@ -650,6 +650,14 @@ val jsContent = section.readJs(version)
 <receiver
     android:name="io.github.dreammooncai.pvz2tool.timer.TimerReceiver"
     android:exported="false" />
+
+<!-- 冷重启专用：独立 :phoenix 进程透明 Activity（参照 ProcessPhoenix），主题指向源包 0x66 的 Pvz2ToolPhoenixTheme -->
+<activity
+    android:name="io.github.dreammooncai.pvz2tool.RestartPhoenixActivity"
+    android:process=":phoenix"
+    android:excludeFromRecents="true"
+    android:theme="@app66:style/Pvz2ToolPhoenixTheme"
+    android:exported="false" />
 ```
 
 > **包名替换**：上述 XML 中所有 `游戏包名` 字符串需统一替换为目标游戏的实际包名（如 `com.ea.game.pvzfree_row`）。

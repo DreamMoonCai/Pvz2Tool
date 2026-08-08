@@ -481,5 +481,20 @@ object InitializePvz2 {
         }.onFailure { e -> errorScreenState = Pvz2ErrorScreenState("初始化配置失败",e) }
     }
 
+    /**
+     * 确保单例已初始化（供非 Activity 路径，如定时器在被杀后的进程里由系统直接重建
+     * [TimerReceiver]/[TimerService] 触发时使用）。
+     *
+     * 此时没有 Activity，[init] 不会被调用，[context] 保持未初始化状态；脚本一旦访问
+     * `InitializePvz2.context.assets`（如 pvz 数据 JSON 加载）就会抛
+     * `UninitializedPropertyAccessException`。这里用调用方提供的 applicationContext 补初始化。
+     * 若已经由 Activity 初始化过则直接跳过，避免重复解析配置。
+     */
+    fun ensureInitialized(context: Context) {
+        if (this::context.isInitialized) return
+        runCatching { init(context.applicationContext) }
+            .onFailure { e -> android.util.Log.e("InitializePvz2", "定时器上下文初始化失败", e) }
+    }
+
     fun hasVersionChanges() = versionName != mSfmVersion
 }

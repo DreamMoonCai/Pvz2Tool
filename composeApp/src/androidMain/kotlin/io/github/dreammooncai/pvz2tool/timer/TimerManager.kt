@@ -55,12 +55,19 @@ object TimerManager {
             PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0)
         )
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        if (Build.VERSION.SDK_INT >= 31) {
-            if (!am.canScheduleExactAlarms()) return
-        }
+        val exactAllowed = if (Build.VERSION.SDK_INT >= 31) am.canScheduleExactAlarms() else true
         try {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pi)
-        } catch (_: SecurityException) { }
+            if (exactAllowed) {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pi)
+            } else {
+                // 未授予 SCHEDULE_EXACT_ALARM 时退化为非精确、但允许在空闲/息屏时触发的闹钟，
+                // 且不要求任何权限。仍由 Manifest 注册的 TimerReceiver 接收，可唤醒已杀掉的进程。
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pi)
+            }
+        } catch (e: SecurityException) {
+            // 极少数 ROM 即便精确闹钟在无权限时未走 canScheduleExactAlarms 拦截而抛错，退化兜底。
+            try { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pi) } catch (_: Exception) { }
+        }
     }
 
     /** 取消指定定时器的闹钟。 */
@@ -129,6 +136,7 @@ object TimerManager {
                 val spec = parts[0]
                 val num = spec.filter { it.isDigit() }.toLongOrNull() ?: 1L
                 val unit = when {
+                    spec.endsWith("s") || spec.endsWith("sec") -> TimeUnit.SECONDS
                     spec.endsWith("m") || spec.endsWith("min") -> TimeUnit.MINUTES
                     spec.endsWith("h") || spec.endsWith("hour") -> TimeUnit.HOURS
                     spec.endsWith("d") || spec.endsWith("day") -> TimeUnit.DAYS

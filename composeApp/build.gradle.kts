@@ -1,7 +1,13 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
+import org.gradle.api.provider.Property
+import org.gradle.api.provider.ValueSource
+import org.gradle.api.provider.ValueSourceParameters
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+// 注意：Kotlin DSL 中 `java` 会被 JavaPluginExtension 遮蔽，禁止写 java.time.* 全限定名，必须 import
+import java.time.LocalDate
+import java.util.Properties as JavaProperties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -9,6 +15,85 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
+}
+
+// ──────────────────────────────────────────────────────────────
+// 动态版本号：versionName = 月.日.迭代（如 8.6.0）
+//            versionCode = yy*1000000 + MM*10000 + dd*100 + 迭代（跨年仍单调递增）
+//
+// 日期在每次构建时实时获取。项目开启了 configuration-cache，配置阶段直接调
+// LocalDate.now() 会被缓存固化导致跨天不刷新，因此必须包进 ValueSource：
+// Gradle 每次构建都会重新执行 obtain()，返回值变化即自动作废配置缓存。
+//
+// 迭代数存于根目录 version.properties：跨天自动归零；
+// 同日再发包执行 ./gradlew bumpIteration，或临时用 -PverIter=N 覆盖。
+// ──────────────────────────────────────────────────────────────
+abstract class AppVersionValueSource : ValueSource<String, AppVersionValueSource.Params> {
+    interface Params : ValueSourceParameters {
+        val propsPath: Property<String>
+        val iterationOverride: Property<String>
+    }
+
+    override fun obtain(): String {
+        val today = LocalDate.now()
+        val file = File(parameters.propsPath.get())
+        val props = JavaProperties()
+        if (file.exists()) file.inputStream().use { props.load(it) }
+        // 记录日期与今天不一致 → 说明是新的一天，迭代数归零
+        val saved = if (props.getProperty("date")?.trim() == today.toString()) {
+            props.getProperty("iteration")?.trim()?.toIntOrNull() ?: 0
+        } else 0
+        val iteration = parameters.iterationOverride.orNull?.trim()?.toIntOrNull() ?: saved
+        val name = "${today.monthValue}.${today.dayOfMonth}.$iteration"
+        val code = (today.year % 100) * 1_000_000 +
+                today.monthValue * 10_000 +
+                today.dayOfMonth * 100 +
+                iteration
+        return "$name|$code"
+    }
+}
+
+private val appVersionRaw = providers.of(AppVersionValueSource::class) {
+    parameters.propsPath.set(rootProject.file("version.properties").absolutePath)
+    parameters.iterationOverride.set(providers.gradleProperty("verIter"))
+}.get()
+val dynamicVersionName: String = appVersionRaw.substringBefore('|')
+val dynamicVersionCode: Int = appVersionRaw.substringAfter('|').toInt()
+
+tasks.register("bumpIteration") {
+    group = "versioning"
+    description = "同一天再次发包时把迭代数 +1（如 8.6.0 → 8.6.1）"
+    val propsFile = rootProject.file("version.properties")
+    doLast {
+        val today = LocalDate.now()
+        val props = JavaProperties()
+        if (propsFile.exists()) propsFile.inputStream().use { props.load(it) }
+        val cur = if (props.getProperty("date")?.trim() == today.toString()) {
+            props.getProperty("iteration")?.trim()?.toIntOrNull() ?: 0
+        } else -1
+        val next = cur + 1
+        // 手写而非 Properties.store()，后者会抹掉文件里的说明注释
+        propsFile.writeText(
+            buildString {
+                appendLine("# Pvz2Tool 版本迭代记录")
+                appendLine("# 版本号规则：versionName = 月.日.迭代   versionCode = yy*1000000 + MM*10000 + dd*100 + 迭代")
+                appendLine("# 日期由构建时实时获取，无需手工维护；跨天后迭代数自动归零。")
+                appendLine("# 同一天需要发第二个包时执行：./gradlew bumpIteration")
+                appendLine("# 也可临时覆盖：./gradlew assembleRelease -PverIter=3")
+                appendLine("date=$today")
+                appendLine("iteration=$next")
+            }
+        )
+        println("版本号已更新为 ${today.monthValue}.${today.dayOfMonth}.$next")
+    }
+}
+
+tasks.register("printVersion") {
+    group = "versioning"
+    description = "打印当前构建将使用的版本号"
+    val n = dynamicVersionName
+    val c = dynamicVersionCode
+    doLast { println("versionName=$n  versionCode=$c") }
 }
 
 kotlin {
@@ -64,6 +149,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(libs.kaml)
         }
         all {
             languageSettings.enableLanguageFeature("ContextParameters")
@@ -82,8 +168,9 @@ android {
         applicationId = "io.github.dreammooncai.pvz2tool"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0.0"
+        // 版本号 = 当前月.日.迭代次数（如 8 月 6 日第 0 次迭代 → 8.6.0），构建时按系统日期动态生成
+        versionCode = dynamicVersionCode
+        versionName = dynamicVersionName
     }
     packaging {
         resources {

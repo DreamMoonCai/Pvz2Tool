@@ -106,9 +106,7 @@ import io.github.dreammooncai.pvz2tool.view.PvzGreenButton
 import io.github.dreammooncai.pvz2tool.view.PvzRedButton
 import android.content.Context
 import android.content.Intent
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.res.painterResource
+import coil3.compose.AsyncImage
 import io.github.dreammooncai.pvz2tool.R
 import io.github.dreammooncai.pvz2tool.view.PvzSimpleCardBrown
 import io.github.dreammooncai.pvz2tool.view.PvzSimpleCardGreen
@@ -119,6 +117,9 @@ import io.github.dreammooncai.pvz2tool.view.PvzTextWhiteStyle
 import com.charleskorn.kaml.MultiLineStringStyle
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
+import com.charleskorn.kaml.YamlMap
+import com.charleskorn.kaml.YamlNode
+import com.charleskorn.kaml.YamlScalar
 import android.net.Uri
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import kotlinx.coroutines.launch
@@ -332,9 +333,14 @@ data class SectionItemDraft(
 
 // ── 从 dream.yml 读取默认值 ───────────────────────────────
 
+// 读取目标 APK 旧版 dream.yml 时用「非严格」解析：遇到新版本已改名/删除的字段直接忽略（取默认值），
+// 而非抛 UnknownPropertyException 导致整套向导默认值回退为内置默认、buildYamlFromWizard 丢弃向导编辑。
+// 结构错误（语法/缩进）仍会抛异常并被 runCatching 捕获，不影响健壮性。
+private val lenientYaml = Yaml(configuration = YamlConfiguration(strictMode = false, encodeDefaults = false, multiLineStringStyle = MultiLineStringStyle.Literal))
+
 fun loadDefaultsFromDreamYml(raw: String): DreamDefaults {
     val config = runCatching {
-        Yaml.default.decodeFromString(Pvz2ToolConfig.serializer(), raw)
+        lenientYaml.decodeFromString(Pvz2ToolConfig.serializer(), raw)
     }.getOrNull()
     return DreamDefaults(
         smfDirectory = config?.smfDirectory ?: "files/",
@@ -535,8 +541,72 @@ fun loadDefaultsFromDreamYml(raw: String): DreamDefaults {
         uiSetChangeProfile = config?.ui?.settings?.changeTheProfileReadLocation ?: "",
         uiSetShowNotUpdate = config?.ui?.settings?.showNotUpdate ?: "",
         uiSetExitConfirm = config?.ui?.settings?.exitConfirm ?: "",
-        uiSndSwitchClick = config?.ui?.sounds?.switchClick ?: "ui_switch_click.wav"
+        uiSndSwitchClick = config?.ui?.sounds?.switchClick ?: "ui_switch_click.wav",
+        cgVideoPath = config?.ui?.assets?.cgVideoPath ?: "opening.mp4",
+        cgVideoPoster = config?.ui?.assets?.cgVideoPoster ?: "",
+        cgVideoLoadTimeout = config?.ui?.assets?.cgVideoLoadTimeout?.toString() ?: "5000"
     )
+}
+
+/**
+ * 更新模式：将「目标 APK 旧 dream.yml」深度合并到「当前工具箱内置模板 dream.yml」之上。
+ * - 目标 yml 已有的字段 → 用目标值（保留用户/旧版的真实配置）。
+ * - 目标 yml 缺失的字段（如新版新增功能）→ 用内置模板的默认值补齐。
+ * 这样更新流程既能保留目标现有配置，又能让新版字段自动带上当前工具箱的默认配置（而非写死的兜底常量）。
+ *
+ * @param baseRaw 内置模板（当前工具箱 APK 自带），作为默认值来源
+ * @param overrideRaw 目标 APK 旧 yml，作为优先覆盖来源
+ */
+private fun mergeDreamYml(baseRaw: String, overrideRaw: String): String {
+    val baseNode = runCatching { lenientYaml.parseToYamlNode(baseRaw) }.getOrNull() ?: return overrideRaw
+    val overrideNode = runCatching { lenientYaml.parseToYamlNode(overrideRaw) }.getOrNull() ?: return baseRaw
+    val mergedNode = deepMergeYaml(baseNode, overrideNode)
+    // 合并后重新解析为 Pvz2ToolConfig 再序列化，确保结构合法、缺省值正确回填
+    val mergedConfig = runCatching {
+        lenientYaml.decodeFromYamlNode(Pvz2ToolConfig.serializer(), mergedNode)
+    }.getOrNull() ?: return overrideRaw
+    return Yaml(configuration = YamlConfiguration(
+        encodeDefaults = false, multiLineStringStyle = MultiLineStringStyle.Literal
+    )).encodeToString(Pvz2ToolConfig.serializer(), mergedConfig)
+}
+
+/**
+ * YAML 节点级深度合并：override 覆盖 base，仅在两侧均为映射(YamlMap)时递归合并子键；
+ * 标量 / 列表 / null 一律以 override 为准（列表整体替换，符合「目标配置优先」语义）。
+ *
+ * 注意：YamlScalar 的 equals 包含 path，不能用「标量引用相等」去重同名 key，
+ * 必须以标量文本内容(content)作为合并依据，否则同名 key 会被当成两个键导致重复键异常。
+ */
+private fun deepMergeYaml(base: YamlNode, override: YamlNode): YamlNode {
+    if (base is YamlMap && override is YamlMap) {
+        val merged = LinkedHashMap<String, YamlNode>()
+        val keyScalar = LinkedHashMap<String, YamlScalar>()
+        for ((k, v) in base.entries) {
+            merged[k.content] = v
+            keyScalar[k.content] = k
+        }
+        for ((k, v) in override.entries) {
+            val key = k.content
+            val existing = merged[key]
+            merged[key] = if (existing != null) deepMergeYaml(existing, v) else v
+            keyScalar[key] = k
+        }
+        val result = LinkedHashMap<YamlScalar, YamlNode>()
+        for ((key, node) in merged) result[keyScalar[key]!!] = node
+        return YamlMap(result, base.path)
+    }
+    return override
+}
+
+/**
+ * 计算向导实际使用的 dream.yml 原始文本：
+ * - 更新模式且已读取到目标 yml → 目标旧 yml 深度合并到内置模板之上（缺失字段取当前工具箱默认）。
+ * - 其余情况 → 直接用内置模板。
+ */
+private fun effectiveDreamYmlRaw(sourceMode: String, targetDreamYmlRaw: String?, dreamYmlRaw: String): String {
+    return if (sourceMode == "update" && !targetDreamYmlRaw.isNullOrEmpty()) {
+        mergeDreamYml(dreamYmlRaw, targetDreamYmlRaw)
+    } else dreamYmlRaw
 }
 
 data class DreamDefaults(
@@ -584,6 +654,7 @@ data class DreamDefaults(
     val gameDisplay: Pvz2ToolConfigGameDisplay,
     val uiSetChangeProfile: String, val uiSetShowNotUpdate: String, val uiSetExitConfirm: String,
     val uiSndSwitchClick: String,
+    val cgVideoPath: String, val cgVideoPoster: String, val cgVideoLoadTimeout: String,
     val schedules: List<ScheduleDraft> = emptyList(),
 )
 
@@ -645,20 +716,11 @@ fun SaveDraft.toConfigSave() = Pvz2ToolConfigUISave(
  * 该路径必须与 [fieldKeyToApkSubDir] 决定的打包落盘位置保持一致：
  * 打包器会把脚本类字段统一放到 `assets/pvz2tool/js/<用户输入相对路径>`，
  * 运行时 [AssetExtractorHolder.openInputStream] 会补 `pvz2tool/` 前缀按此路径查找。
- * 因此 yml 里写的 jsPath 也必须带 `js/` 前缀，否则运行时找不到文件。
- *
- * 规则：
- * - 空 → null（不写该字段）
- * - 绝对路径（/ 开头）、占位符（$ 开头）、HTTP(S) URL → 原样返回（不属于被打包的脚本）
- * - 已以 `js/` 开头 → 原样返回（避免重复前缀）
- * - 其余相对路径 → 补 `js/` 前缀
+ * 因此 yml 里写的 jsPath 直接使用用户输入值，不做自动补前缀。
  */
 private fun packScriptAssetPath(raw: String?): String? {
     if (raw.isNullOrBlank()) return null
-    if (raw.startsWith("/") || raw.startsWith("$") ||
-        raw.startsWith("http://") || raw.startsWith("https://")) return raw
-    if (raw.startsWith("js/")) return raw
-    return "js/$raw"
+    return raw
 }
 
 private fun buildYamlFromWizard(
@@ -702,7 +764,9 @@ private fun buildYamlFromWizard(
     uiWelcomeEditTitle: String, uiWelcomeEditHint: String,
     saveDraft: SaveDraft, gameDisplay: Pvz2ToolConfigGameDisplay,
     uiSetChangeProfile: String, uiSetShowNotUpdate: String, uiSetExitConfirm: String, uiSndSwitchClick: String,
-    schedules: List<ScheduleDraft>
+    schedules: List<ScheduleDraft>,
+    /** 更新模式：gameActivity 直接沿用目标 APK 之前的配置（template.gameActivity 经深度合并后已是目标原值），不取向导状态，避免被空值/重新探测覆盖 */
+    isUpdateMode: Boolean = false
 ): String {
     // 简易模式：直接构建精简 config 对象
     if (simplifiedLaunch) {
@@ -744,11 +808,12 @@ private fun buildYamlFromWizard(
 
     // 完整模式：解析模板 YAML 保留未编辑字段（title/button/extractor 等），只覆盖向导编辑的部分
     val template = runCatching {
-        Yaml.default.decodeFromString(Pvz2ToolConfig.serializer(), templateYml)
+        lenientYaml.decodeFromString(Pvz2ToolConfig.serializer(), templateYml)
     }.getOrNull() ?: return templateYml
 
     val cfg = template.copy(
-        gameActivity = gameActivity,
+        // 更新模式：直接用目标 APK 之前记录的 gameActivity（template.gameActivity 已深度合并目标 yml），不取向导状态
+        gameActivity = if (isUpdateMode) template.gameActivity else gameActivity,
         smfDirectory = smfDirectory,
         baseAssetPath = baseAssetPath.ifBlank { "version/base/smf" },
         simplifiedLaunch = false,
@@ -997,6 +1062,22 @@ private fun extractYamlKey(line: String): String {
  */
 val LocalOverwriteChecker = staticCompositionLocalOf<(String) -> String?> { { _ -> null } }
 
+/** 扫描目标 APK 中第一个超过阈值的 DEX 序号（1-based）。
+ *  直接通过 ZipFile 读取条目大小——ARSCLib 的 InputSource.getLength() 对 APK 内未解压的
+ *  DEX 条目常返回不准确/抛异常，不能用于精确大小判断。 */
+private fun findLargeDexIndex(apk: File, thresholdBytes: Long = 20L * 1024 * 1024): Int {
+    return runCatching {
+        java.util.zip.ZipFile(apk).use { zip ->
+            val dexEntries = zip.entries().asSequence()
+                .filter { !it.isDirectory && it.name.endsWith(".dex") }
+                .sortedBy { it.name }
+                .toList()
+            val idx = dexEntries.indexOfFirst { it.size > thresholdBytes }
+            if (idx >= 0) idx + 1 else 1
+        }
+    }.getOrDefault(1)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToolboxIntegratorScreen(
@@ -1017,6 +1098,8 @@ fun ToolboxIntegratorScreen(
     val sourceApk = remember { File(context.applicationInfo.sourceDir) }
     // 基础 APK（工具箱自身）已存在的资源条目名集合，用于「选择文件时检测是否覆盖基础资源」
     var baseApkEntries by remember { mutableStateOf<Set<String>>(emptySet()) }
+    // 源 APK（工具箱自身）的 DEX 数量（更新模式结束序号默认值计算用，需在引用它的 LaunchedEffect 之前声明）
+    var sourceDexCount by remember { mutableStateOf(0) }
     LaunchedEffect(sourceApk) {
         withContext(Dispatchers.IO) {
             val set = runCatching {
@@ -1024,6 +1107,11 @@ fun ToolboxIntegratorScreen(
                 m.listInputSources().map { it.name }.toSet()
             }.getOrDefault(emptySet())
             baseApkEntries = set
+        }
+    }
+    LaunchedEffect(sourceApk) {
+        withContext(Dispatchers.IO) {
+            sourceDexCount = runCatching { ApkModule.loadApkFile(sourceApk).listDexFiles().size }.getOrDefault(0)
         }
     }
     val sourceVersion = remember {
@@ -1038,7 +1126,6 @@ fun ToolboxIntegratorScreen(
             context.assets.open("pvz2tool/dream.yml").bufferedReader().use { it.readText() }
         }.getOrDefault("")
     }
-    val defaults = remember(dreamYmlRaw) { loadDefaultsFromDreamYml(dreamYmlRaw) }
 
     // ── 向导步骤状态 ──
     var step by remember { mutableStateOf(1) }
@@ -1049,6 +1136,27 @@ fun ToolboxIntegratorScreen(
     var result by remember { mutableStateOf<MergeResult?>(null) }
     var loading by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+
+    // ── 集成模式：内置到未集成的 APK / 更新已集成的 APK ──
+    // "integrate" = 首次内置到未集成的目标 APK；"update" = 在已集成工具箱的 APK 上更新（替换旧版 DEX）
+    var sourceMode by remember { mutableStateOf("integrate") }
+    // 更新模式下的 DEX 替换参数
+    var updDexStart by remember { mutableStateOf("1") }      // 旧版工具箱 DEX 起始序号（1 起）
+    var updDexEnd by remember { mutableStateOf("") }         // 结束序号（留空=覆盖到本版本所有 DEX）
+    var updInsertMode by remember { mutableStateOf(DexStrategy.INSERT_BEFORE) }
+    // 更新模式：是否附加源 APK 中目标未包含的 pvz2tool 文件（如默认图/示例）。默认开，无描述文件时关
+    var appendUnreferencedAssets by remember { mutableStateOf(false) }
+    // 选完目标 APK 后从描述文件检测到的历史集成信息（null=未检测到）
+    var detectedInfo by remember { mutableStateOf<ToolboxApkMerger.IntegratorInfo?>(null) }
+    // 更新模式下，从目标 APK 读取的 dream.yml（作为向导模板，保留目标现有配置）
+    var targetDreamYmlRaw by remember { mutableStateOf<String?>(null) }
+
+    // ── 从 dream.yml 读取默认值（更新模式优先取目标 APK 当前配置）──
+    // 更新模式：以「内置模板 dream.yml」为 base、「目标旧 dream.yml」为 override 做深度合并——
+    // 目标有的字段用目标的（保留用户/旧版真实配置），目标缺失的字段（如新版新增功能）用内置模板默认补齐。
+    // 普通集成直接用内置模板。
+    val effectiveDefaultsRaw = effectiveDreamYmlRaw(sourceMode, targetDreamYmlRaw, dreamYmlRaw)
+    val defaults = remember(sourceMode, targetDreamYmlRaw, dreamYmlRaw) { loadDefaultsFromDreamYml(effectiveDefaultsRaw) }
 
     // ── 集成选项 ──
     var gameActivity by remember { mutableStateOf("") }
@@ -1101,6 +1209,8 @@ fun ToolboxIntegratorScreen(
     var targetApkBrowserScope by remember { mutableStateOf<String?>(null) }
     // PopCap 原版 APK 警告弹窗：非 null 时显示，值为待删除的缓存文件
     var popCapWarningFile by remember { mutableStateOf<File?>(null) }
+    // 工具箱模式不匹配警告："update_wrong"=更新模式选了无工具箱APK / "integrate_wrong"=普通模式选了有工具箱APK
+    var toolboxModeWarning by remember { mutableStateOf<String?>(null) }
     // 从目标 APK 选择的条目：addedSmfFiles rel → APK 内完整路径（如 assets/beach.rsb.smf）
     // 用于「先选择后开删除开关」时追溯登记到 removedTargetEntries
     var targetApkMapping by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -1212,6 +1322,24 @@ fun ToolboxIntegratorScreen(
     var floatingBallIcon by remember { mutableStateOf(defaults.floatingBallIcon.ifBlank { "ic_floating_dave.png" }) }
     // 窗口填充背景图（@mipmap/bg_fill_image）：替换 App 启动窗口背景，无需输入路径，直接选图替换默认图
     var bgFillImageFile by remember { mutableStateOf<File?>(null) }
+    // 更新模式：目标 APK 当前生效的 bg_fill_image（未显式覆盖时默认取自目标，而非工具箱内置图）
+    var targetBgFillImage by remember { mutableStateOf<File?>(null) }
+    // 更新模式：未显式覆盖背景图时，解出目标 APK 当前生效的 bg_fill_image 供预览（否则沿用工具箱内置默认图会误导）
+    LaunchedEffect(sourceMode, targetApk, bgFillImageFile) {
+        targetBgFillImage = null
+        if (sourceMode != "update" || targetApk == null || bgFillImageFile != null) return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val cacheDir = context.cacheDir ?: context.filesDir ?: return@withContext
+                val fileDir = File(cacheDir, "integrator_target_bg").apply { mkdirs() }
+                val out = File(fileDir, "bg_fill_image.jpg")
+                val module = ApkModule.loadApkFile(targetApk)
+                val ins = module.getInputSource("res/mipmap-hdpi-v4/bg_fill_image.jpg") ?: return@withContext
+                ins.openStream().use { inp -> out.outputStream().use { inp.copyTo(it) } }
+                targetBgFillImage = out
+            }
+        }
+    }
 
     /** 读取当前 APK 内置的 anti-distribution.txt 内容作为默认值（即打包时若无修改会落盘的声明文本）。 */
     fun readDefaultAntiDistribution(ctx: Context): String = runCatching {
@@ -1221,12 +1349,82 @@ fun ToolboxIntegratorScreen(
     // 进游戏声明文本（anti-distribution.txt）：进入游戏时逐行 Toast，默认预填当前 APK 内置内容，可直接修改
     var antiDistributionText by remember { mutableStateOf(readDefaultAntiDistribution(context)) }
 
-    // 全屏图片预览浮层状态：点缩略图/背景图预览时设置，置 null 关闭
-    var previewBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-    val openImagePreview: (ImageBitmap) -> Unit = { previewBitmap = it }
-    val openImagePreviewFromResource: () -> Unit = {
-        previewBitmap = runCatching { BitmapFactory.decodeResource(context.resources, R.mipmap.bg_fill_image)?.asImageBitmap() }.getOrNull()
+    /** 把全部「来自 dream.yml 默认值的向导字段」重置为给定默认值 d。
+     *  不含游戏 Activity、不含流程/UI 导航态/SMF 选择态。 */
+    fun applyConfigDefaults(d: DreamDefaults, isUpdateMode: Boolean = false) {
+        smfDirectory = d.smfDirectory
+        baseAssetPath = d.baseAssetPath.ifBlank { "version/base/smf" }
+        simplifiedLaunch = false
+        cgVideoPath = d.cgVideoPath.ifBlank { "opening.mp4" }
+        cgVideoPoster = d.cgVideoPoster.ifBlank { "bg_main.jpg" }
+        cgVideoLoadTimeout = d.cgVideoLoadTimeout.ifBlank { "5000" }
+        gameActivityInvalid = "设置的游戏Activity有误或不存在"
+        bgImage = d.bgImage.ifBlank { "bg_main.jpg" }; isUseSolidColorBg = d.isUseSolidColorBg
+        bgMusic = d.bgMusic.ifBlank { "bg_music.wav" }; isPlayBgMusic = d.isPlayBgMusic
+        sideBgImage = d.sideBgImage.ifBlank { "game_side_bg.jpg" }
+        floatingBallIcon = d.floatingBallIcon.ifBlank { "ic_floating_dave.png" }
+        bgFillImageFile = null
+        // 更新模式：进游戏声明由 pickApk 从目标 APK 读取，不在 applyConfigDefaults 中覆盖
+        if (!isUpdateMode) antiDistributionText = readDefaultAntiDistribution(context)
+        versions = d.versions.ifEmpty { listOf(VersionDraft("new", "正式服", "全新体验", "new_version_icon.png", default = true), VersionDraft("old", "怀旧服", "经典怀旧", "old_version_icon.png")) }
+        isExpandedVersions = d.isExpandedVersions; versionsTheme = d.versionsTheme
+        sections = d.sections.filter { includeExamples || !it.id.startsWith("example_") }
+        announcements = d.announcements.ifEmpty { listOf(AnnouncementDraft("拓展2.5.1(最新版)", "内容{{red:演示的红色内容}}内容"), AnnouncementDraft("拓展2.0.0(怀旧版)", "内容")) }
+        showFloatingWindowLabel = d.showFloatingWindowLabel.ifBlank { "是否开启悬浮窗" }
+        isShowFloatingWindowDefault = d.isShowFloatingWindowDefault
+        fwItems = d.fwItems.ifEmpty { listOf(FwItemDraft(id = "vpn_toggle", name = "{{js:vpn.isActive() ? '恢复网络' : '断开网络'}}", buttonColor = "red", isShowFromJs = "vpn.isPrepared()", jsScript = "vpn.isActive() ? vpn.restore() : vpn.disconnect();"), FwItemDraft(id = "game_display", name = "画面设置", buttonColor = "green", isShowFromJs = "ui.isCustomGameDisplayEnabled()", jsScript = "ui.showGameDisplay();")) }
+        fwEmptyTip = d.fwEmptyTip.ifBlank { "（悬浮窗暂无内容，请在 dream.yml 的 ui.floatingWindow.items 中配置）" }
+        fwAllHiddenTip = d.fwAllHiddenTip.ifBlank { "（当前没有可用的功能）" }
+        exitConfirmTitle = d.exitConfirmTitle.ifBlank { "退出游戏" }
+        exitConfirmMessage = d.exitConfirmMessage.ifBlank { "确定要退出游戏吗？" }; isUseExitConfirm = d.isUseExitConfirm
+        exitConfirmButtonText = d.exitConfirmButtonText.ifBlank { "确认退出" }
+        floatingExitConfirmTitle = d.floatingExitConfirmTitle.ifBlank { "确认退出" }
+        floatingExitConfirmMessage = d.floatingExitConfirmMessage.ifBlank { "确定要退出悬浮窗吗(直至重启游戏后显示)？" }
+        floatingExitConfirmButtonText = d.floatingExitConfirmButtonText.ifBlank { "确认" }
+        tbiItems = d.tbiItems.ifEmpty { listOf(TbiItemDraft(id = "refresh_top", icon = "images/new_version_icon.png", iconPress = "images/new_version_icon.png", contentDescription = "刷新", isShowFromJs = "ui.isCustomGameDisplayEnabled()", jsScript = "ui.refreshAll();"), TbiItemDraft(id = "help_top", icon = "images/new_version_icon.png", contentDescription = "帮助", jsPath = "topbar/help.js")) }
+        uiVersionLabel = d.uiVersionLabel; uiUiVersion = d.uiUiVersion; uiAuthorInfo = d.uiAuthorInfo
+        uiTutorial = d.uiTutorial; uiNoValidDirTip = d.uiNoValidDirTip
+        uiTitleTopAppBar = d.uiTitleTopAppBar; uiTitleAbout = d.uiTitleAbout
+        uiTitleCoreFunction = d.uiTitleCoreFunction; uiTitleVersionManage = d.uiTitleVersionManage
+        uiBtnEnterGame = d.uiBtnEnterGame; uiBtnTutorial = d.uiBtnTutorial
+        uiBtnResetData = d.uiBtnResetData; uiBtnShowFW = d.uiBtnShowFW; uiBtnConfirmVersion = d.uiBtnConfirmVersion
+        uiLogPanelTitle = d.uiLogPanelTitle; uiLogCopyDesc = d.uiLogCopyDesc; uiLogClearDesc = d.uiLogClearDesc
+        uiLogNoLogText = d.uiLogNoLogText; uiLogPresetSaveLabel = d.uiLogPresetSaveLabel; uiLogLocalSaveLabel = d.uiLogLocalSaveLabel
+        uiDialogConfirm = d.uiDialogConfirm; uiDialogCancel = d.uiDialogCancel
+        uiWelcomeGreeting = d.uiWelcomeGreeting; uiWelcomeEditTitle = d.uiWelcomeEditTitle; uiWelcomeEditHint = d.uiWelcomeEditHint
+        uiExDialogTitle = d.uiExDialogTitle; uiExInitLoadTip = d.uiExInitLoadTip; uiExInitProgTip = d.uiExInitProgTip
+        uiExNoNeedTip = d.uiExNoNeedTip; uiExSingleFileTip = d.uiExSingleFileTip; uiExMultiFileTip = d.uiExMultiFileTip
+        uiExWaitingTip = d.uiExWaitingTip; uiExCompleteTip = d.uiExCompleteTip
+        uiExFailPrefix = d.uiExFailPrefix; uiExSkipPrefix = d.uiExSkipPrefix
+        uiExContinueBtn = d.uiExContinueBtn; uiExCompleteBtn = d.uiExCompleteBtn; uiExToastErr = d.uiExToastErr
+        uiSndSwitchPress = d.uiSndSwitchPress; uiSndSwitchRelease = d.uiSndSwitchRelease
+        uiSndBtnPress = d.uiSndBtnPress; uiSndBtnRelease = d.uiSndBtnRelease
+        uiSndSettingsPress = d.uiSndSettingsPress; uiSndSettingsRelease = d.uiSndSettingsRelease
+        uiSndXClosePress = d.uiSndXClosePress; uiSndXCloseRelease = d.uiSndXCloseRelease
+        uiSndPanelPress = d.uiSndPanelPress; uiSndPanelRelease = d.uiSndPanelRelease
+        uiSndSwitchClick = d.uiSndSwitchClick
+        uiBtnEnterGameIcon = d.uiBtnEnterGameIcon; uiBtnTutorialIcon = d.uiBtnTutorialIcon; uiBtnResetDataIcon = d.uiBtnResetDataIcon
+        uiSetTitle = d.uiSetTitle; uiSetSolidBg = d.uiSetSolidBg; uiSetPlayMusic = d.uiSetPlayMusic
+        uiSetImportSmf = d.uiSetImportSmf; uiSetReload = d.uiSetReload; uiSetResetSmf = d.uiSetResetSmf
+        uiSetCustomDisplay = d.uiSetCustomDisplay; uiSetDisplayTitle = d.uiSetDisplayTitle; uiSetApplyBtn = d.uiSetApplyBtn
+        uiErrJsTitle = d.uiErrJsTitle; uiErrUnknown = d.uiErrUnknown
+        uiDlgDelSave = d.uiDlgDelSave; uiDlgEditUser = d.uiDlgEditUser; uiDlgShareTitle = d.uiDlgShareTitle
+        uiDlgPackFail = d.uiDlgPackFail; uiDlgNoShare = d.uiDlgNoShare
+        uiSetChangeProfile = d.uiSetChangeProfile; uiSetShowNotUpdate = d.uiSetShowNotUpdate; uiSetExitConfirm = d.uiSetExitConfirm
+        saveDraft = d.save; gameDisplay = d.gameDisplay
+        schedules = d.schedules
     }
+
+    // 更新模式：选完目标 APK 后，用目标 dream.yml 作为向导默认值（覆盖内置模板）；切回内置模式则恢复内置默认。
+    // 仅在进入向导填写前触发（pickApk 之后），不会清空用户在向导内已编辑的内容。
+    LaunchedEffect(sourceMode, targetDreamYmlRaw) {
+        applyConfigDefaults(loadDefaultsFromDreamYml(effectiveDefaultsRaw), isUpdateMode = sourceMode == "update")
+    }
+
+    // 全屏图片预览浮层状态：点缩略图/背景图预览后设置（Coil model），置 null 关闭
+    var previewModel by remember { mutableStateOf<Any?>(null) }
+    val openImagePreview: (Any) -> Unit = { previewModel = it }
+    val openImagePreviewFromResource: () -> Unit = { previewModel = R.mipmap.bg_fill_image }
 
     // ── 预览模式状态 ──
     var isPreviewing by remember { mutableStateOf(false) }
@@ -1234,9 +1432,9 @@ fun ToolboxIntegratorScreen(
     // 基于向导状态实时构建，随任何编辑即时更新
     val previewYml by remember {
         derivedStateOf {
-            if (dreamYmlRaw.isEmpty()) null
+            if (dreamYmlRaw.isEmpty() && targetDreamYmlRaw.isNullOrEmpty()) null
             else buildYamlFromWizard(
-                dreamYmlRaw,
+                effectiveDefaultsRaw,
                 gameActivity, smfDirectory, baseAssetPath, simplifiedLaunch,
                 cgVideoPath, cgVideoPoster, cgVideoLoadTimeout, gameActivityInvalid,
                 versions, sections, announcements,
@@ -1267,14 +1465,15 @@ fun ToolboxIntegratorScreen(
                 uiDlgDelSave, uiDlgEditUser, uiDlgShareTitle, uiDlgPackFail, uiDlgNoShare,
                 uiWelcomeEditTitle, uiWelcomeEditHint,
                 saveDraft, gameDisplay, uiSetChangeProfile, uiSetShowNotUpdate, uiSetExitConfirm, uiSndSwitchClick,
-                schedules = schedules
+                schedules = schedules,
+                isUpdateMode = sourceMode == "update"
             )
         }
     }
     val parsedConfig = remember(previewYml) {
         previewYml?.let {
             runCatching {
-                Yaml().decodeFromString(Pvz2ToolConfig.serializer(), it)
+                lenientYaml.decodeFromString(Pvz2ToolConfig.serializer(), it)
             }.getOrNull()
         }
     }
@@ -1321,11 +1520,67 @@ fun ToolboxIntegratorScreen(
                         return@onSuccess
                     }
 
+                    // 工具箱特征检测：检查 APK 是否包含 assets/pvz2tool/ 目录
+                    val hasToolbox = withContext(Dispatchers.IO) {
+                        runCatching {
+                            java.util.zip.ZipFile(out).use { zip ->
+                                zip.entries().asSequence().any { it.name.startsWith("assets/pvz2tool/") }
+                            }
+                        }.getOrDefault(false)
+                    }
+                    if (sourceMode == "update" && !hasToolbox) {
+                        JsUiManager.hideLoading()
+                        toolboxModeWarning = "update_wrong"
+                        return@onSuccess
+                    }
+                    if (sourceMode == "integrate" && hasToolbox) {
+                        JsUiManager.hideLoading()
+                        toolboxModeWarning = "integrate_wrong"
+                        return@onSuccess
+                    }
+
                     targetApk = out
                     report = null; result = null
                     gameActivity = info.gameActivity
                     // 默认选择：目标含 kotlin → 插入之前（新版推荐）；否则 → 追加之后（老版推荐）
                     dexStrategy = if (info.hasKotlin) DexStrategy.INSERT_BEFORE else DexStrategy.APPEND
+
+                    // 更新模式：检测目标 APK 内的集成描述文件，并读取其 dream.yml 作为向导模板
+                    if (sourceMode == "update") {
+                        detectedInfo = ToolboxApkMerger.detectIntegratorInfo(out)
+                        targetDreamYmlRaw = runCatching {
+                            ApkModule.loadApkFile(out)
+                                .getInputSource("assets/pvz2tool/dream.yml")
+                                ?.openStream()?.readBytes()?.toString(Charsets.UTF_8)
+                        }.getOrNull()
+                        // 同时读取目标 APK 的进游戏声明文本（anti-distribution.txt）
+                        runCatching {
+                            ApkModule.loadApkFile(out)
+                                .getInputSource("assets/pvz2tool/anti-distribution.txt")
+                                ?.openStream()?.readBytes()?.toString(Charsets.UTF_8)
+                        }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { antiDistributionText = it }
+                        detectedInfo?.let { di ->
+                            // 描述文件内部的 dexStart/dexEnd 是 0-based，UI 使用 1-based 序号
+                            updDexStart = (di.dexStart + 1).toString()
+                            updDexEnd = (di.dexEnd + 1).toString()
+                            updInsertMode = if (di.insertMode == "after") DexStrategy.APPEND else DexStrategy.INSERT_BEFORE
+                            includeExamples = di.includeExamples
+                            simplifiedLaunch = di.simplifiedLaunch
+                        } ?: run {
+                            // 无描述文件：扫描目标 APK 第一个 >20MB 的 DEX 序号作为默认值
+                            val idx = findLargeDexIndex(out)
+                            updDexStart = idx.toString()
+                            updDexEnd = ""
+                            // 起始序号=1（第一个 DEX）→ 插之前；否则 → 追之后
+                            updInsertMode = if (idx <= 1) DexStrategy.INSERT_BEFORE else DexStrategy.APPEND
+                            // 无描述文件视为旧版集成，示例项目默认关闭，pvz2tool 仅替换已有文件
+                            includeExamples = false
+                            appendUnreferencedAssets = false
+                        }
+                    } else {
+                        detectedInfo = null
+                        targetDreamYmlRaw = null
+                    }
                 }
                 JsUiManager.hideLoading()
             }
@@ -1340,8 +1595,6 @@ fun ToolboxIntegratorScreen(
         fieldKey.contains("sound") || fieldKey.contains("Sound") ||
         fieldKey.contains("Music") || fieldKey == "bgMusic" -> "sound/"
         fieldKey.startsWith("cgVideo") -> "video/"
-        fieldKey.contains("jsPath") || fieldKey.contains("enterGamePath") ||
-        fieldKey.contains("isShowFromJsPath") -> "js/"
         else -> ""
     }
 
@@ -1580,7 +1833,24 @@ fun ToolboxIntegratorScreen(
             JsUiManager.showLoading("正在计算差异", "请稍候，正在分析 APK 差异…")
             val res = withContext(Dispatchers.IO) {
                 val (extraAssets, extraRes) = computeExtraResources()
-                runCatching { ToolboxApkMerger.preview(sourceApk, t, dexStrategy, extraAssets, extraRes, excludedSmfAssets, removedTargetEntries) }
+                val isUpdateMode = sourceMode == "update"
+                val rawStart = updDexStart.toIntOrNull() ?: 1     // 1-based UI 值
+                val effStart = rawStart - 1                         // 内部 0-based
+                val effEnd = run {
+                    val rawEnd = updDexEnd.toIntOrNull()
+                    if (rawEnd == null) effStart + sourceDexCount - 1   // 留空 = 覆盖到本版本所有 DEX
+                    else (rawEnd - 1).coerceAtLeast(effStart)           // 用户填写（1-based → 0-based）
+                }
+                runCatching {
+                    // 更新模式下 bg_fill_image 的保留由合并引擎统一处理（res 全量替换、仅跳过 bg_fill_image），此处无需重复计算
+                    val preserveTargetRes = emptySet<String>()
+                    ToolboxApkMerger.preview(
+                        sourceApk, t, dexStrategy, extraAssets, extraRes, excludedSmfAssets, removedTargetEntries,
+                        version = sourceVersion, updateMode = isUpdateMode, dexStart = effStart, dexEnd = effEnd,
+                        overrideDreamYml = previewYml, preserveTargetResEntries = preserveTargetRes,
+                        preserveTargetAssets = isUpdateMode, appendUnreferenced = !isUpdateMode || appendUnreferencedAssets
+                    )
+                }
             }
             res.onFailure { errorMsg = "计算差异失败：${it.message}" }
             report = res.getOrNull()
@@ -1600,7 +1870,7 @@ fun ToolboxIntegratorScreen(
                     val base = context.cacheDir ?: context.filesDir ?: throw IllegalStateException("无可用缓存目录")
                     val out = File(base, "integrator_out/$outName")
                     val overrideYml = buildYamlFromWizard(
-                        dreamYmlRaw,
+                        effectiveDefaultsRaw,
                         gameActivity, smfDirectory, baseAssetPath, simplifiedLaunch,
                         cgVideoPath, cgVideoPoster, cgVideoLoadTimeout, gameActivityInvalid,
                         versions, sections, announcements,
@@ -1631,16 +1901,32 @@ fun ToolboxIntegratorScreen(
                         uiDlgDelSave, uiDlgEditUser, uiDlgShareTitle, uiDlgPackFail, uiDlgNoShare,
                         uiWelcomeEditTitle, uiWelcomeEditHint,
                         saveDraft, gameDisplay, uiSetChangeProfile, uiSetShowNotUpdate, uiSetExitConfirm, uiSndSwitchClick,
-                        schedules = schedules
+                        schedules = schedules,
+                        isUpdateMode = sourceMode == "update"
                     )
                     // 组装额外资源：区分 assets 与 res 两条注入通道（与预览共用同一逻辑，保证清单一致）
                     val (extraAssets, extraRes) = computeExtraResources()
+                    val isUpdateMode = sourceMode == "update"
+                    val rawStart = updDexStart.toIntOrNull() ?: 1     // 1-based UI 值
+                    val effStart = rawStart - 1                         // 内部 0-based
+                    val effEnd = run {
+                        val rawEnd = updDexEnd.toIntOrNull()
+                        if (rawEnd == null) effStart + sourceDexCount - 1 else (rawEnd - 1).coerceAtLeast(effStart)
+                    }
+                    // 更新模式且用户未显式覆盖背景图时，保留目标 APK 现有 bg_fill_image（跳过源 APK 覆盖）
+                    val preserveTargetRes = if (isUpdateMode && !extraRes.containsKey("mipmap-hdpi-v4/bg_fill_image.jpg"))
+                        setOf("res/mipmap-hdpi-v4/bg_fill_image.jpg") else emptySet()
                     ToolboxApkMerger.apply(sourceApk, t, dexStrategy, out, includeExamples,
                         overrideDreamYml = overrideYml,
                         extraResources = extraAssets,
                         extraResResources = extraRes,
                         excludedSmfAssets = excludedSmfAssets,
-                        removedTargetEntries = removedTargetEntries)
+                        removedTargetEntries = removedTargetEntries,
+                        version = sourceVersion, updateMode = isUpdateMode, dexStart = effStart, dexEnd = effEnd, insertMode = updInsertMode,
+                        preserveTargetResEntries = preserveTargetRes,
+                        simplifiedLaunch = simplifiedLaunch,
+                        preserveTargetAssets = isUpdateMode,
+                        appendUnreferenced = !isUpdateMode || appendUnreferencedAssets)
                 }
             }
             res.onFailure { errorMsg = "合并失败：${it.message}"; it.printStackTrace() }
@@ -1847,15 +2133,8 @@ fun ToolboxIntegratorScreen(
     fun restart() {
         step = 1; targetApk = null; report = null; result = null
         dexStrategy = DexStrategy.INSERT_BEFORE; includeExamples = true
-        gameActivity = ""; smfDirectory = defaults.smfDirectory; baseAssetPath = defaults.baseAssetPath.ifBlank { "version/base/smf" }; simplifiedLaunch = false
-        cgVideoPath = "opening.mp4"; cgVideoPoster = "bg_main.jpg"; cgVideoLoadTimeout = "5000"
-        gameActivityInvalid = "设置的游戏Activity有误或不存在"
-        bgImage = defaults.bgImage.ifBlank { "bg_main.jpg" }; isUseSolidColorBg = defaults.isUseSolidColorBg
-        bgMusic = defaults.bgMusic.ifBlank { "bg_music.wav" }; isPlayBgMusic = defaults.isPlayBgMusic
-        sideBgImage = defaults.sideBgImage.ifBlank { "game_side_bg.jpg" }
-        floatingBallIcon = defaults.floatingBallIcon.ifBlank { "ic_floating_dave.png" }
-        bgFillImageFile = null
-        antiDistributionText = readDefaultAntiDistribution(context)
+        applyConfigDefaults(defaults)   // 配置字段恢复为当前模式默认值（更新模式=目标 APK 配置，内置模式=内置模板）
+        gameActivity = ""               // 游戏 Activity 由下一步 pickApk 重新探测，此处清空
         showUiSettings = false; showAnnouncementSettings = false; showFloatingWindowSettings = false
         showTopBarIconSettings = false; showVersionSettings = false; showSectionSettings = false; showUiAdvancedSettings = false
         showSmfResourceSettings = false
@@ -1873,22 +2152,6 @@ fun ToolboxIntegratorScreen(
         localFolderUris = emptyMap()
         pendingLocalDeletions = emptyList()
         targetApkBrowserScope = null
-        versions = defaults.versions.ifEmpty { listOf(VersionDraft("new", "正式服", "全新体验", "new_version_icon.png", default = true), VersionDraft("old", "怀旧服", "经典怀旧", "old_version_icon.png")) }
-        isExpandedVersions = defaults.isExpandedVersions; versionsTheme = defaults.versionsTheme
-        sections = defaults.sections.filter { includeExamples || !it.id.startsWith("example_") }
-        announcements = defaults.announcements.ifEmpty { listOf(AnnouncementDraft("拓展2.5.1(最新版)", "内容{{red:演示的红色内容}}内容"), AnnouncementDraft("拓展2.0.0(怀旧版)", "内容")) }
-        showFloatingWindowLabel = defaults.showFloatingWindowLabel.ifBlank { "是否开启悬浮窗" }
-        isShowFloatingWindowDefault = defaults.isShowFloatingWindowDefault
-        fwItems = defaults.fwItems.ifEmpty { listOf(FwItemDraft(id = "vpn_toggle", name = "{{js:vpn.isActive() ? '恢复网络' : '断开网络'}}", buttonColor = "red", isShowFromJs = "vpn.isPrepared()", jsScript = "vpn.isActive() ? vpn.restore() : vpn.disconnect();"), FwItemDraft(id = "game_display", name = "画面设置", buttonColor = "green", isShowFromJs = "ui.isCustomGameDisplayEnabled()", jsScript = "ui.showGameDisplay();")) }
-        fwEmptyTip = defaults.fwEmptyTip.ifBlank { "（悬浮窗暂无内容，请在 dream.yml 的 ui.floatingWindow.items 中配置）" }
-        fwAllHiddenTip = defaults.fwAllHiddenTip.ifBlank { "（当前没有可用的功能）" }
-        exitConfirmTitle = defaults.exitConfirmTitle.ifBlank { "退出游戏" }
-        exitConfirmMessage = defaults.exitConfirmMessage.ifBlank { "确定要退出游戏吗？" }; isUseExitConfirm = defaults.isUseExitConfirm
-        exitConfirmButtonText = defaults.exitConfirmButtonText.ifBlank { "确认退出" }
-        floatingExitConfirmTitle = defaults.floatingExitConfirmTitle.ifBlank { "确认退出" }
-        floatingExitConfirmMessage = defaults.floatingExitConfirmMessage.ifBlank { "确定要退出悬浮窗吗(直至重启游戏后显示)？" }
-        floatingExitConfirmButtonText = defaults.floatingExitConfirmButtonText.ifBlank { "确认" }
-        tbiItems = defaults.tbiItems.ifEmpty { listOf(TbiItemDraft(id = "refresh_top", icon = "images/new_version_icon.png", iconPress = "images/new_version_icon.png", contentDescription = "刷新", isShowFromJs = "ui.isCustomGameDisplayEnabled()", jsScript = "ui.refreshAll();"), TbiItemDraft(id = "help_top", icon = "images/new_version_icon.png", contentDescription = "帮助", jsPath = "topbar/help.js")) }
     }
 
     // ── 预览模式切换 ──
@@ -1940,6 +2203,24 @@ fun ToolboxIntegratorScreen(
         val yml = previewYml ?: run { toast("配置尚未就绪，无法预览"); return }
         val cfg = parsedConfig ?: run { toast("配置尚未就绪，无法预览"); return }
         val previewDir = File(context.cacheDir, "integrator_preview").apply { deleteRecursively(); mkdirs() }
+        // 更新模式：先把目标 APK 的 assets/pvz2tool/ 整目录复制到预览目录作为底包（不含 dream.yml）
+        if (sourceMode == "update" && targetApk != null) {
+            runCatching {
+                ApkModule.loadApkFile(targetApk!!).use { module ->
+                    module.listInputSources().filter {
+                        it.name.startsWith("assets/pvz2tool/") && it.name != "assets/pvz2tool/dream.yml"
+                    }.forEach { ins ->
+                        val rel = ins.name.removePrefix("assets/pvz2tool/")
+                        if (rel.isNotEmpty() && !rel.contains("..")) {
+                            ins.openStream().use { inp ->
+                                File(previewDir, rel).apply { parentFile?.mkdirs() }.outputStream().use { inp.copyTo(it) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // 第二阶段：用户选择/修改的文件覆盖底包
         stagePreviewAssets(previewDir)
         // 写入预览用 dream.yml（仅作为本地配置目录入口文件，其 parent 即预览工作目录）
         val localYml = File(previewDir, "dream.yml").apply { writeText(yml) }
@@ -2287,7 +2568,8 @@ fun ToolboxIntegratorScreen(
                 // ── SMF/资源设置子页面 ──
                 showSmfResourceSettings && step == 2 -> {
                     SmfResourceSettingsContent(
-                        sourceApk = sourceApk,
+                        // 更新模式：目标 APK 已有旧版工具箱资源，列出目标内资源让用户决定保留/替换
+                        sourceApk = if (sourceMode == "update") targetApk ?: sourceApk else sourceApk,
                         baseAssetPath = baseAssetPath,
                         onBaseAssetPath = { baseAssetPath = it },
                         versions = versions,
@@ -2384,7 +2666,13 @@ fun ToolboxIntegratorScreen(
                                     FileInputRow(cgVideoPath, "如 opening.mp4", "*/*", "cgVideoPath", { cgVideoPath = it }, selectedFolder = selectedFolders["cgVideoPath"], onPickFile = { label, mime -> pickAnyFile(label, mime) }, onPickFolder = { fk -> pickFolder(fk) }, onClearSelection = { clearFieldSelection("cgVideoPath") })
                                 }
                                 UiInputCard("${ymlAssets}cgVideoPoster", "CG 加载超时或出错时的占位海报图。") {
-                                    FileInputRow(cgVideoPoster, "如 bg_main.jpg", "*/*", "cgVideoPoster", { cgVideoPoster = it }, selectedFile = selectedFiles["cgVideoPoster"], selectedFolder = selectedFolders["cgVideoPoster"], onImagePreview = openImagePreview, onPickFile = { label, mime -> pickAnyFile(label, mime) }, onPickFolder = { fk -> pickFolder(fk) }, onClearSelection = { clearFieldSelection("cgVideoPoster") })
+                                    FileInputRow(cgVideoPoster, "如 bg_main.jpg", "*/*", "cgVideoPoster", { cgVideoPoster = it },
+                                        selectedFile = selectedFiles["cgVideoPoster"], selectedFolder = selectedFolders["cgVideoPoster"],
+                                        onImagePreview = openImagePreview,
+                                        onPickFile = { label, mime -> pickAnyFile(label, mime) },
+                                        onPickFolder = { fk -> pickFolder(fk) },
+                                        onClearSelection = { clearFieldSelection("cgVideoPoster") },
+                                        targetApk = if (sourceMode == "update") targetApk else null)
                                 }
                                 UiInputCard("${ymlAssets}cgVideoLoadTimeout", "CG 视频加载超时时间（毫秒），默认 5000。") {
                                     IntegratorInputField(cgVideoLoadTimeout, "如 5000") { cgVideoLoadTimeout = it }
@@ -2435,7 +2723,8 @@ fun ToolboxIntegratorScreen(
                                             onImagePreview = openImagePreview,
                                             onPickFile = { label, mime -> pickAnyFile(label, mime) },
                                             onPickFolder = { fk -> pickFolder(fk) },
-                                            onClearSelection = { clearFieldSelection("bgImage") })
+                                            onClearSelection = { clearFieldSelection("bgImage") },
+                                            targetApk = if (sourceMode == "update") targetApk else null)
                                     }
                                     UiSwitchCard(
                                         "ui.assets.isUseSolidColorBackground",
@@ -2457,7 +2746,8 @@ fun ToolboxIntegratorScreen(
                                             onImagePreview = openImagePreview,
                                             onPickFile = { label, mime -> pickAnyFile(label, mime) },
                                             onPickFolder = { fk -> pickFolder(fk) },
-                                            onClearSelection = { clearFieldSelection("sideBgImage") })
+                                            onClearSelection = { clearFieldSelection("sideBgImage") },
+                                            targetApk = if (sourceMode == "update") targetApk else null)
                                     }
                                     UiInputCard("ui.assets.floatingBallIcon", "悬浮球图标文件名。") {
                                         FileInputRow(
@@ -2471,36 +2761,22 @@ fun ToolboxIntegratorScreen(
                                             onImagePreview = openImagePreview,
                                             onPickFile = { label, mime -> pickAnyFile(label, mime) },
                                             onPickFolder = { fk -> pickFolder(fk) },
-                                            onClearSelection = { clearFieldSelection("floatingBallIcon") })
+                                            onClearSelection = { clearFieldSelection("floatingBallIcon") },
+                                            targetApk = if (sourceMode == "update") targetApk else null)
                                     }
                                 }
-                                UiInputCard("ui.assets.bgFillImage (@mipmap/bg_fill_image)", "App 启动窗口背景图（windowBackground）。下方为当前默认背景，点「修改背景图」选本地图片替换即可；资源表固定为 .jpg，所选图片打包时会自动转为 JPEG。") {
-                                    val selectedBmp = remember(bgFillImageFile) {
-                                        bgFillImageFile?.let { BitmapFactory.decodeFile(it.absolutePath) }
-                                    }
-                                    if (selectedBmp != null) {
-                                        Image(
-                                            bitmap = selectedBmp.asImageBitmap(),
-                                            contentDescription = "已选背景图预览（点击大屏预览）",
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(140.dp)
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .clickable { openImagePreview(selectedBmp.asImageBitmap()) },
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        Image(
-                                            painter = painterResource(R.mipmap.bg_fill_image),
-                                            contentDescription = "默认背景图（点击大屏预览）",
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(140.dp)
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .clickable { openImagePreviewFromResource() },
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    }
+                                UiInputCard("ui.assets.bgFillImage (@mipmap/bg_fill_image)", "App 启动窗口背景图（windowBackground）。下方为当前默认背景，点「修改背景图」选本地图片替换即可；资源表固定为 .jpg，所选图片打包时会自动转为 JPEG。更新模式下未单独修改则保留目标 APK 现有背景。") {
+                                    val fillModel = bgFillImageFile ?: targetBgFillImage ?: R.mipmap.bg_fill_image
+                                    AsyncImage(
+                                        model = fillModel,
+                                        contentDescription = if (bgFillImageFile != null) "已选背景图预览（点击大屏预览）" else "目标 APK 当前背景图预览（点击大屏预览）",
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(140.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable { openImagePreview(fillModel) },
+                                        contentScale = ContentScale.Crop
+                                    )
                                     Spacer(Modifier.height(8.dp))
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                                         PvzBlueButton("修改背景图", Modifier.height(36.dp)) { pickBgFillImage() }
@@ -2598,7 +2874,12 @@ fun ToolboxIntegratorScreen(
                                     .verticalScroll(rememberScrollState())
                             ) {
                                 when (step) {
-                                    1 -> StepSourceLeft(sourceApk.name, sourceVersion)
+                                    1 -> StepSourceLeft(
+                                        sourceName = sourceApk.name,
+                                        sourceVersion = sourceVersion,
+                                        sourceMode = sourceMode,
+                                        onSourceMode = { sourceMode = it }
+                                    )
                                     2 -> StepTargetLeft(
                                         targetApk = targetApk,
                                         gameActivity = gameActivity,
@@ -2606,7 +2887,21 @@ fun ToolboxIntegratorScreen(
                                         smfDirectory = smfDirectory,
                                         onStrategy = { dexStrategy = it },
                                         onSmfDirectory = { smfDirectory = it },
-                                        onPickApk = { pickApk() }
+                                        onPickApk = { pickApk() },
+                                        sourceMode = sourceMode,
+                                        detectedInfo = detectedInfo,
+                                        sourceDexCount = sourceDexCount,
+                                        updDexStart = updDexStart,
+                                        updDexEnd = updDexEnd,
+                                        updInsertMode = updInsertMode,
+                                        onUpdDexStart = {
+                                            updDexStart = it
+                                            updInsertMode = if ((it.toIntOrNull() ?: 1) <= 1) DexStrategy.INSERT_BEFORE else DexStrategy.APPEND
+                                        },
+                                        onUpdDexEnd = { updDexEnd = it },
+                                        onUpdInsertMode = { updInsertMode = it },
+                                        appendUnreferencedAssets = appendUnreferencedAssets,
+                                        onAppendUnreferencedAssets = { appendUnreferencedAssets = it }
                                     )
                                     3 -> StepPreviewLeft(
                                         report = report, result = result, loading = loading,
@@ -2644,7 +2939,9 @@ fun ToolboxIntegratorScreen(
                                         onOpenVersionSettings = { showVersionSettings = true },
                                         onOpenSectionSettings = { showSectionSettings = true; editingSectionIndex = -1 },
                                         onOpenSmfResourceSettings = { showSmfResourceSettings = true },
-                                        onOpenScheduleSettings = { showScheduleSettings = true }
+                                        onOpenScheduleSettings = { showScheduleSettings = true },
+                                        // 更新模式无描述文件时隐藏简易模式/示例项目开关（沿用目标 APK 已有状态）
+                                        showLaunchOptions = !(sourceMode == "update" && detectedInfo == null)
                                     )
                                     3 -> StepPreviewRight(
                                         report = report, result = result,
@@ -2685,16 +2982,16 @@ fun ToolboxIntegratorScreen(
         }
 
         // 全屏图片预览浮层：点缩略图/背景图预览后展示，点任意处关闭
-        if (previewBitmap != null) {
+        if (previewModel != null) {
             Box(
                 Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.92f))
-                    .clickable { previewBitmap = null },
+                    .clickable { previewModel = null },
                 contentAlignment = Alignment.Center
             ) {
-                Image(
-                    bitmap = previewBitmap!!,
+                AsyncImage(
+                    model = previewModel!!,
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2750,6 +3047,28 @@ fun ToolboxIntegratorScreen(
                         .fillMaxWidth()
                         .height(42.dp)) {
                         f.delete(); popCapWarningFile = null
+                    }
+                }
+            }
+        ) {}
+    }
+    // 工具箱模式不匹配警告弹窗
+    toolboxModeWarning?.let { mode ->
+        val (title, desc) = if (mode == "update_wrong")
+            "该 APK 不含工具箱" to "此 APK 未检测到工具箱特征（assets/pvz2tool/），无法执行更新。\n请选择已集成工具箱的 APK，或在第一步切换为「内置到未集成的 APK」。"
+        else
+            "该 APK 已含工具箱" to "此 APK 已包含工具箱特征，请使用更新模式。\n请在第一步切换为「更新已集成的 APK」后重新选择。"
+        PvzStyledDialog(
+            isVisible = true,
+            titleText = title,
+            onDismissRequest = { toolboxModeWarning = null },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            bottomContent = {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PvzBodyText(desc)
+                    PvzRedButton("我知道了", Modifier.fillMaxWidth().height(42.dp)) {
+                        toolboxModeWarning = null
                     }
                 }
             }
@@ -2858,12 +3177,33 @@ private fun BottomNavRow(
 // ── 第 1 步：源确认（左右分栏）──────────────────────────────────
 
 @Composable
-private fun StepSourceLeft(sourceName: String, sourceVersion: String) {
+private fun StepSourceLeft(
+    sourceName: String,
+    sourceVersion: String,
+    sourceMode: String,
+    onSourceMode: (String) -> Unit
+) {
     PvzSectionTitle("第 1 步 · 源确认")
 
     PvzInfoCard("源 = 当前安装的工具箱 APK（自身）") {
         PvzBodyText("即本应用自身 APK，自带资源包 id 0x66，将作为「新版本」集成到目标游戏 APK。")
         PvzHighlightText("文件：$sourceName　版本：$sourceVersion")
+    }
+
+    Spacer(Modifier.height(8.dp))
+    PvzInfoCard("集成模式") {
+        PvzBodyText("选择本次集成的目标类型。")
+        Spacer(Modifier.height(8.dp))
+        PvzChoiceRow(
+            label = "内置到未集成的 APK 中",
+            selected = sourceMode == "integrate",
+            onClick = { onSourceMode("integrate") }
+        )
+        PvzChoiceRow(
+            label = "更新已集成的 APK",
+            selected = sourceMode == "update",
+            onClick = { onSourceMode("update") }
+        )
     }
 }
 
@@ -2890,12 +3230,30 @@ private fun StepTargetLeft(
     smfDirectory: String,
     onStrategy: (DexStrategy) -> Unit,
     onSmfDirectory: (String) -> Unit,
-    onPickApk: () -> Unit
+    onPickApk: () -> Unit,
+    // 更新模式相关
+    sourceMode: String = "integrate",
+    detectedInfo: ToolboxApkMerger.IntegratorInfo? = null,
+    sourceDexCount: Int = 0,
+    updDexStart: String = "0",
+    updDexEnd: String = "",
+    updInsertMode: DexStrategy = DexStrategy.INSERT_BEFORE,
+    onUpdDexStart: (String) -> Unit = {},
+    onUpdDexEnd: (String) -> Unit = {},
+    onUpdInsertMode: (DexStrategy) -> Unit = {},
+    // 更新模式：「附加未包含 pvz2tool 内容」开关
+    appendUnreferencedAssets: Boolean = true,
+    onAppendUnreferencedAssets: (Boolean) -> Unit = {}
 ) {
     PvzSectionTitle("第 2 步 · 目标设置")
 
     PvzInfoCard("选择目标游戏 APK") {
-        PvzBodyText("选择一个未集成的目标游戏 APK。集成器将把工具箱注入其中。")
+        PvzBodyText(
+            if (sourceMode == "update")
+                "选择一个已集成工具箱的 APK。集成器将替换其中的旧版工具箱 DEX（依据描述文件或手动指定的范围）。"
+            else
+                "选择一个未集成的目标游戏 APK。集成器将把工具箱注入其中。"
+        )
         Spacer(Modifier.height(8.dp))
         PvzGreenButton("选择 APK 文件", Modifier
             .fillMaxWidth()
@@ -2907,7 +3265,7 @@ private fun StepTargetLeft(
     }
 
     // gameActivity 展示（只读，自动检测）—— Info 风格（浅绿卡片）
-    if (gameActivity.isNotEmpty() || targetApk != null) {
+    if ((gameActivity.isNotEmpty() || targetApk != null) && sourceMode != "update") {
         Spacer(Modifier.height(6.dp))
         PvzInfoCard("目标游戏活动 (gameActivity)") {
             PvzBodyText("自动检测到的游戏入口 Activity，将写入 dream.yml。")
@@ -2923,19 +3281,60 @@ private fun StepTargetLeft(
         }
     }
 
-    PvzInfoCard("DEX 合并策略") {
-        PvzBodyText("决定工具箱的 dex 放在目标 dex 之前还是之后。")
-        Spacer(Modifier.height(8.dp))
-        PvzChoiceRow(
-            label = "插入到目标所有 dex 之前（新版推荐）",
-            selected = dexStrategy == DexStrategy.INSERT_BEFORE,
-            onClick = { onStrategy(DexStrategy.INSERT_BEFORE) }
-        )
-        PvzChoiceRow(
-            label = "追加到目标 dex 之后（老版推荐）",
-            selected = dexStrategy == DexStrategy.APPEND,
-            onClick = { onStrategy(DexStrategy.APPEND) }
-        )
+    if (sourceMode == "update") {
+        // ── 更新模式：DEX 策略为「替换旧版工具箱 DEX」，不再自由选插入/追加 ──
+        val defaultEnd = (updDexStart.toIntOrNull() ?: 1) + (sourceDexCount - 1).coerceAtLeast(0)
+        PvzInfoCard("DEX 合并策略（更新模式）") {
+            PvzBodyText("更新模式：将替换目标 APK 中旧版工具箱 DEX，而非自由插入。")
+            Spacer(Modifier.height(8.dp))
+            detectedInfo?.let { di ->
+                PvzHighlightText("已检测到描述文件：版本 ${di.version}，旧工具箱 DEX 范围 [${di.dexStart + 1}..${di.dexEnd + 1}]")
+                Spacer(Modifier.height(6.dp))
+                PvzBodyText("新工具箱 DEX 将依据描述文件插入到剩余目标 DEX 的：")
+            } ?: run {
+                PvzBodyText("未检测到描述文件，请手动指定旧工具箱 DEX 所在范围：")
+                Spacer(Modifier.height(6.dp))
+                PvzBodyText("起始序号（1 起）：")
+                IntegratorInputField(updDexStart, "如 1") { onUpdDexStart(it) }
+                Spacer(Modifier.height(4.dp))
+                PvzBodyText("结束序号（留空 = 覆盖到本版本所有 DEX，默认 $defaultEnd）：")
+                IntegratorInputField(updDexEnd, "留空自动计算") { onUpdDexEnd(it) }
+                Spacer(Modifier.height(6.dp))
+            }
+            PvzChoiceRow(
+                label = "插入到剩余目标 DEX 之前（新版推荐）",
+                selected = updInsertMode == DexStrategy.INSERT_BEFORE,
+                onClick = { onUpdInsertMode(DexStrategy.INSERT_BEFORE) }
+            )
+            PvzChoiceRow(
+                label = "追加到剩余目标 DEX 之后（老版推荐）",
+                selected = updInsertMode == DexStrategy.APPEND,
+                onClick = { onUpdInsertMode(DexStrategy.APPEND) }
+            )
+        }
+        // 更新模式：附加未包含内容的开关
+        Spacer(Modifier.height(6.dp))
+        PvzInfoCard("附加未包含的 pvz2tool 内容") {
+            PvzBodyText("开启：源 APK 中目标没有的文件（如默认图/示例/新功能 JS）也会写入。关闭：仅替换目标已有文件。文档类（js_documentation.md / config_documentation.md）始终覆盖。")
+            Spacer(Modifier.height(6.dp))
+            PvzCheckRow("附加未包含内容", appendUnreferencedAssets) { onAppendUnreferencedAssets(!appendUnreferencedAssets) }
+        }
+    } else {
+        // ── 普通集成模式：DEX 插入/追加策略 ──
+        PvzInfoCard("DEX 合并策略") {
+            PvzBodyText("决定工具箱的 dex 放在目标 dex 之前还是之后。")
+            Spacer(Modifier.height(8.dp))
+            PvzChoiceRow(
+                label = "插入到目标所有 dex 之前（新版推荐）",
+                selected = dexStrategy == DexStrategy.INSERT_BEFORE,
+                onClick = { onStrategy(DexStrategy.INSERT_BEFORE) }
+            )
+            PvzChoiceRow(
+                label = "追加到目标 dex 之后（老版推荐）",
+                selected = dexStrategy == DexStrategy.APPEND,
+                onClick = { onStrategy(DexStrategy.APPEND) }
+            )
+        }
     }
 
     Spacer(Modifier.height(6.dp))
@@ -2960,19 +3359,25 @@ private fun StepTargetRight(
     onOpenSectionSettings: () -> Unit,
     onOpenSmfResourceSettings: () -> Unit,
     onOpenScheduleSettings: () -> Unit,
+    /** 更新模式无描述文件时隐藏简易模式/示例项目开关（沿用目标 APK 已有状态） */
+    showLaunchOptions: Boolean = true
 ) {
     PvzSectionTitle("集成选项")
 
-    // 简易模式开关
-    PvzInfoCard("简易模式 (simplifiedLaunch)") {
-        PvzBodyText("开启后跳过完整主界面，只解压基础资源后直接进入游戏。")
-        Spacer(Modifier.height(6.dp))
-        PvzCheckRow("启用简易模式", simplifiedLaunch) { onSimplifiedLaunch(!simplifiedLaunch) }
+    // 简易模式开关（更新模式无描述文件时隐藏，沿用目标 APK 已有状态）
+    if (showLaunchOptions) {
+        PvzInfoCard("简易模式 (simplifiedLaunch)") {
+            PvzBodyText("开启后跳过完整主界面，只解压基础资源后直接进入游戏。")
+            Spacer(Modifier.height(6.dp))
+            PvzCheckRow("启用简易模式", simplifiedLaunch) { onSimplifiedLaunch(!simplifiedLaunch) }
+        }
     }
 
     if (!simplifiedLaunch) {
-        PvzInfoCard("示例栏目") {
-            PvzCheckRow("保留示例栏目", includeExamples) { onIncludeExamples(!includeExamples) }
+        if (showLaunchOptions) {
+            PvzInfoCard("示例栏目") {
+                PvzCheckRow("保留示例栏目", includeExamples) { onIncludeExamples(!includeExamples) }
+            }
         }
         PvzRowLink("版本设置 →") { onOpenVersionSettings() }
         PvzRowLink("栏目设置 →") { onOpenSectionSettings() }
@@ -3520,7 +3925,7 @@ private fun CompositeTextToolDialog(onDismiss: () -> Unit) {
             Column(Modifier.fillMaxWidth()) {
                 PvzRichText(ctType.mainLabel, defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
-                IntegratorInputField(ctText, ctType.mainLabel, multiline = ctType == CtType.JS) { ctText = it }
+                IntegratorInputField(ctText, ctType.mainLabel, multiline = true) { ctText = it }
             }
 
         Spacer(Modifier.height(12.dp))
@@ -4188,14 +4593,34 @@ private fun ApkTreeNodes(
     }
 }
 
-private fun resolveDefaultThumb(context: Context, value: String): Bitmap? {
-    if (value.isBlank() || value.startsWith("/") || value.startsWith("http://") || value.startsWith("https://")) return null
-    val base = value.removePrefix("images/").removePrefix("pvz2tool/").removePrefix("pvz2tool")
-    val candidates = listOf("pvz2tool/images/$base", "pvz2tool/$base")
-    for (c in candidates) {
-        runCatching { context.assets.open(c).use { BitmapFactory.decodeStream(it) } }.getOrNull()?.let { return it }
+/** 解析默认图路径（用于 Coil AsyncImage）。更新模式下先从目标 APK 提取到临时文件。 */
+@Composable
+private fun rememberDefaultImagePath(context: Context, value: String, targetApk: File?): Any? {
+    return remember(value, targetApk) {
+        if (value.isBlank() || value.startsWith("/") || value.startsWith("http://") || value.startsWith("https://")) return@remember null
+        val base = value.removePrefix("images/").removePrefix("pvz2tool/").removePrefix("pvz2tool")
+        val candidates = listOf("pvz2tool/images/$base", "pvz2tool/$base")
+        // 更新模式：从目标 APK 提取到临时文件
+        if (targetApk != null) {
+            for (c in candidates) {
+                val apkPath = "assets/$c"
+                runCatching {
+                    ApkModule.loadApkFile(targetApk).use { module ->
+                        module.getInputSource(apkPath)?.openStream()?.use { inp ->
+                            val tmp = File(context.cacheDir, "thumb_${base.hashCode()}")
+                            tmp.outputStream().use { inp.copyTo(it) }
+                            return@remember tmp
+                        }
+                    }
+                }
+            }
+        }
+        // 回退：源 APK assets 路径（Coil 支持 android_asset URI）
+        for (c in candidates) {
+            try { context.assets.open(c).close(); return@remember "file:///android_asset/$c" } catch (_: Exception) {}
+        }
+        null
     }
-    return null
 }
 
 @Composable
@@ -4206,9 +4631,11 @@ private fun FileInputRow(
     onPickFolder: (fieldKey: String) -> Unit = {},
     selectedFile: File? = null,
     selectedFolder: File? = null,
-    onImagePreview: (ImageBitmap) -> Unit = {},
+    onImagePreview: (Any) -> Unit = {},
     /** 用户输入变化且需重置已选文件/文件夹时回调（仅当曾选过文件/文件夹时触发） */
-    onClearSelection: () -> Unit = {}
+    onClearSelection: () -> Unit = {},
+    /** 更新模式：目标 APK（优先从此读取图片预览，而非源 APK 内置资源） */
+    targetApk: File? = null
 ) {
     // 仅相对路径可打包进 APK：非空 && 非 / 开头 && 非 http/https 开头
     val isPackable = value.isNotBlank()
@@ -4259,18 +4686,17 @@ private fun FileInputRow(
     Column(Modifier.fillMaxWidth()) {
         // 预览图放在输入框上方（与 bgFillImage 一致）。优先显示已选文件缩略图；未选文件时尝试解析 value 指向的默认打包图片
         val ctx = LocalContext.current
-        val selectedThumb = remember(selectedFile) { selectedFile?.let { BitmapFactory.decodeFile(it.absolutePath) } }
-        val defaultThumb = remember(value) { resolveDefaultThumb(ctx, value) }
-        val thumb = selectedThumb ?: defaultThumb
-        if (thumb != null) {
-            Image(
-                bitmap = thumb.asImageBitmap(),
+        val defaultModel = rememberDefaultImagePath(ctx, value, targetApk)
+        val model: Any? = selectedFile ?: defaultModel
+        if (model != null) {
+            AsyncImage(
+                model = model,
                 contentDescription = "图片预览",
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(140.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .clickable { onImagePreview(thumb.asImageBitmap()) },
+                    .clickable { onImagePreview(model) },
                 contentScale = ContentScale.Crop
             )
             Spacer(Modifier.height(6.dp))
@@ -4727,7 +5153,7 @@ private fun TopBarIconSettingsContent(
     onUpdate: (List<TbiItemDraft>) -> Unit,
     onPickFile: (fieldKey: String, mimeType: String) -> Unit,
     selectedFiles: Map<String, File> = emptyMap(),
-    onImagePreview: (ImageBitmap) -> Unit = {},
+    onImagePreview: (Any) -> Unit = {},
     selectedFolders: Map<String, File> = emptyMap(),
     onPickFolder: (fieldKey: String) -> Unit = {},
     onClearFieldSelection: (String) -> Unit = {},
@@ -4797,7 +5223,7 @@ private fun TbiItemEditor(
     tbiItems: List<TbiItemDraft>,
     onPickFile: (fieldKey: String, mimeType: String) -> Unit,
     selectedFiles: Map<String, File> = emptyMap(),
-    onImagePreview: (ImageBitmap) -> Unit = {},
+    onImagePreview: (Any) -> Unit = {},
     selectedFolders: Map<String, File> = emptyMap(),
     onPickFolder: (fieldKey: String) -> Unit = {},
     onClearFieldSelection: (String) -> Unit = {}
@@ -4868,7 +5294,7 @@ private fun VersionSettingsContent(
     onVersionsTheme: (String) -> Unit,
     onPickFile: (label: String, mimeType: String) -> Unit,
     selectedFiles: Map<String, File> = emptyMap(),
-    onImagePreview: (ImageBitmap) -> Unit = {},
+    onImagePreview: (Any) -> Unit = {},
     selectedFolders: Map<String, File> = emptyMap(),
     onPickFolder: (fieldKey: String) -> Unit = {},
     onClearFieldSelection: (String) -> Unit = {}
@@ -5102,7 +5528,7 @@ private fun ItemSettingsContent(
     onUpdate: (SectionDraft) -> Unit,
     onPickFile: (label: String, mimeType: String) -> Unit,
     selectedFiles: Map<String, File> = emptyMap(),
-    onImagePreview: (ImageBitmap) -> Unit = {},
+    onImagePreview: (Any) -> Unit = {},
     selectedFolders: Map<String, File> = emptyMap(),
     onPickFolder: (fieldKey: String) -> Unit = {},
     onClearFieldSelection: (String) -> Unit = {}

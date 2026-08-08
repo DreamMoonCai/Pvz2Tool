@@ -161,14 +161,12 @@ class Pvz2InitializeActivity : ComponentActivity() {
                     return@Pvz2ToolTheme
                 }
 
-                var showCgVideo by remember { mutableStateOf(false) }
+                // 同步判定是否需要播放开场 CG —— hasVersionChanges() 只是读字段比较
+                // （versionName != mSfmVersion），init() 在 setContent 之前已执行，组合期调用安全。
+                // 避免「初始 false → 首帧先渲染 Pvz2MainScreen → LaunchedEffect 异步置 true →
+                // 切到 CG → 播完回到主界面」造成的「主界面→CG→主界面」闪现/重复显示。
+                var showCgVideo by remember { mutableStateOf(InitializePvz2.hasVersionChanges()) }
                 var cgVideoSkipped by remember { mutableStateOf(false) }
-
-                LaunchedEffect(Unit) {
-                    if (InitializePvz2.hasVersionChanges()) {
-                        showCgVideo = true
-                    }
-                }
 
                 val onCgSkip: () -> Unit = {
                     showCgVideo = false

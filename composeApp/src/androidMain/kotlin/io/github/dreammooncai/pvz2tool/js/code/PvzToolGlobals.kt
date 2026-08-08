@@ -688,6 +688,10 @@ object PvzToolGlobals {
         listOf("console".js, "控制台".js).forEach { key ->
             runtime.set(key, console, VariableType.Global)
         }
+        // JsConsole 别名：部分脚本直接引用 JsConsole（与 console 等价），避免 ReferenceError
+        listOf("JsConsole".js).forEach { key ->
+            runtime.set(key, console, VariableType.Global)
+        }
         listOf("pvz".js, "植物大战僵尸".js).forEach { key ->
             runtime.set(key, JsPvz.js, VariableType.Global)
         }

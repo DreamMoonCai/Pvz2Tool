@@ -52,7 +52,8 @@
 
     <application
         android:allowBackup="true"
-        android:label="Pvz2Tool"
+        android:label="戴夫工具箱集成器"
+        android:icon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
@@ -142,6 +143,16 @@
         <receiver
             android:name=".timer.TimerReceiver"
             android:exported="false" />
+
+        <!-- 冷重启专用：独立进程透明 Activity（参照 ProcessPhoenix）。主进程被杀后仍存活，
+             并在 :phoenix 进程内拉起入口 Activity 到前台。无需精确闹钟/后台启动豁免。 -->
+        <activity
+            android:name=".RestartPhoenixActivity"
+            android:process=":phoenix"
+            android:excludeFromRecents="true"
+            android:theme="@style/Pvz2ToolPhoenixTheme"
+            android:exported="false" />
+
     </application>
 
 </manifest>
