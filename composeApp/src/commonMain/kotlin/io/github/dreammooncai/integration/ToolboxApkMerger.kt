@@ -2,15 +2,13 @@ package io.github.dreammooncai.integration
 
 import com.reandroid.apk.ApkModule
 import com.reandroid.archive.ByteInputSource
-import com.reandroid.archive.InputSource
+import com.reandroid.archive.FileInputSource
 import com.reandroid.archive.RenamedInputSource
-import com.reandroid.arsc.chunk.PackageBlock
 import com.reandroid.arsc.chunk.TableBlock
 import com.reandroid.arsc.chunk.xml.AndroidManifestBlock
-import com.reandroid.arsc.chunk.xml.ResXmlElement
 import com.reandroid.arsc.chunk.xml.ResXmlAttribute
+import com.reandroid.arsc.chunk.xml.ResXmlElement
 import com.reandroid.xml.kxml2.KXmlParser
-import io.github.dreammooncai.pvz2tool.pop.plugin.io.CoroutineBinaryStream
 import java.io.File
 import java.io.IOException
 import java.io.StringReader
@@ -587,10 +585,11 @@ object ToolboxApkMerger {
         mergeAssetsPvz2tool(source, target, targetPackage, includeExamples, overrideDreamYml, excludedSmfAssets, preserveTargetAssets, appendUnreferenced)
 
         // 注入向导中选择的额外文件到 APK
+        // 关键：用 FileInputSource 从磁盘按需分块读，避免 readBytes() 把整文件读进内存（大体积 smf 会直接 OOM）
         for ((apkPath, localFile) in extraResources) {
             val fullPath = "assets/pvz2tool/$apkPath"
             target.removeInputSource(fullPath)
-            target.add(ByteInputSource(localFile.readBytes(), fullPath))
+            target.add(FileInputSource(localFile, fullPath))
         }
 
         // 注入向导中选择的额外 res 资源（如 @mipmap/bg_fill_image）到 APK 的 res/ 目录
@@ -598,7 +597,7 @@ object ToolboxApkMerger {
         for ((apkPath, localFile) in extraResResources) {
             val fullPath = "res/$apkPath"
             target.removeInputSource(fullPath)
-            target.add(ByteInputSource(localFile.readBytes(), fullPath))
+            target.add(FileInputSource(localFile, fullPath))
         }
 
         // 6. lib 按 ABI 合并

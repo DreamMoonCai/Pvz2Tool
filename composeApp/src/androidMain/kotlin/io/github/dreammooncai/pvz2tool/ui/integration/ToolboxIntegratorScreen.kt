@@ -2084,9 +2084,10 @@ fun ToolboxIntegratorScreen(
             val out = File(fileDir, "${assetScope.replace('/', '_')}_$fileName")
             val ok = withContext(Dispatchers.IO) {
                 runCatching {
-                    val module = ApkModule.loadApkFile(t)
-                    val ins = module.getInputSource(entryName) ?: error("条目不存在：$entryName")
-                    ins.openStream().use { inp -> out.outputStream().use { inp.copyTo(it) } }
+                    ApkModule.loadApkFile(t).use { module ->
+                        val ins = module.getInputSource(entryName) ?: error("条目不存在：$entryName")
+                        ins.openStream().use { inp -> out.outputStream().use { inp.copyTo(it) } }
+                    }
                 }.isSuccess
             }
             if (!ok) {
@@ -3022,11 +3023,17 @@ fun ToolboxIntegratorScreen(
 
     // 目标 APK 条目浏览器（从目标 APK 选择条目追加为 SMF 资源）
     targetApkBrowserScope?.let { assetScope ->
+        // 当前 scope 下已从目标 APK 选过的条目（APK 内完整路径），传入对话框以隐藏其「选择」按钮
+        val selectedTargets = targetApkMapping
+            .filter { (rel, _) -> rel.startsWith("$assetScope/") }
+            .values
+            .toSet()
         TargetApkBrowserDialog(
             targetApk = targetApk,
             assetScope = assetScope,
             onDismiss = { targetApkBrowserScope = null },
-            onPickEntry = { entry -> addEntryFromTargetApk(assetScope, entry) }
+            onPickEntry = { entry -> addEntryFromTargetApk(assetScope, entry) },
+            selectedEntries = selectedTargets
         )
     }
     // PopCap 原版 APK 警告弹窗
@@ -4504,7 +4511,9 @@ private fun TargetApkBrowserDialog(
     targetApk: File?,
     assetScope: String,
     onDismiss: () -> Unit,
-    onPickEntry: (String) -> Unit
+    onPickEntry: (String) -> Unit,
+    /** 已选条目（APK 内完整路径集合）；命中时该条目不再显示「选择」按钮，改为显示「✓ 已选」 */
+    selectedEntries: Set<String> = emptySet()
 ) {
     var loading by remember { mutableStateOf(true) }
     var root by remember { mutableStateOf<ApkTreeNode?>(null) }
@@ -4559,7 +4568,7 @@ private fun TargetApkBrowserDialog(
                     )
                     Spacer(Modifier.height(6.dp))
                     if (query.isBlank()) {
-                        ApkTreeNodes(r.children, 0, expanded, onPickEntry)
+                        ApkTreeNodes(r.children, 0, expanded, onPickEntry, selectedEntries)
                     } else {
                         val matches = remember(r, query) { flattenMatching(r, query) }
                         if (matches.isEmpty()) {
@@ -4580,7 +4589,11 @@ private fun TargetApkBrowserDialog(
                                         fontWeight = if (special) FontWeight.Bold else FontWeight.Normal,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    PvzGreenButton("选择", Modifier.height(28.dp)) { onPickEntry(node.fullPath) }
+                                    if (node.fullPath in selectedEntries) {
+                                        Text("✓ 已选", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(end = 8.dp))
+                                    } else {
+                                        PvzGreenButton("选择", Modifier.height(28.dp)) { onPickEntry(node.fullPath) }
+                                    }
                                 }
                             }
                         }
@@ -4596,7 +4609,8 @@ private fun ApkTreeNodes(
     nodes: List<ApkTreeNode>,
     depth: Int,
     expanded: SnapshotStateMap<String, Boolean>,
-    onPickEntry: (String) -> Unit
+    onPickEntry: (String) -> Unit,
+    selectedEntries: Set<String> = emptySet()
 ) {
     nodes.forEach { node ->
         val indent = (depth * 14 + 4).dp
@@ -4633,11 +4647,15 @@ private fun ApkTreeNodes(
                     fontWeight = if (special) FontWeight.Bold else FontWeight.Normal,
                     modifier = Modifier.weight(1f)
                 )
-                PvzGreenButton("选择", Modifier.height(28.dp)) { onPickEntry(node.fullPath) }
+                if (node.fullPath in selectedEntries) {
+                    Text("✓ 已选", fontSize = 12.sp, color = Color.Gray)
+                } else {
+                    PvzGreenButton("选择", Modifier.height(28.dp)) { onPickEntry(node.fullPath) }
+                }
             }
         }
         if (node.isDir && expanded[node.fullPath] == true) {
-            ApkTreeNodes(node.children, depth + 1, expanded, onPickEntry)
+            ApkTreeNodes(node.children, depth + 1, expanded, onPickEntry, selectedEntries)
         }
     }
 }
