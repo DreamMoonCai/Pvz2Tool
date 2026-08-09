@@ -3481,6 +3481,12 @@ private fun StepPreviewRight(
 
     // 合并成功
     result?.let {
+        // 需用户手动介入的告警优先于成功卡展示：产物虽已生成，但不照做可能导致运行异常，必须先看到。
+        // 当前合并管线不产生告警（列表恒空），此处保留为扩展点。
+        it.report.warnings.forEach { w ->
+            PvzWarningCard("⚠ $w")
+            Spacer(Modifier.height(8.dp))
+        }
         PvzSuccessCard(
             path = it.outputApk.absolutePath,
             sizeMb = "%.2f".format(it.outputApk.length() / 1024f / 1024f),
@@ -3738,8 +3744,8 @@ private val CT_LINK_STYLES = listOf("", "green", "purple", "red", "gold", "gray"
  * - 普通文字：原样返回
  * - 颜色文本：{{color:内容}} 或 {{#RRGGBB:内容}}
  * - JS表达式：{{js:表达式}}
- * - 图标：{{icon:path}} 或 {{icon|width=w|height=h:path}}
- * - 链接：{{link:url:显示}} 或 {{link-green:url:显示}}
+ * - 图标：{{icon:path}}（宽高留空则省略，由字号自适应）或 {{icon|width=w|height=h:path}}（可选 x/y/z：带 x 或 y 即进入浮层模式，不占位、按文本起点偏移覆盖）
+ * - 链接：{{link:url:显示}} 或 {{link-green:url:显示}}（url 可为网址——点击用浏览器打开，或 JS 代码/.js 文件——点击执行）
  */
 private fun buildCompositeText(
     type: CtType,
@@ -3749,6 +3755,9 @@ private fun buildCompositeText(
     customHex: String,
     iconWidth: String,
     iconHeight: String,
+    iconX: String,
+    iconY: String,
+    iconZ: String,
     linkUrl: String,
     linkStyle: String
 ): String {
@@ -3760,10 +3769,16 @@ private fun buildCompositeText(
         }
         CtType.JS -> if (text.isBlank()) "" else "{{js:$text}}"
         CtType.ICON -> {
-            // 任一维度留空时按 80 兜底（与输入框占位提示一致），避免解析器把缺省维度算成 fontSize*1.2f 导致图标被压扁/看似无效
-            val w = iconWidth.ifBlank { "80" }
-            val h = iconHeight.ifBlank { "80" }
-            "{{icon|width=$w|height=$h:$text}}"
+            // 仅当用户填写才追加对应参数：宽/高留空即省略（解析器按 fontSize*1.2f 自适应）；
+            // x 或 y 任一存在即触发浮层模式；z 控制层级（>0 在文字之上、<0 之下）。
+            val parts = mutableListOf<String>()
+            if (iconWidth.isNotBlank()) parts += "width=$iconWidth"
+            if (iconHeight.isNotBlank()) parts += "height=$iconHeight"
+            if (iconX.isNotBlank()) parts += "x=$iconX"
+            if (iconY.isNotBlank()) parts += "y=$iconY"
+            if (iconZ.isNotBlank()) parts += "z=$iconZ"
+            if (parts.isEmpty()) "{{icon:$text}}"
+            else "{{icon|${parts.joinToString("|")}:$text}}"
         }
         CtType.LINK -> {
             val tag = "link" + if (linkStyle.isNotBlank()) "-$linkStyle" else ""
@@ -3870,11 +3885,14 @@ private fun CompositeTextToolDialog(onDismiss: () -> Unit) {
     var ctCustomHex by remember { mutableStateOf("#FF0000") }
     var ctIconWidth by remember { mutableStateOf("") }
     var ctIconHeight by remember { mutableStateOf("") }
+    var ctIconX by remember { mutableStateOf("") }
+    var ctIconY by remember { mutableStateOf("") }
+    var ctIconZ by remember { mutableStateOf("") }
     var ctLinkUrl by remember { mutableStateOf("") }
     var ctLinkStyle by remember { mutableStateOf("") }
 
-    val generated = remember(ctType, ctText, ctColorMode, ctPresetColor, ctCustomHex, ctIconWidth, ctIconHeight, ctLinkUrl, ctLinkStyle) {
-        buildCompositeText(ctType, ctText, ctColorMode, ctPresetColor, ctCustomHex, ctIconWidth, ctIconHeight, ctLinkUrl, ctLinkStyle)
+    val generated = remember(ctType, ctText, ctColorMode, ctPresetColor, ctCustomHex, ctIconWidth, ctIconHeight, ctIconX, ctIconY, ctIconZ, ctLinkUrl, ctLinkStyle) {
+        buildCompositeText(ctType, ctText, ctColorMode, ctPresetColor, ctCustomHex, ctIconWidth, ctIconHeight, ctIconX, ctIconY, ctIconZ, ctLinkUrl, ctLinkStyle)
     }
 
     val clipboard = LocalClipboard.current
@@ -3975,27 +3993,52 @@ private fun CompositeTextToolDialog(onDismiss: () -> Unit) {
             CtType.ICON -> {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column(Modifier.weight(1f)) {
-                        PvzRichText("宽度(默认80)", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        PvzRichText("宽度(留空自适应)", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(4.dp))
-                        IntegratorInputField(ctIconWidth, "80") { ctIconWidth = it }
+                        IntegratorInputField(ctIconWidth, "留空自适应") { ctIconWidth = it }
                     }
                     Column(Modifier.weight(1f)) {
-                        PvzRichText("高度(默认80)", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        PvzRichText("高度(留空自适应)", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(4.dp))
-                        IntegratorInputField(ctIconHeight, "80") { ctIconHeight = it }
+                        IntegratorInputField(ctIconHeight, "留空自适应") { ctIconHeight = it }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        PvzRichText("X偏移(dp,可选)", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        IntegratorInputField(ctIconX, "如 10") { ctIconX = it }
+                    }
+                    Column(Modifier.weight(1f)) {
+                        PvzRichText("Y偏移(dp,可选)", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        IntegratorInputField(ctIconY, "-6") { ctIconY = it }
+                    }
+                    Column(Modifier.weight(1f)) {
+                        PvzRichText("层级z(可选)", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        IntegratorInputField(ctIconZ, "2") { ctIconZ = it }
                     }
                 }
                 Spacer(Modifier.height(4.dp))
                 PvzRichText("提示：图标相对 images/ 目录，如 auto_collect.png", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 12.sp)
+                Spacer(Modifier.height(2.dp))
+                PvzRichText("填写 X 或 Y 即进入浮层模式：图标不再占位，从整段文本起点按偏移覆盖其他文字；z>0 在文字之上、<0 在下、可分层。", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 12.sp)
             }
             CtType.LINK -> {
                 Column(Modifier.fillMaxWidth()) {
-                    PvzRichText("链接地址", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    PvzRichText("链接地址 / JS代码(点击执行)", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
-                    IntegratorInputField(ctLinkUrl, "https://example.com") { ctLinkUrl = it }
+                    IntegratorInputField(ctLinkUrl, "https://... 或 JS代码") { ctLinkUrl = it }
                 }
                 Spacer(Modifier.height(8.dp))
                 CtSpinner("链接样式(可选)", CT_LINK_STYLES, ctLinkStyle) { ctLinkStyle = it }
+                Spacer(Modifier.height(4.dp))
+                PvzRichText(
+                    "提示：地址可为网址（点击用浏览器打开），也可填 JS 代码或 .js 文件（点击即执行，相当于点击式 JS）。",
+                    defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 12.sp
+                )
             }
             else -> {
                 PvzRichText(
@@ -4007,7 +4050,8 @@ private fun CompositeTextToolDialog(onDismiss: () -> Unit) {
 
         Spacer(Modifier.height(14.dp))
 
-        // 实时预览
+        // 实时预览（图标两侧加示例文字，便于查看图标在文字中的内联效果；
+        // 若使用 X/Y 坐标，需有周围文字作为锚点，否则图标因无文本起点可能不显示）
         PvzRichText("预览", defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(6.dp))
         PvzSimpleCardGreen(borderColor = Color(0xFFD4E8A0), backgroundColor = Color(0xFFD4E8A0)) {
@@ -4015,12 +4059,17 @@ private fun CompositeTextToolDialog(onDismiss: () -> Unit) {
                 .fillMaxWidth()
                 .padding(12.dp), contentAlignment = Alignment.Center) {
                 PvzRichText(
-                    if (generated.isBlank()) "（输出为空）" else generated,
+                    if (generated.isBlank()) "（输出为空）" else "示例文字 $generated 示例文字",
                     defaultStyle = PvzTextOliveStyleNoShadow,
                     fontSize = 15.sp
                 )
             }
         }
+        Spacer(Modifier.height(4.dp))
+        PvzRichText(
+            "提示：使用 X/Y 坐标时，图标漂浮在文字之上/下且不占位，需要周围有文字提供起点锚点；若整段只有图标本身，坐标模式可能无法定位而不显示。",
+            defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 12.sp
+        )
 
         Spacer(Modifier.height(10.dp))
 

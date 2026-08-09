@@ -36,6 +36,7 @@ lifecycleViewmodelKtx = "2.10.0"
 kotlin-gadulka = "1.11.0"
 animationCore = "1.10.6"
 ktor = "3.1.3"
+dexlib2 = "2.5.2"
 
 [libraries]
 androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
@@ -90,6 +91,7 @@ ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negoti
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 arsclib = { module = "io.github.reandroid:ARSCLib", version.ref = "arsclib" }
+dexlib2 = { module = "org.smali:dexlib2", version.ref = "dexlib2" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

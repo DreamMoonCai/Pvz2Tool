@@ -1,18 +1,16 @@
 package io.github.dreammooncai.pvz2tool.view
 
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -26,8 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.*
+import kotlin.math.roundToInt
 
 import io.github.dreammooncai.pvz2tool.DynamicSection
 import io.github.dreammooncai.pvz2tool.SectionItem
@@ -373,8 +371,13 @@ private data class IconTag(
     val path: String,
     val width: TextUnit,
     val height: TextUnit,
-    val fullMatch: String
-)
+    val fullMatch: String,
+    val x: Float? = null,   // dp：相对文本起点(首个文字处)的水平偏移；非空即进入浮层模式
+    val y: Float? = null,   // dp：相对文本起点的垂直偏移
+    val z: Float = 0f       // z-index：>0 在文字之上，<0 在文字之下，图标之间也可分层
+) {
+    val isOverlay: Boolean get() = x != null || y != null
+}
 
 // ---------------- 富文本区域 ----------------
 
@@ -406,35 +409,60 @@ private val DefaultPvzTagStyles = mapOf(
 )
 
 /**
- * 解析图标标签内容，提取路径、宽度、高度
- * 支持两种格式：
- * 1. 带参数：width=80|height=80:auto_collect.png
- * 2. 无参数：auto_collect.png
+ * 图标标签解析结果（路径/尺寸/可选坐标与层级）
  */
-private fun parseIconTagContent(content: String, fontSize: TextUnit): Triple<String, TextUnit, TextUnit> {
+private data class ParsedIcon(
+    val path: String,
+    val width: TextUnit? = null,
+    val height: TextUnit? = null,
+    val x: Float? = null,   // dp，相对文本起点水平偏移
+    val y: Float? = null,   // dp，相对文本起点垂直偏移
+    val z: Float? = null    // z-index，控制覆盖层级
+)
+
+/**
+ * 解析图标标签内容，提取路径、宽度、高度以及可选的坐标(x/y, 单位 dp)与层级(z)。
+ * 支持两种格式：
+ * 1. 带参数：width=80|height=80|x=10|y=-6|z=2:auto_collect.png
+ * 2. 无参数：auto_collect.png
+ * 只要出现 x= 或 y= 即进入浮层模式（不再占位，按文本起点偏移覆盖）。
+ */
+private fun parseIconTagContent(content: String, fontSize: TextUnit): ParsedIcon {
     // 判断是否为带参数格式：":" 前面包含 "="（参数特征）
     val lastColonIndex = content.lastIndexOf(":")
     val hasParamsBeforeColon = lastColonIndex > 0 &&
             content.substring(0, lastColonIndex).contains("=")
 
     if (hasParamsBeforeColon) {
-        // 带参数：width=80|height=80:auto_collect.png
+        // 带参数：width=80|height=80|x=10|y=-6|z=2:auto_collect.png
         val paramsPart = content.substring(0, lastColonIndex)
         val path = content.substring(lastColonIndex + 1)
-        var width: TextUnit? = null
-        var height: TextUnit? = null
+        var width: Float? = null
+        var height: Float? = null
+        var x: Float? = null
+        var y: Float? = null
+        var z: Float? = null
         paramsPart.split("|").forEach { part ->
             val trimmed = part.trim()
-            if (trimmed.startsWith("width=")) {
-                width = trimmed.substringAfter("=").toFloatOrNull()?.sp
-            } else if (trimmed.startsWith("height=")) {
-                height = trimmed.substringAfter("=").toFloatOrNull()?.sp
+            when {
+                trimmed.startsWith("width=") -> width = trimmed.substringAfter("=").toFloatOrNull()
+                trimmed.startsWith("height=") -> height = trimmed.substringAfter("=").toFloatOrNull()
+                trimmed.startsWith("x=") -> x = trimmed.substringAfter("=").toFloatOrNull()
+                trimmed.startsWith("y=") -> y = trimmed.substringAfter("=").toFloatOrNull()
+                trimmed.startsWith("z=") -> z = trimmed.substringAfter("=").toFloatOrNull()
             }
         }
-        return Triple(path, width ?: (fontSize * 1.2f), height ?: (fontSize * 1.2f))
+        return ParsedIcon(
+            path = path,
+            width = width?.sp,
+            height = height?.sp,
+            x = x,
+            y = y,
+            z = z
+        )
     } else {
         // 无参数：auto_collect.png
-        return Triple(content.trim(), fontSize * 1.2f, fontSize * 1.2f)
+        return ParsedIcon(path = content.trim())
     }
 }
 
@@ -450,40 +478,34 @@ private fun parseIconTags(text: String, jsCache: Map<String, String>, fontSize: 
     val tags = mutableListOf<IconTag>()
     var globalIndex = 0
 
-    // 从原始 text 中解析图标标签
-    iconRegex.findAll(text).forEach { match ->
-        val content = match.groupValues[2]
-        val (path, width, height) = parseIconTagContent(content, fontSize)
+    fun addTag(fullMatch: String, p: ParsedIcon) {
+        val isOverlay = p.x != null || p.y != null
         tags.add(
             IconTag(
-                id = "icon_${globalIndex}_$path",
-                path = path,
-                width = width,
-                height = height,
-                fullMatch = match.value
+                id = "icon_${globalIndex}_${p.path}",
+                path = p.path,
+                width = p.width ?: (fontSize * 1.2f),
+                height = p.height ?: (fontSize * 1.2f),
+                fullMatch = fullMatch,
+                x = p.x,
+                y = p.y,
+                z = p.z ?: if (isOverlay) 1f else 0f
             )
         )
         globalIndex++
     }
 
-    // 从 JS 返回结果中解析图标标签
+    // 从原始 text 中解析图标标签
+    iconRegex.findAll(text).forEach { match ->
+        addTag(match.value, parseIconTagContent(match.groupValues[2], fontSize))
+    }
+
+    // 从 JS 返回结果中解析图标标签（去重）
     jsCache.values.forEach { result ->
         iconRegex.findAll(result).forEach { iconMatch ->
-            val content = iconMatch.groupValues[2]
-            val (iconPath, iconWidth, iconHeight) = parseIconTagContent(content, fontSize)
             val fullMatch = iconMatch.value
-            // 去重：如果 fullMatch 已存在则跳过
             if (tags.none { it.fullMatch == fullMatch }) {
-                tags.add(
-                    IconTag(
-                        id = "icon_${globalIndex}_$iconPath",
-                        path = iconPath,
-                        width = iconWidth,
-                        height = iconHeight,
-                        fullMatch = fullMatch
-                    )
-                )
-                globalIndex++
+                addTag(fullMatch, parseIconTagContent(iconMatch.groupValues[2], fontSize))
             }
         }
     }
@@ -546,8 +568,8 @@ fun PvzRichText(
         parseIconTags(text, jsCache, fontSize)
     }
 
-    // 4. 动态构建 inlineContent 映射表
-    val dynamicInlineContent = allIconTags.associate { tag ->
+    // 4. 动态构建 inlineContent 映射表（仅非浮层图标需要占位；浮层图标走覆盖渲染）
+    val dynamicInlineContent = allIconTags.filter { !it.isOverlay }.associate { tag ->
         tag.id to InlineTextContent(
             Placeholder(
                 width = tag.width,
@@ -578,15 +600,73 @@ fun PvzRichText(
         pop()
     }
 
-    Text(
-        text = annotatedString,
-        modifier = modifier,
-        lineHeight = lineHeight,
-        style = LocalTextStyle.current.copy(fontSize = fontSize),
-        textAlign = textAlign,
-        maxLines = maxLines,
-        inlineContent = dynamicInlineContent
-    )
+    // 6. 浮层图标（带 x/y 坐标）：不占文本空间，按「文本起点(首个文字处) + (x,y)dp」浮于文字之上/之下，z 控制层级
+    val density = LocalDensity.current
+    val overlayIcons = allIconTags.filter { it.isOverlay }
+    var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+
+    if (overlayIcons.isEmpty()) {
+        // 无浮层图标：渲染行为与原版完全一致（不引入 Box 包裹，避免改变文本布局/对齐/换行）
+        Text(
+            text = annotatedString,
+            modifier = modifier,
+            lineHeight = lineHeight,
+            style = LocalTextStyle.current.copy(fontSize = fontSize),
+            textAlign = textAlign,
+            maxLines = maxLines,
+            inlineContent = dynamicInlineContent,
+            onTextLayout = { textLayoutResult = it }
+        )
+    } else {
+        Box(modifier = modifier) {
+            // 浮层文本：按内容自适应宽度，由外层 Box 的 modifier 决定整体尺寸，
+            // 覆盖层坐标以文本起点(0,0)为锚点，与 Box 左上角对齐。
+            Text(
+                text = annotatedString,
+                modifier = Modifier,
+                lineHeight = lineHeight,
+                style = LocalTextStyle.current.copy(fontSize = fontSize),
+                textAlign = textAlign,
+                maxLines = maxLines,
+                inlineContent = dynamicInlineContent,
+                onTextLayout = { textLayoutResult = it }
+            )
+
+            textLayoutResult?.let { result ->
+                // 锚点：整段文本起点（首个文字处），换行不重算
+                val anchorLeft: Float
+                val anchorTop: Float
+                if (result.layoutInput.text.length > 0) {
+                    val b = result.getBoundingBox(0)
+                    anchorLeft = b.left
+                    anchorTop = b.top
+                } else {
+                    anchorLeft = 0f
+                    anchorTop = 0f
+                }
+                overlayIcons.forEach { icon ->
+                    val px = (anchorLeft + (icon.x ?: 0f) * density.density).roundToInt()
+                    val py = (anchorTop + (icon.y ?: 0f) * density.density).roundToInt()
+                    val wDp = with(density) { icon.width.toDp() }
+                    val hDp = with(density) { icon.height.toDp() }
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .zIndex(icon.z)
+                    ) {
+                        val imagePath = if (icon.path.startsWith("/")) icon.path else "images/${icon.path}"
+                        AsyncImageFromAssets(
+                            imagePath,
+                            contentDescription = icon.path,
+                            modifier = Modifier
+                                .offset { IntOffset(px, py) }
+                                .size(wDp, hDp)
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -640,13 +720,13 @@ private fun parseRichText(
                 }
                 builder.pop()
             } else if (tagName == "icon") {
-                // 新格式：{{icon|width=xx|height=xx:path}}
+                // 新格式：{{icon|width=xx|height=xx|x=..|y=..|z=..:path}}
                 val fullMatch = "{{$inner}}"
                 val iconTag = allIconTags.find { it.fullMatch == fullMatch }
-                if (iconTag != null) {
-                    builder.appendInlineContent(id = iconTag.id, alternateText = "[${iconTag.path}]")
-                } else {
-                    builder.append("{{$inner}}")
+                when {
+                    iconTag == null -> builder.append("{{$inner}}")
+                    iconTag.isOverlay -> { /* 浮层图标：不在文本内占位，交由 Box 覆盖渲染 */ }
+                    else -> builder.appendInlineContent(id = iconTag.id, alternateText = "[${iconTag.path}]")
                 }
             }
         } else if (inner.contains(":")) {
@@ -665,10 +745,10 @@ private fun parseRichText(
             } else if (tagName == "icon") {
                 // 在 allIconTags 中查找（包括 JS 返回结果中的图标）
                 val iconTag = allIconTags.find { it.fullMatch == "{{$tagName:$displayContent}}" }
-                if (iconTag != null) {
-                    builder.appendInlineContent(id = iconTag.id, alternateText = "[${iconTag.path}]")
-                } else {
-                    builder.append("{{$inner}}")
+                when {
+                    iconTag == null -> builder.append("{{$inner}}")
+                    iconTag.isOverlay -> { /* 浮层图标：不在文本内占位 */ }
+                    else -> builder.appendInlineContent(id = iconTag.id, alternateText = "[${iconTag.path}]")
                 }
             } else {
                 val targetStyle = parseHexColorTag(tagName) ?: (DefaultPvzTagStyles[tagName] ?: defaultStyle)

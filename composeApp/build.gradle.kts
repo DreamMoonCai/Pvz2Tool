@@ -265,9 +265,13 @@ tasks.named<Test>("jvmTest") {
 
 dependencies {
     implementation(libs.androidx.appcompat)
-    implementation(libs.material)
+    // 注意：刻意不引入 com.google.android.material:material 与 androidx.constraintlayout。
+    // 二者原先仅由 material 以「传递依赖」形式进入产物（本项目源码/XML 未直接使用 Material 或
+    // ConstraintLayout；唯一引用是平台内置主题 @android:style/Theme.Material.Light.NoActionBar）。
+    // 工具箱 dex 一旦自带 constraintlayout，会与目标游戏 APK 自带的那份在 INSERT_BEFORE 下抢先加载、
+    // 资源 id 不匹配导致登录界面异常，因此合并引擎才需要剥离。直接从依赖根消除它，比运行时剥离更干净，
+    // ToolboxApkMerger 的 STRIP_DEX_PACKAGE_PREFIXES 兜底逻辑保留以应对「目标 APK 自带 CL」的场景。
     implementation(libs.androidx.annotation)
-    implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.lifecycle.livedata.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     debugImplementation(libs.compose.uiTooling)

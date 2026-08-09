@@ -4,7 +4,6 @@ import com.reandroid.apk.ApkModule
 import com.reandroid.archive.ByteInputSource
 import com.reandroid.archive.InputSource
 import com.reandroid.archive.RenamedInputSource
-import com.reandroid.dex.model.DexFile
 import com.reandroid.arsc.chunk.PackageBlock
 import com.reandroid.arsc.chunk.TableBlock
 import com.reandroid.arsc.chunk.xml.AndroidManifestBlock
@@ -115,7 +114,13 @@ object ToolboxApkMerger {
         val smfExcluded: List<String>,
         /** 被用户从「目标 APK」中删除的原始条目（APK 内完整路径），受保护条目已过滤 */
         val targetRemoved: List<String>,
-        val notes: List<String>
+        val notes: List<String>,
+        /**
+         * 合并过程中产生的「需用户介入」的告警（与 notes 的中性说明区分，UI 用醒目样式渲染）。
+         * 保留为扩展点：当前合并管线不产生任何告警，恒为空列表。
+         * （历史来源为 dex 剥离失败提示，该子系统已于 2026-08-09 整体移除。）
+         */
+        val warnings: List<String> = emptyList()
     )
 
     /**
@@ -619,40 +624,23 @@ object ToolboxApkMerger {
     // ---- dex ----
 
     /**
-     * 目标 APK 原 DEX 已自带、需要被剔除出工具箱 DEX 的包前缀（类型描述符形式，含末尾 '/'）。
-     * 典型场景：游戏 APK 自身已内置 androidx.constraintlayout，而工具箱 DEX 也打包了一份，
-     * 插入到最前时两份同名类会冲突/被游戏版本覆盖，因此工具箱侧主动剥离、改由游戏侧提供。
-     */
-    private val STRIP_DEX_PACKAGE_PREFIXES = listOf("Landroidx/constraintlayout/")
-
-    /**
      * 普通（首次集成）DEX 合并：把工具箱 DEX 按策略插入/追加到目标。
      * 返回工具箱 DEX 在最终 APK 中的索引区间 [start, end]（含端点），用于写入描述文件。
      */
-    private fun renumberDex(source: ApkModule, target: ApkModule, dexStrategy: DexStrategy): Pair<Int, Int> {
+    private fun renumberDex(
+        source: ApkModule,
+        target: ApkModule,
+        dexStrategy: DexStrategy
+    ): Pair<Int, Int> {
         val srcDex = source.listDexFiles().sortedBy { it.name }
         val tgtDex = target.listDexFiles().sortedBy { it.name }
         val ordered = if (dexStrategy == DexStrategy.INSERT_BEFORE) srcDex + tgtDex else tgtDex + srcDex
-        val stripPackages = dexStrategy == DexStrategy.INSERT_BEFORE &&
-            tgtDex.any { dex -> dexContainsAnyPackage(dex) }
         target.listDexFiles().forEach { target.removeInputSource(it.name) }
 
-        val tempDir = File(System.getProperty("java.io.tmpdir"), "dex_strip").apply { mkdirs() }
         ordered.forEachIndexed { idx, dex ->
-            val isSourceDex = srcDex.any { it === dex }
-            val renamed = if (stripPackages && isSourceDex && dexContainsAnyPackage(dex)) {
-                val stripped = runCatching { stripPackagesToFile(dex, tempDir) }
-                    .onFailure { it.printStackTrace() }
-                if (stripped.isSuccess)
-                    com.reandroid.archive.FileInputSource(stripped.getOrThrow(), dexName(idx))
-                else
-                    RenamedInputSource(dexName(idx), dex)
-            } else {
-                RenamedInputSource(dexName(idx), dex)
-            }
-            target.add(renamed)
+            target.add(RenamedInputSource(dexName(idx), dex))
         }
-        // 工具箱 DEX 的索引区间
+        // 工具箱 DEX 在最终 APK 中的索引区间 [start, end]（含端点），用于写入描述文件。
         val start = if (dexStrategy == DexStrategy.INSERT_BEFORE) 0 else tgtDex.size
         val end = (start + srcDex.size - 1).coerceAtLeast(start)
         return start to end
@@ -674,7 +662,6 @@ object ToolboxApkMerger {
         val tgtDex = target.listDexFiles().sortedBy { it.name }
         val count = tgtDex.size
         if (count == 0) {
-            // 目标没有任何 DEX，退化为普通插入
             return renumberDex(source, target, insertMode)
         }
         val start = dexStart.coerceIn(0, count - 1)
@@ -685,22 +672,9 @@ object ToolboxApkMerger {
         val remaining = target.listDexFiles().sortedBy { it.name }
         val ordered = if (insertMode == DexStrategy.INSERT_BEFORE) srcDex + remaining else remaining + srcDex
         target.listDexFiles().forEach { target.removeInputSource(it.name) }
-        // 3. 重新编号写入（仅 INSERT_BEFORE 时对工具箱 DEX 做 constraintlayout 剥离）
-        val strip = insertMode == DexStrategy.INSERT_BEFORE
-        val tempDir = File(System.getProperty("java.io.tmpdir"), "dex_strip").apply { mkdirs() }
+        // 3. 重新编号写入
         ordered.forEachIndexed { idx, dex ->
-            val isSourceDex = srcDex.any { it === dex }
-            val renamed = if (strip && isSourceDex && dexContainsAnyPackage(dex)) {
-                val stripped = runCatching { stripPackagesToFile(dex, tempDir) }
-                    .onFailure { it.printStackTrace() }
-                if (stripped.isSuccess)
-                    com.reandroid.archive.FileInputSource(stripped.getOrThrow(), dexName(idx))
-                else
-                    RenamedInputSource(dexName(idx), dex)
-            } else {
-                RenamedInputSource(dexName(idx), dex)
-            }
-            target.add(renamed)
+            target.add(RenamedInputSource(dexName(idx), dex))
         }
         // 4. 新工具箱 DEX 区间
         val srcCount = srcDex.size
@@ -710,93 +684,6 @@ object ToolboxApkMerger {
         return newStart to newEnd
     }
 
-    /** 目标原 DEX 是否包含任一需剔除包下的类。
-     *  流式扫描 dex 内容中是否出现类型描述符前缀（如 "Landroidx/constraintlayout/"），
-     *  不将整个 dex 加载到内存中，适配 Android 受限堆。 */
-    private fun dexContainsAnyPackage(dex: InputSource): Boolean {
-        return runCatching {
-            dex.openStream().use { stream ->
-                val target = STRIP_DEX_PACKAGE_PREFIXES.first().encodeToByteArray()
-                val buf = ByteArray(target.size * 2)
-                var pos = 0
-                var bytesRead: Int
-                while (stream.read(buf, pos, buf.size - pos).also { bytesRead = it } > 0) {
-                    val end = pos + bytesRead
-                    // 在已读缓冲区中搜索
-                    if (buf.searchBytes(target, 0, end) >= 0) return@runCatching true
-                    // 保留末尾 target.size-1 字节作为滚动窗口（防止模式跨块边界）
-                    if (end > target.size) {
-                        val keep = target.size - 1
-                        System.arraycopy(buf, end - keep, buf, 0, keep)
-                        pos = keep
-                    } else {
-                        pos = end
-                    }
-                }
-                false
-            }
-        }.onFailure { it.printStackTrace() }.getOrDefault(false)
-    }
-
-    private fun ByteArray.searchBytes(pattern: ByteArray, from: Int, to: Int): Int {
-        if (pattern.isEmpty() || pattern.size > (to - from)) return -1
-        val last = to - pattern.size
-        outer@ for (i in from..last) {
-            for (j in pattern.indices) {
-                if (this[i + j] != pattern[j]) continue@outer
-            }
-            return i
-        }
-        return -1
-    }
-
-    /** 从工具箱 DEX 中剔除需剥离包下的类定义。
-     *  纯字节级操作，不动用 ARSCLib DexFile（其内部构建完整对象树，Android 上 OOM）。
-     *  解析 dex header → 遍历 type_ids→string_ids 标记匹配前缀 → 移除对应 class_def → 更新 header。 */
-    private fun stripPackagesToFile(dex: InputSource, tempDir: File): File {
-        val bytes = dex.openStream().use { it.readBytes() }
-        val stripped = stripClassesFromDexBytes(bytes, STRIP_DEX_PACKAGE_PREFIXES)
-        val outFile = File(tempDir, "out_${System.nanoTime()}.dex")
-        try {
-            outFile.writeBytes(stripped)
-            return outFile
-        } catch (e: Exception) {
-            outFile.delete()
-            throw e
-        }
-    }
-
-    /** 从工具箱 DEX 中剔除需剥离包下的类定义。
-     *  改用 ARSCLib DexFile 对象模型进行剥离（而非手写字节级编辑）：
-     *  - removeClassesWithKeys 删除 class_def 及其关联数据；
-     *  - shrink()/clearUnused() 清理被删类遗留的 class_data_item / code_item / 字段 / 方法，
-     *    彻底消除手写编辑无法根除的 "Could not find declaring class for non-empty class data item" 损坏；
-     *  - refresh() 自动重算 section 偏移、adler32 校验和与 SHA-1 签名，并写回合法零填充。
-     *  手写字节级方案曾连续暴露 4 层损坏（map offset / checksum / padding / 孤立 class_data），
-     *  故此处改用库自身的 proven 路径。为避免在 Android 上为每个 dex 都构建完整对象树（OOM 风险），
-     *  先做一次廉价的前缀字节扫描，仅当 dex 确实含待剥离包名时才加载 DexFile。 */
-    internal fun stripClassesFromDexBytes(bytes: ByteArray, prefixes: List<String>): ByteArray {
-        if (prefixes.isEmpty()) return bytes
-        // 廉价预判：原始字节中是否存在任一待剥离包名前缀；不存在则直接原样返回，避免构建对象树。
-        if (!prefixes.any { bytes.searchBytes(it.encodeToByteArray(), 0, bytes.size) >= 0 }) return bytes
-
-        val dexFile = DexFile.read(bytes)
-        try {
-            // 删除所有 type descriptor 以任一前缀开头的 class_def（及 DexClass 关联数据）。
-            dexFile.removeClassesWithKeys { typeKey ->
-                prefixes.any { typeKey.typeName.startsWith(it) }
-            }
-            // 清理被删类遗留的 class_data_item / code_item / 字段 / 方法等孤立数据。
-            dexFile.shrink()
-            dexFile.clearEmptySections()
-            // 重算 section 偏移 + adler32 校验和 + SHA-1 签名（库内部会迭代重算以保证一致），
-            // 并自动写回合法的对齐零填充。
-            dexFile.refresh()
-            return dexFile.getBytes()
-        } finally {
-            dexFile.close()
-        }
-    }
 
     private fun dexName(index: Int): String =
         if (index == 0) "classes.dex" else "classes${index + 1}.dex"
