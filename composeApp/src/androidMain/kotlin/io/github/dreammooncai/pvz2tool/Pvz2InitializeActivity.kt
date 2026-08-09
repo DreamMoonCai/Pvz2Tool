@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -105,7 +106,17 @@ class Pvz2InitializeActivity : ComponentActivity() {
         }
     }
 
-    // 2. FilePickerManager 必须在这里初始化！(类属性初始化，确保在 onCreate 之前)
+    // 2. 通知权限 Launcher（Android 13+ 运行时危险权限；低于 13 由安装时授予）
+    //    通知为可选能力（定时任务/工具提示类通知），无论授权与否均不阻断主流程
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) {
+            Log.d("Pvz2InitializeActivity", "用户未授予通知权限，应用核心功能不受影响")
+        }
+    }
+
+    // 3. FilePickerManager 必须在这里初始化！(类属性初始化，确保在 onCreate 之前)
     // 即使现在用不到，也要先注册好 Launcher（其 pick() 异步选择器 Launcher 也在此注册）
     private val filePickerManager = FilePickerManager(this)
 
@@ -252,6 +263,9 @@ class Pvz2InitializeActivity : ComponentActivity() {
         )
 
         handleImportIntent(intent)
+
+        // 界面启动后额外申请通知权限（Android 13+ 运行时；可选能力，不阻断流程）
+        requestNotificationPermission()
     }
 
     // ======================== 权限检查逻辑 ========================
@@ -279,6 +293,21 @@ class Pvz2InitializeActivity : ComponentActivity() {
         } catch (e: PackageManager.NameNotFoundException) {
             false
         }
+    }
+
+    // ======================== 通知权限（Android 13+ 运行时申请） ========================
+    /**
+     * 在界面启动后额外申请 POST_NOTIFICATIONS 权限。
+     * - Android 13（API 33）及以上为危险权限，需运行时申请；低于 13 为安装时授予，无需处理。
+     * - 该权限为可选能力（定时任务/工具提示类通知），无论用户授权与否均不阻断初始化流程。
+     */
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (!hasPermissionDeclared(Manifest.permission.POST_NOTIFICATIONS)) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            == PackageManager.PERMISSION_GRANTED
+        ) return
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     /**

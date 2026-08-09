@@ -3961,6 +3961,7 @@ if (!vpn.isPrepared()) {
 - 通知渠道首次发送时自动创建（Android 8.0+）。
 - `tapAction` 指定的 JS 在用户点击通知时，通过 `Pvz2InitializeActivity` 执行（有 UI 上下文）。
 - 每次调用生成唯一通知 ID（基于时间戳），返回该 ID 可用于后续 `cancel()`。
+- **权限检测**：Android 13（API 33）及以上未授予 `POST_NOTIFICATIONS` 时，系统会静默丢弃通知；`show()` 内部已内置检测——未授权则不发送、并在 JS 控制台输出警告，调用方拿到 `null` 即表示本次未发出。可先用 `notifications.isGranted()` 预判。
 
 **返回**：number — 通知 ID，可用于取消。
 
@@ -3999,6 +4000,31 @@ notifications.show("检测到更新", "点击查看详情", {
 var nid = notifications.show("下载中", "正在下载...");
 // ... 下载完成
 notifications.cancel(nid);
+```
+
+#### notifications.isGranted / notifications.已授权
+
+检测通知权限（POST_NOTIFICATIONS）是否已授予。
+
+**语法**：`notifications.isGranted() -> boolean`
+
+**参数**：无。
+
+**说明**：
+- Android 13（API 33）及以上为运行时危险权限，需用户在系统弹窗中授权；低于 13 由安装时授予，本方法恒返回 `true`。
+- `show()` 内部已内置此检测：未授权时不会真正发送通知，并会在 JS 控制台输出一条警告（不抛异常、不影响后续代码）。
+- 本方法仅做检测，不涉及任何权限请求或弹窗。若需授权，请引导用户在系统设置中开启「通知」权限（应用启动时会自动弹一次申请）。
+
+**返回**：boolean — `true` 表示已授权（或当前系统版本无需运行时授权），`false` 表示未授权。
+
+**示例**：
+```javascript
+// 发送前先判断，避免无通知权限时白发
+if (notifications.isGranted()) {
+    notifications.show("签到提醒", "今天记得签到哦！");
+} else {
+    ui.alert("提示", "未授予通知权限，请在系统设置中开启后重试");
+}
 ```
 
 ---

@@ -24,7 +24,9 @@ import io.github.dreammooncai.pvz2tool.js.code.JsReflect
 import io.github.dreammooncai.pvz2tool.js.code.JsBrowser
 import io.github.dreammooncai.pvz2tool.js.code.JsToast
 import io.github.dreammooncai.pvz2tool.js.code.JsThread
+import io.github.dreammooncai.pvz2tool.NotificationPermission
 import io.github.dreammooncai.pvz2tool.js.JsRichTextRefresher
+import io.github.dreammooncai.util.ContextUtil
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
@@ -56,7 +58,6 @@ import androidx.core.graphics.drawable.IconCompat
 import io.github.dreammooncai.pvz2tool.controller.GameDisplayFloatingController
 import io.github.dreammooncai.pvz2tool.service.LocalVpnService
 import io.github.dreammooncai.pvz2tool.ui.main.SettingsDialogState
-import io.github.dreammooncai.util.ContextUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
@@ -456,6 +457,12 @@ object PvzToolGlobals {
             val title = toString(args[0]); val message = toString(args[1])
             val opts = args[2].orNull as? JsObject
             val ctx = InitializePvz2.context
+            // Android 13+ 需要在 Manifest 声明并运行时授予 POST_NOTIFICATIONS，未授权时系统会静默丢弃通知。
+            // 这里提前检测：未授权则不发送并输出 JS 控制台警告（不阻断 JS 调用），调用方拿到 null 即表示本次未发出。
+            if (!NotificationPermission.isGranted(ctx)) {
+                JsConsole.warn("未授予通知权限(POST_NOTIFICATIONS)，通知未发送（可在系统设置中开启通知）")
+                return@func null
+            }
             val cid = opts?.get("channelId".js, this)?.orNull?.let { toString(it) } ?: "pvz2tool_default"
             val cname = opts?.get("channelName".js, this)?.orNull?.let { toString(it) } ?: "工具箱通知"
             val icon = opts?.get("icon".js, this)?.orNull?.let { toString(it) }
@@ -489,6 +496,11 @@ object PvzToolGlobals {
             val id = args[0].orNull?.let { toNumber(it).toInt() } ?: return@func null
             (InitializePvz2.context.getSystemService(Context.NOTIFICATION_SERVICE) as AndroidNotificationManager).cancel(id)
             null
+        }
+        // 检测通知权限是否已授予（Android 13+ 需运行时授权；低于 13 恒为 true）
+        // 用法：notifications.isGranted() / 通知.已授权()
+        listOf("isGranted".js, "已授权".js).func { _ ->
+            NotificationPermission.isGranted(InitializePvz2.context).js
         }
     }
 
