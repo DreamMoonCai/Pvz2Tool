@@ -765,7 +765,12 @@ object ToolboxApkMerger {
 
     // ---- manifest ----
 
-    /** 更新模式：移除目标 APK 中旧版工具箱已注入的 manifest 条目，避免 appendLauncherBlock 追加时重复。 */
+    /**
+     * 更新模式：移除目标 APK 中旧版工具箱已注入的 manifest 条目，避免 appendLauncherBlock 追加时重复。
+     *
+     * 🔴 本集合必须与下方 [LAUNCHER_BLOCK_XML] 注入的组件**逐一对应**，否则漏删的组件会在每次更新时累积重复。
+     * 新增注入组件时务必同步到这里（Activity 另在下方显式匹配；FileProvider 因游戏自身也可能声明，改用 authority 判定）。
+     */
     private fun removePreviousToolboxEntries(tm: AndroidManifestBlock, targetPackage: String) {
         val toRemove = mutableListOf<ResXmlElement>()
         val toolboxClasses = setOf(
@@ -775,7 +780,13 @@ object ToolboxApkMerger {
             "io.github.dreammooncai.pvz2tool.timer.TimerReceiver",
             "io.github.dreammooncai.pvz2tool.RestartPhoenixActivity",
             "com.petterp.floatingx.assist.FxContentProvider",
+            // 以下为工具箱依赖库随 LAUNCHER_BLOCK_XML 一并注入的组件，曾因漏删导致更新模式重复累积
+            "androidx.startup.InitializationProvider",
+            "androidx.profileinstaller.ProfileInstallReceiver",
+            "com.kdroid.androidcontextprovider.ContextInitProvider",
         )
+        // 随块注入的 uses-library（其 name 不含 OUR_PKG_NAME 前缀，不能走 startsWith 判定）
+        val toolboxLibs = setOf("androidx.window.extensions", "androidx.window.sidecar")
         val app = tm.applicationElement ?: return
 
         // 移除旧版 Activity
@@ -792,17 +803,18 @@ object ToolboxApkMerger {
                 if (name in toolboxClasses) {
                     toRemove.add(el)
                 } else if (tag == "provider" && name == "androidx.core.content.FileProvider") {
+                    // 仅删我们注入的那个（authority=%PKG%.fileprovider），避免误删游戏自身的 FileProvider
                     val authority = el.attr("authorities") ?: ""
                     if (authority.startsWith(targetPackage)) toRemove.add(el)
                 }
             }
         }
 
-        // 移除 uses-library（引用 OUR_PKG_NAME）
+        // 移除随块注入的 uses-library（OUR_PKG_NAME 前缀 + 工具箱固定库名）
         app.getElements().forEach { child ->
             if (child.name == "uses-library") {
                 val libName = child.attr("name") ?: ""
-                if (libName.startsWith(OUR_PKG_NAME)) toRemove.add(child)
+                if (libName in toolboxLibs || libName.startsWith(OUR_PKG_NAME)) toRemove.add(child)
             }
         }
 

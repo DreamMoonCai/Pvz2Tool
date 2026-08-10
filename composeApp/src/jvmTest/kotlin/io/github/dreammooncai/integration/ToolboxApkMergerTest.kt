@@ -426,6 +426,79 @@ class ToolboxApkMergerTest {
         println("[IMMERSIVE THEME no-pretheme] OK -> ${off.absolutePath}")
     }
 
+    /**
+     * 回归测试：更新模式重复集成时，LAUNCHER_BLOCK_XML 注入的组件 / uses-library 不得重复累积。
+     *
+     * 修复前：[removePreviousToolboxEntries] 的移除白名单漏掉
+     *  `androidx.startup.InitializationProvider`、
+     *  `androidx.profileinstaller.ProfileInstallReceiver`、
+     *  `com.kdroid.androidcontextprovider.ContextInitProvider`
+     *  以及 uses-library `androidx.window.extensions` / `androidx.window.sidecar`，
+     *  → 每次更新都往 manifest 追加一份，导致这些条目成倍增长。
+     */
+    @Test
+    fun `更新模式重复集成注入组件不得重复累积`() {
+        val src = requireSource()
+        val srcDexFirst = readDex(ApkModule.loadApkFile(src), 0)
+
+        val work = File(moduleDir, "build/tmp/integrator-test")
+        work.mkdirs()
+        val target = File(work, "target_dup.apk")
+        buildTargetApk(target, srcDexFirst)
+
+        fun counts(apk: File): Map<String, Int> {
+            val m = ApkModule.loadApkFile(apk).androidManifest
+            val bag = mutableMapOf<String, Int>()
+            m.listApplicationElementsByTag("provider").forEach { el ->
+                el.attrValue("name")?.let { bag["provider:$it"] = (bag["provider:$it"] ?: 0) + 1 }
+            }
+            m.listApplicationElementsByTag("receiver").forEach { el ->
+                el.attrValue("name")?.let { bag["receiver:$it"] = (bag["receiver:$it"] ?: 0) + 1 }
+            }
+            m.applicationElement?.getElements()?.forEach { child ->
+                if (child.name == "uses-library") {
+                    child.attrValue("name")?.let { bag["lib:$it"] = (bag["lib:$it"] ?: 0) + 1 }
+                }
+            }
+            m.getActivities(true).forEach { act ->
+                act.attrValue("name")?.let { bag["activity:$it"] = (bag["activity:$it"] ?: 0) + 1 }
+            }
+            return bag
+        }
+
+        val injected = listOf(
+            "provider:androidx.core.content.FileProvider",
+            "provider:com.petterp.floatingx.assist.FxContentProvider",
+            "provider:androidx.startup.InitializationProvider",
+            "provider:com.kdroid.androidcontextprovider.ContextInitProvider",
+            "receiver:androidx.profileinstaller.ProfileInstallReceiver",
+            "lib:androidx.window.extensions",
+            "lib:androidx.window.sidecar",
+            "activity:io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity",
+        )
+
+        // 第 1 次：首次集成（append 模式）
+        val out1 = File(work, "out_dup_1.apk")
+        ToolboxApkMerger.apply(src, target, DexStrategy.INSERT_BEFORE, out1)
+        val c1 = counts(out1)
+        injected.forEach { assertEquals(1, c1[it] ?: 0, "首次集成后 $it 应为 1 条，实际 ${c1[it]}") }
+
+        // 第 2 次：更新模式重复集成
+        val out2 = File(work, "out_dup_2.apk")
+        val srcDexCount = ApkModule.loadApkFile(src).listDexFiles().size
+        ToolboxApkMerger.apply(
+            src, out1, DexStrategy.INSERT_BEFORE, out2,
+            updateMode = true, dexStart = 0, dexEnd = srcDexCount - 1,
+            insertMode = DexStrategy.INSERT_BEFORE
+        )
+        val c2 = counts(out2)
+        injected.forEach {
+            assertEquals(1, c2[it] ?: 0, "更新模式重复集成后 $it 应仍为 1 条（不可累积），实际 ${c2[it]}")
+        }
+
+        println("[UPDATE no-dup] OK -> ${out2.absolutePath}")
+    }
+
     /** 工具箱注入的启动 Activity 全限定名（其主题即 Theme.DreamPvzApp） */
     private val OUR_LAUNCH_ACTIVITY = "io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity"
 
