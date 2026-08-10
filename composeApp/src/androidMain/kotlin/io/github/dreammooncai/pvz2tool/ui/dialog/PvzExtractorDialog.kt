@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reandroid.apk.ApkModule
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.Pvz2ToolConfig
 import kotlinx.coroutines.*
@@ -907,6 +908,83 @@ class AssetExtractorHolder(
             openUriCache.clear()
             assetExistsCache.clear()
             assetDirExistsCache.clear()
+            targetApkCache.clear()
+            targetApkListCache.clear()
+        }
+
+        // ======================== 目标 APK 底包源（更新模式预览按需读取） ========================
+        // 预览时把目标 APK 当作「底包资源源」，按需从 APK 内读取（懒提取到 cache），
+        // 避免 enterPreview 把整个 assets/pvz2tool/（含数 GB smf）整目录拷贝到预览目录导致卡死。
+        // 在解析链中优先级介于「本地工作目录」与「应用自带 assets」之间：更新模式下目标 APK 应覆盖应用默认资源。
+        @Volatile private var targetApkFile: File? = null
+        @Volatile private var targetApkModule: ApkModule? = null
+        private val targetApkLock = Any()
+        // 按需提取出的文件 Uri 缓存（assetPath -> cache file uri）；仅保存被实际引用过的资源
+        private val targetApkCache = ConcurrentHashMap<String, Uri>()
+        private val targetApkListCache = ConcurrentHashMap<String, List<String>>()
+
+        /** 设置/清除目标 APK 资源源。传入 null 即关闭并释放模块；相同文件且已加载时跳过重新解析。 */
+        fun setTargetApkSource(apk: File?) {
+            synchronized(targetApkLock) {
+                if (targetApkFile?.absolutePath == apk?.absolutePath && (apk == null || targetApkModule != null)) return
+                targetApkModule?.let { runCatching { it.close() } }
+                targetApkModule = apk?.let { runCatching { ApkModule.loadApkFile(it) }.getOrNull() }
+                targetApkFile = apk
+            }
+            clearResourceCaches()
+        }
+
+        private fun getTargetApkModule(): ApkModule? {
+            targetApkModule?.let { return it }
+            val file = targetApkFile ?: return null
+            synchronized(targetApkLock) {
+                targetApkModule?.let { return it }
+                return ApkModule.loadApkFile(file).also { targetApkModule = it }
+            }
+        }
+
+        /** 目标 APK 内是否存在该资源文件（assetPath 已带 pvz2tool/ 前缀）。 */
+        private fun targetApkHasFile(assetPath: String): Boolean {
+            val module = getTargetApkModule() ?: return false
+            return runCatching { module.getInputSource("assets/$assetPath") != null }.getOrDefault(false)
+        }
+
+        /** 按需从目标 APK 提取资源到 cache 并返回可加载的 Uri（仅提取被引用者）。不存在或提取失败返回 null。 */
+        private fun openFromTargetApk(assetPath: String): Uri? {
+            val module = getTargetApkModule() ?: return null
+            val ins = runCatching { module.getInputSource("assets/$assetPath") }.getOrNull() ?: return null
+            targetApkCache[assetPath]?.let { return it }
+            val cacheFile = File(InitializePvz2.context.cacheDir, "integrator_apk_cache/$assetPath")
+            runCatching {
+                cacheFile.parentFile?.mkdirs()
+                ins.openStream().use { inp -> cacheFile.outputStream().use { inp.copyTo(it) } }
+            }.onFailure { e ->
+                Log.w("AssetExtractorHolder", "目标APK资源提取失败: $assetPath", e)
+                return null
+            }
+            val uri = Uri.fromFile(cacheFile)
+            targetApkCache[assetPath] = uri
+            return uri
+        }
+
+        /** 列出目标 APK 内某目录下的直接子项名（internalPath 为相对 pvz2tool/ 的路径）。模块为空返回 null。 */
+        private fun listTargetApkDir(internalPath: String): List<String>? {
+            val module = getTargetApkModule() ?: return null
+            val prefix = "assets/${complementThePrefix(internalPath)}"
+            return targetApkListCache[prefix] ?: run {
+                val names = runCatching {
+                    module.getInputSources()
+                        .asSequence()
+                        .map { it.name }
+                        .filter { it.startsWith("$prefix/") }
+                        .map { it.removePrefix("$prefix/").substringBefore("/") }
+                        .filter { it.isNotEmpty() }
+                        .toSet()
+                        .toList()
+                }.getOrDefault(emptyList())
+                targetApkListCache[prefix] = names
+                names
+            }
         }
 
         /**
@@ -967,7 +1045,16 @@ class AssetExtractorHolder(
                 }
             }
 
-            // 2. APK Assets
+            // 2. 目标 APK 底包源（更新模式预览，优先于应用自带 assets）
+            val apkAssetPath = complementThePrefix(path)
+            if (targetApkHasFile(apkAssetPath)) {
+                val size = runCatching {
+                    getTargetApkModule()?.getInputSource("assets/$apkAssetPath")?.getLength() ?: -1L
+                }.getOrDefault(-1L)
+                return ResourceInfo(exists = true, isFile = true, size = size, lastModified = 0L)
+            }
+
+            // 3. APK Assets
             val assetPath = complementThePrefix(path)
             val isDir = assetDirExists(assetPath)
             val isFile = assetFileExists(assetPath)
@@ -1037,6 +1124,8 @@ class AssetExtractorHolder(
                     return listLocalDocumentFiles(localDocument)
                 }
             }
+            // 目标 APK 源（更新模式预览底包）
+            listTargetApkDir(internalPath)?.takeIf { it.isNotEmpty() }?.let { return it }
             // 本地没有，从 assets 获取
             return listAssetFiles(internalPath)
         }
@@ -1080,7 +1169,9 @@ class AssetExtractorHolder(
             if (localDoc != null && localDoc.exists() && localDoc.isFile) {
                 return localDoc.uri
             }
+            // 目标 APK 底包源（更新模式预览，按需提取，优先于应用自带 assets）
             val assetPath = complementThePrefix(path)
+            openFromTargetApk(assetPath)?.let { return it }
             return if (assetFileExists(assetPath)) "file:///android_asset/$assetPath".toUri() else null
         }
 
@@ -1100,6 +1191,7 @@ class AssetExtractorHolder(
             }
             if (existFromLocalWorkDir(path)) return true
             val assetPath = complementThePrefix(path)
+            if (targetApkHasFile(assetPath)) return true
             return assetFileExists(assetPath) || assetDirExists(assetPath)
         }
 

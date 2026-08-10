@@ -12,7 +12,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import io.github.dreammooncai.pvz2tool.ui.PvzInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.material3.*
@@ -1094,35 +1094,14 @@ fun JsPromptDialog() {
             }
 
             // 输入框
-            PvzSimpleCardBrown(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(10.dp),
-                borderColor = PvzCollapsiblePanelTheme.GREEN.sliderInactiveColor,
-                backgroundColor = PvzCollapsiblePanelTheme.GREEN.sliderInactiveColor
-            ) {
-                BasicTextField(
-                    value = inputValue,
-                    onValueChange = { newValue -> inputValue = newValue },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    textStyle = LocalTextStyle.current.copy(color = Color.White, fontSize = 14.sp),
-                    decorationBox = { innerTextField ->
-                        Box {
-                            if (inputValue.isEmpty()) {
-                                PvzRichText(
-                                    text = state.placeholder.ifEmpty { "请输入..." },
-                                    fontSize = 14.sp,
-                                    defaultStyle = PvzTextStyle(Color(0xCCFFFFFF)),
-                                )
-                            }
-                            innerTextField()
-                        }
-                    },
-                    singleLine = false
-                )
-            }
+            PvzInput(
+                value = inputValue,
+                onValueChange = { newValue -> inputValue = newValue },
+                placeholder = state.placeholder.ifEmpty { "请输入..." },
+                modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth(),
+                theme = PvzCollapsiblePanelTheme.GREEN,
+                multiline = true
+            )
         }
     }
 }

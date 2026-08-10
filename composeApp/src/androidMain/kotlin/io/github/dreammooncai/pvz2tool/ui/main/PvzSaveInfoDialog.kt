@@ -1,6 +1,5 @@
 package io.github.dreammooncai.pvz2tool.ui.main
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,32 +7,25 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import android.widget.Toast
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.ui.popup.PvzPopupContent
 import io.github.dreammooncai.pvz2tool.view.PvzGreenButton
 import io.github.dreammooncai.pvz2tool.view.PvzRedButton
-import io.github.dreammooncai.pvz2tool.view.PvzRichText
-import io.github.dreammooncai.pvz2tool.view.PvzTextStyle
+import io.github.dreammooncai.pvz2tool.ui.PvzInput
 
 /**
  * 存档信息输入弹窗（适配PVZ视觉风格）
@@ -49,12 +41,7 @@ fun PvzSaveInfoDialog(dialogState: PvzSaveInfoDialogState) {
     val inputName = remember { mutableStateOf("") }
     val inputDesc = remember { mutableStateOf("") }
 
-    // PVZ风格颜色常量（保持不变）
-    val pvzPrimaryGreen = Color(0xFF8ED229)
-    val pvzBorderGreen = Color(0xFF78A52B)
-    val pvzDarkGreen = Color(0xFF344702)
-    val pvzBgColor = Color(0xFFF3EEB9)
-    val pvzTextColor = Color(0xFF423F00)
+    // 输入框统一使用 PvzInput（默认 GREEN 主题）
 
     if (dialogState.showDialog.value) {
         LaunchedEffect(dialogState.showCount.intValue) {
@@ -72,72 +59,30 @@ fun PvzSaveInfoDialog(dialogState: PvzSaveInfoDialogState) {
             PvzPopupContent(
                 title = dialogState.title.value, showBackButton = false, onClose = { dialogState.reset() }, isInternalCard = false
             ) {
-                // 存档名称输入框（PVZ风格保持不变，仅 value 用 inputName.value）
-                OutlinedTextField(
+                // 存档名称输入框
+                PvzInput(
                     value = inputName.value,
                     onValueChange = { inputName.value = it },
-                    label = {
-                        PvzRichText(
-                            text = saveConfig.saveNameLabel,
-                            defaultStyle = PvzTextStyle(pvzTextColor, null),
-                            fontSize = 16.sp,
-                            lineHeight = 20.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
+                    label = saveConfig.saveNameLabel,
+                    placeholder = "",
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                        .background(pvzBgColor, RoundedCornerShape(15.dp))
-                        .padding(2.dp),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = pvzBorderGreen,
-                        focusedBorderColor = pvzPrimaryGreen,
-                        focusedTextColor = pvzTextColor,
-                        unfocusedTextColor = pvzTextColor,
-                        cursorColor = pvzDarkGreen,
-                        focusedLabelColor = pvzDarkGreen,
-                        unfocusedLabelColor = pvzTextColor,
-                        disabledBorderColor = pvzBorderGreen.copy(alpha = 0.5f),
-                        disabledTextColor = pvzTextColor.copy(alpha = 0.5f)
-                    ),
-                    shape = RoundedCornerShape(15.dp),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = pvzTextColor, fontSize = 16.sp, fontWeight = FontWeight.Bold, lineHeight = 20.sp)
+                        .padding(bottom = 8.dp),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
                 )
 
-                // 存档描述输入框（同理，仅 value 用 inputDesc.value）
-                OutlinedTextField(
+                // 存档描述输入框
+                PvzInput(
                     value = inputDesc.value,
                     onValueChange = { inputDesc.value = it },
-                    label = {
-                        PvzRichText(
-                            text = saveConfig.saveDescLabel,
-                            defaultStyle = PvzTextStyle(pvzTextColor, null),
-                            fontSize = 16.sp,
-                            lineHeight = 20.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
+                    label = saveConfig.saveDescLabel,
+                    placeholder = "",
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                        .background(pvzBgColor, RoundedCornerShape(15.dp))
-                        .padding(2.dp),
+                        .padding(bottom = 16.dp),
+                    multiline = true,
                     maxLines = 3,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = pvzBorderGreen,
-                        focusedBorderColor = pvzPrimaryGreen,
-                        focusedTextColor = pvzTextColor,
-                        unfocusedTextColor = pvzTextColor,
-                        cursorColor = pvzDarkGreen,
-                        focusedLabelColor = pvzDarkGreen,
-                        unfocusedLabelColor = pvzTextColor
-                    ),
-                    shape = RoundedCornerShape(15.dp),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = pvzTextColor, fontSize = 16.sp, fontWeight = FontWeight.Bold, lineHeight = 20.sp)
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
                 )
 
                 // 操作按钮（保持不变）

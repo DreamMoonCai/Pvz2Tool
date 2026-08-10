@@ -1,14 +1,10 @@
 package io.github.dreammooncai.pvz2tool.ui.main
 
 import android.widget.Toast
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,9 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,6 +26,8 @@ import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzExtractorDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.rememberAssetExtractor
+import io.github.dreammooncai.pvz2tool.ui.PvzInput
+import io.github.dreammooncai.pvz2tool.view.PvzCollapsiblePanelTheme
 import io.github.dreammooncai.pvz2tool.ui.popup.MainPopup
 import io.github.dreammooncai.pvz2tool.ui.popup.PvzPopupContent
 import io.github.dreammooncai.pvz2tool.ui.popup.PvzPopupHost
@@ -346,7 +342,7 @@ private fun formatRatio(ratio: Float): String {
     return ratio.toString()
 }
 
-/** 游戏画面设置页面中复用的数字输入框 */
+/** 游戏画面设置页面中复用的数字输入框（统一使用 PvzInput，BROWN 主题） */
 @Composable
 private fun GameDisplayTextField(
     value: String,
@@ -354,19 +350,12 @@ private fun GameDisplayTextField(
     keyboardType: KeyboardType = KeyboardType.Number,
     modifier: Modifier = Modifier
 ) {
-    BasicTextField(
+    PvzInput(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier
-            .border(1.dp, Color(0xFF9E927C), RoundedCornerShape(4.dp))
-            .background(Color(0xFFF5EDD0), RoundedCornerShape(4.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        textStyle = TextStyle(
-            color = Color(0xFF423F00),
-            fontSize = 18.sp
-        ),
-        cursorBrush = SolidColor(Color(0xFF423F00)),
-        singleLine = true,
+        placeholder = "",
+        modifier = modifier,
+        theme = PvzCollapsiblePanelTheme.BROWN,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType)
     )
 }

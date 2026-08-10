@@ -28,7 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
+import io.github.dreammooncai.pvz2tool.ui.PvzInput
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
@@ -1827,38 +1827,18 @@ private fun DynamicSectionComponent(
                                     )
                                 }
 
-                                // 输入框（使用主题的 sliderInactiveColor 作为背景和边框）
-                                // 卡片内文字使用白色以保证对比度
-                                PvzSimpleCardBrown(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    borderColor = section.theme.sliderInactiveColor,
-                                    backgroundColor = section.theme.sliderInactiveColor
-                                ) {
-                                    BasicTextField(
-                                        value = currentValue,
-                                        onValueChange = { newValue ->
-                                            val newState = state.copy(inputValues = state.inputValues + (item.id to newValue))
-                                            onStateChange(newState)
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(12.dp),
-                                        textStyle = LocalTextStyle.current.copy(color = Color.White,fontSize = 14.sp),
-                                        decorationBox = { innerTextField ->
-                                            Box {
-                                                if (currentValue.isEmpty()) {
-                                                PvzRichText(
-                                                        text = item.placeholder ?: "请输入...",
-                                                        fontSize = 14.sp,
-                                                        defaultStyle = PvzTextStyle(Color(0xCCFFFFFF)),
-                                                    )
-                                                }
-                                                innerTextField()
-                                            }
-                                        },
-                                        singleLine = false
-                                    )
-                                }
+                                // 输入框（使用主题色；默认标题=placeholder，默认多行）
+                                PvzInput(
+                                    value = currentValue,
+                                    onValueChange = { newValue ->
+                                        val newState = state.copy(inputValues = state.inputValues + (item.id to newValue))
+                                        onStateChange(newState)
+                                    },
+                                    placeholder = item.placeholder ?: "请输入...",
+                                    modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth(),
+                                    theme = section.theme,
+                                    multiline = true
+                                )
                             }
 
                             // 输入完成时保存
@@ -2413,43 +2393,14 @@ private fun EditUserNameDialog(
             }
         }
     ) {
-        // 提示文本
-        PvzRichText(
-            InitializePvz2.config.ui.welcome.editUserNameHint,
-            fontSize = 14.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(vertical = 10.dp),
-            defaultStyle = PvzTextOliveStyle.copy(shadowColor = null)
-        )
-
         // 输入框
-        PvzSimpleCardBrown(
-            modifier = Modifier.fillMaxWidth().padding(10.dp),
-            borderColor = PvzCollapsiblePanelTheme.GREEN.sliderInactiveColor,
-            backgroundColor = PvzCollapsiblePanelTheme.GREEN.sliderInactiveColor
-        ) {
-            BasicTextField(
-                value = inputValue,
-                onValueChange = { newValue -> inputValue = newValue },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                textStyle = LocalTextStyle.current.copy(color = Color.White,fontSize = 14.sp),
-                decorationBox = { innerTextField ->
-                    Box {
-                        if (inputValue.isEmpty()) {
-                            PvzRichText(
-                                text = "请输入用户名...",
-                                fontSize = 14.sp,
-                                defaultStyle = PvzTextStyle(Color(0xCCFFFFFF)),
-                            )
-                        }
-                        innerTextField()
-                    }
-                },
-                singleLine = true
-            )
-        }
+        PvzInput(
+            value = inputValue,
+            onValueChange = { newValue -> inputValue = newValue },
+            placeholder = InitializePvz2.config.ui.welcome.editUserNameHint,
+            modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth(),
+            theme = PvzCollapsiblePanelTheme.GREEN
+        )
     }
 }
 
