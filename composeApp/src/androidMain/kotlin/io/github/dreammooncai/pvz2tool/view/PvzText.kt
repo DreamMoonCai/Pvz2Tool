@@ -38,6 +38,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.text.LinkInteractionListener
+import androidx.compose.ui.text.style.TextOverflow
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import java.io.File
 import java.net.HttpURLConnection
@@ -523,6 +524,7 @@ fun PvzRichText(
     fontWeight: FontWeight = FontWeight.Bold,
     textAlign: TextAlign? = null,
     maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
     jsContext: JsExecutionContext? = null,
 ) {
     val blurRadius = calculateBlurRadius(fontSize)
@@ -615,7 +617,8 @@ fun PvzRichText(
             textAlign = textAlign,
             maxLines = maxLines,
             inlineContent = dynamicInlineContent,
-            onTextLayout = { textLayoutResult = it }
+            onTextLayout = { textLayoutResult = it },
+            overflow = overflow,
         )
     } else {
         Box(modifier = modifier) {
@@ -629,7 +632,8 @@ fun PvzRichText(
                 textAlign = textAlign,
                 maxLines = maxLines,
                 inlineContent = dynamicInlineContent,
-                onTextLayout = { textLayoutResult = it }
+                onTextLayout = { textLayoutResult = it },
+                overflow = overflow,
             )
 
             textLayoutResult?.let { result ->

@@ -1082,16 +1082,7 @@ fun JsPromptDialog() {
                             state.deferred?.complete(inputValue)
                         })
                 }
-            }) { // 提示文本
-            if (state.message.isNotEmpty()) {
-                PvzRichText(
-                    state.message,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 10.dp),
-                    defaultStyle = PvzTextOliveStyle.copy(shadowColor = null)
-                )
-            }
+            }) {
 
             // 输入框
             PvzInput(
@@ -1100,6 +1091,7 @@ fun JsPromptDialog() {
                 placeholder = state.placeholder.ifEmpty { "请输入..." },
                 modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth(),
                 theme = PvzCollapsiblePanelTheme.GREEN,
+                label = state.message,
                 multiline = true
             )
         }
@@ -1406,10 +1398,10 @@ private fun ItemIconOrPlaceholder(item: JsChoiceItem, size: Dp, index: Int = -1,
                     .background(Color(0x33999999), RoundedCornerShape(6.dp))
                     .border(1.dp, Color(0x66999999), RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center
             ) {
-                Text(
+                PvzRichText(
                     item.name,
                     fontSize = if (size > 36.dp) 10.sp else 12.sp,
-                    color = Color(0xFF5a4a1a),
+                    defaultStyle = PvzTextStyle(Color(0xFF5a4a1a)),
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1674,11 +1666,11 @@ fun JsSliderDialog() {
         ) {
             Spacer(modifier = Modifier.height(8.dp))
             if (state.showValue) {
-                Text(
+                PvzRichText(
                     text = String.format(fmt, sliderValue) + unitSuffix,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF3a4a1a),
+                    defaultStyle = PvzTextStyle(Color(0xFF3a4a1a)),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1805,10 +1797,10 @@ fun JsSliderDialog() {
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
+            PvzRichText(
                 text = "范围 ${String.format(fmt, state.min)} ~ ${String.format(fmt, state.max)}$unitSuffix",
                 fontSize = 12.sp,
-                color = Color(0xAA3a4a1a),
+                defaultStyle = PvzTextStyle(Color(0xAA3a4a1a)),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )

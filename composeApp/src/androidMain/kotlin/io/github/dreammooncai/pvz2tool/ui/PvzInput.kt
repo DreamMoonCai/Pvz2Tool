@@ -2,6 +2,7 @@ package io.github.dreammooncai.pvz2tool.ui
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.LocalTextStyle
@@ -23,6 +24,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.dreammooncai.pvz2tool.view.PvzCollapsiblePanelTheme
+import io.github.dreammooncai.pvz2tool.view.PvzRichText
+import io.github.dreammooncai.pvz2tool.view.PvzTextStyle
+import io.github.dreammooncai.pvz2tool.view.PvzTextWhiteStyle
 
 /**
  * M3 内部常量 `OutlinedTextFieldInnerPadding`（private，Material 规范固定值 4dp）。
@@ -73,8 +77,7 @@ fun PvzInput(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     enabled: Boolean = true
 ) {
-    val fieldLabel = label ?: placeholder
-    // 主题色：所有主题的 sliderInactiveColor 均为深底，白字恒成立
+    val fieldLabel = label?.ifBlank { placeholder } ?: placeholder // 主题色：所有主题的 sliderInactiveColor 均为深底，白字恒成立
     val fieldBg = theme.sliderInactiveColor
     val fieldBorder = theme.headerGradientStart
     val fieldAccent = theme.sliderActiveColor
@@ -87,110 +90,95 @@ fun PvzInput(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier,
+        modifier = modifier.padding(top = 2.dp),
         interactionSource = interactionSource,
         enabled = enabled,
         keyboardOptions = keyboardOptions,
         label = if (fieldLabel.isNotEmpty()) {
             {
-                Text(
+                PvzRichText(
                     text = fieldLabel,
-                fontSize = 11.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                // 精确补上描边缺口：左右各外扩 4dp（= M3 挖缺口时多留的量），刚好填平，
-                // 既不残留空隙、也不会盖住两端还该保留的描边。
-                // 同时按焦点状态补描边，让输入框外框在标签处「环抱」标签，视觉连续不断开。
-                modifier = Modifier.drawBehind {
-                    // 未悬浮（空值且未聚焦）时标签落在输入框内部，M3 不挖缺口，
-                    // 此时既无缺口可补、也无需描边，直接退出避免无谓绘制。
-                    if (!isFloating) return@drawBehind
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    defaultStyle = PvzTextStyle(if (isFocused) fieldAccent else fieldAccent.copy(alpha = 0.8f)),
+                    overflow = TextOverflow.Ellipsis, // 精确补上描边缺口：左右各外扩 4dp（= M3 挖缺口时多留的量），刚好填平，
+                    // 既不残留空隙、也不会盖住两端还该保留的描边。
+                    // 同时按焦点状态补描边，让输入框外框在标签处「环抱」标签，视觉连续不断开。
+                    modifier = Modifier.drawBehind { // 未悬浮（空值且未聚焦）时标签落在输入框内部，M3 不挖缺口，
+                        // 此时既无缺口可补、也无需描边，直接退出避免无谓绘制。
+                        if (!isFloating) return@drawBehind
 
-                    val ext = LABEL_CUTOUT_INNER_PADDING.toPx()   // 4.dp
-                    val r = 5.dp.toPx()
-                    val w = size.width + ext * 2
-                    // 向下多画一截：缺口高度按 label 外层 Box（有 16dp 最小高度）算，
-                    // 比文字本身高，不补会在下沿留一条细缝。
-                    // 向下溢出全落在容器内部（同色）不可见；向上绝不能溢出——那已是组件之外。
-                    val h = size.height
-                    val strokeW = 1.dp.toPx()   // 与 M3 OutlinedTextField 外框线宽一致
+                        val ext = LABEL_CUTOUT_INNER_PADDING.toPx()   // 4.dp
+                        val r = 5.dp.toPx()
+                        val w = size.width + ext * 2 // 向下多画一截：缺口高度按 label 外层 Box（有 16dp 最小高度）算，
+                        // 比文字本身高，不补会在下沿留一条细缝。
+                        // 向下溢出全落在容器内部（同色）不可见；向上绝不能溢出——那已是组件之外。
+                        val h = size.height
+                        val strokeW = 1.dp.toPx()   // 与 M3 OutlinedTextField 外框线宽一致
 
-                    // 1) 容器底色补缺口（与输入框同色，盖住 M3 挖掉的页面背景）
-                    drawRoundRect(
-                        color = fieldBg,
-                        topLeft = Offset(-ext, 0f),
-                        size = Size(w, h),
-                        cornerRadius = CornerRadius(r, r)
-                    )
-                    // 底部两角补回方角：那里在描边线**以下**、属于容器内部，
-                    // 圆掉会在缺口下沿露出两个页面背景小三角；补成方角后同色不可见。
-                    drawRect(
-                        color = fieldBg,
-                        topLeft = Offset(-ext, h - r),
-                        size = Size(w, r)
-                    )
-
-                    // 2) 描边：让输入框外框在标签处连续环抱
-                    if (isFocused) {
+                        // 1) 容器底色补缺口（与输入框同色，盖住 M3 挖掉的页面背景）
                         drawRoundRect(
-                            color = fieldAccent,
-                            topLeft = Offset(-ext, 0F),
+                            color = fieldBg,
+                            topLeft = Offset(-ext, 0f),
                             size = Size(w, h),
-                            cornerRadius = CornerRadius(r, r),
-                            style = Stroke(width = strokeW)
+                            cornerRadius = CornerRadius(r, r)
+                        ) // 底部两角补回方角：那里在描边线**以下**、属于容器内部，
+                        // 圆掉会在缺口下沿露出两个页面背景小三角；补成方角后同色不可见。
+                        drawRect(
+                            color = fieldBg, topLeft = Offset(-ext, h - r), size = Size(w, r)
                         )
-                    } else {
-                        // 常态（悬浮但未聚焦）：描边只画上半截，从中间剪断、下半截不要，与外框顶部对齐
-                        clipRect(
-                            left = -ext - strokeW,
-                            top = -strokeW,
-                            right = w + strokeW,
-                            bottom = h / 2f
-                        ) {
+
+                        // 2) 描边：让输入框外框在标签处连续环抱
+                        if (isFocused) {
                             drawRoundRect(
-                                color = fieldBorder,
+                                color = fieldAccent,
                                 topLeft = Offset(-ext, 0F),
                                 size = Size(w, h),
                                 cornerRadius = CornerRadius(r, r),
                                 style = Stroke(width = strokeW)
                             )
+                        } else { // 常态（悬浮但未聚焦）：描边只画上半截，从中间剪断、下半截不要，与外框顶部对齐
+                            clipRect(
+                                left = -ext - strokeW, top = -strokeW, right = w + strokeW, bottom = h / 2f
+                            ) {
+                                drawRoundRect(
+                                    color = fieldBorder,
+                                    topLeft = Offset(-ext, 0F),
+                                    size = Size(w, h),
+                                    cornerRadius = CornerRadius(r, r),
+                                    style = Stroke(width = strokeW)
+                                )
+                            }
                         }
-                    }
-                }
-            )
+                    })
             }
         } else null,
         placeholder = {
-            Text(
+            PvzRichText(
                 text = placeholder,
                 fontSize = 13.sp,
                 maxLines = if (multiline) 2 else 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                defaultStyle = PvzTextStyle(theme.secondaryTextColor)
             )
         },
         singleLine = !multiline,
         maxLines = if (multiline) maxLines else 1,
         shape = RoundedCornerShape(12.dp),
         textStyle = LocalTextStyle.current.copy(color = Color.White, fontSize = 13.sp),
-        colors = OutlinedTextFieldDefaults.colors(
-            // 容器：主题深底，聚焦与否都一致，避免闪色
+        colors = OutlinedTextFieldDefaults.colors( // 容器：主题深底，聚焦与否都一致，避免闪色
             focusedContainerColor = fieldBg,
             unfocusedContainerColor = fieldBg,
-            disabledContainerColor = fieldBg,
-            // 描边：常态偏暗（主题 header），聚焦亮（主题 accent）
+            disabledContainerColor = fieldBg, // 描边：常态偏暗（主题 header），聚焦亮（主题 accent）
             focusedBorderColor = fieldAccent,
-            unfocusedBorderColor = fieldBorder,
-            // 正文：白字白光标（与项目其它绿底输入框一致）
+            unfocusedBorderColor = fieldBorder, // 正文：白字白光标（与项目其它绿底输入框一致）
             focusedTextColor = Color.White,
             unfocusedTextColor = Color.White,
-            cursorColor = Color.White,
-            // 标签：常态半透明白，聚焦时主题 accent 高亮
+            cursorColor = Color.White, // 标签：常态半透明白，聚焦时主题 accent 高亮
             focusedLabelColor = fieldAccent,
-            unfocusedLabelColor = Color(0xB3FFFFFF),
-            // 占位示例值：更淡，明显区别于已输入内容
+            unfocusedLabelColor = Color(0xB3FFFFFF), // 占位示例值：更淡，明显区别于已输入内容
             focusedPlaceholderColor = Color(0x80FFFFFF),
-            unfocusedPlaceholderColor = Color(0x80FFFFFF),
-            // 禁用态
+            unfocusedPlaceholderColor = Color(0x80FFFFFF), // 禁用态
             disabledTextColor = Color(0x80FFFFFF),
             disabledBorderColor = fieldBorder.copy(alpha = 0.5f),
             disabledLabelColor = Color(0x80FFFFFF),
