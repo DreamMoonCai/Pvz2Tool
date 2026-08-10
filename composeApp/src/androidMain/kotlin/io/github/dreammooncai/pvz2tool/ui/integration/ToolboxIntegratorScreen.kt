@@ -3768,7 +3768,7 @@ private fun IntegratorInputField(
         value = value,
         onValueChange = onValue,
         placeholder = placeholder,
-        modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         label = label ?: LocalIntegratorFieldLabel.current,
         multiline = multiline,
         theme = PvzCollapsiblePanelTheme.GREEN
