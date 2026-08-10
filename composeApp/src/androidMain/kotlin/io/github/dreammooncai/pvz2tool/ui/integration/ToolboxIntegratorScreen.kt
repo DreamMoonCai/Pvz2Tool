@@ -3762,14 +3762,21 @@ private fun IntegratorInputField(
     placeholder: String,
     multiline: Boolean = false,
     label: String? = null,
+    /** 字段名（yml 键）。提供后标题自动拼为「键-友好文字」，保证键永远在标题里。 */
+    fieldKey: String? = null,
     onValue: (String) -> Unit
 ) {
+    // 标题统一为「键-友好文字」：显式 label 优先；其次 fieldKey 与友好文字(placeholder)组合；
+    // 再退化为外层 UiInputCard 下发的字段名；最后回退 placeholder。键永远在。
+    val effectiveLabel = label
+        ?: (if (fieldKey != null) "$fieldKey-$placeholder" else null)
+        ?: LocalIntegratorFieldLabel.current
     PvzInput(
         value = value,
         onValueChange = onValue,
         placeholder = placeholder,
         modifier = Modifier.fillMaxWidth(),
-        label = label ?: LocalIntegratorFieldLabel.current,
+        label = effectiveLabel,
         multiline = multiline,
         theme = PvzCollapsiblePanelTheme.GREEN
     )
@@ -4753,7 +4760,9 @@ private fun FileInputRow(
     /** 用户输入变化且需重置已选文件/文件夹时回调（仅当曾选过文件/文件夹时触发） */
     onClearSelection: () -> Unit = {},
     /** 更新模式：目标 APK（优先从此读取图片预览，而非源 APK 内置资源） */
-    targetApk: File? = null
+    targetApk: File? = null,
+    /** 显示用字段键：裸调用（未包 UiInputCard）时用于标题「键-友好文字」；留空则沿用外层 UiInputCard 下发的字段名 */
+    label: String? = null
 ) {
     // 仅相对路径可打包进 APK：非空 && 非 / 开头 && 非 http/https 开头
     val isPackable = value.isNotBlank()
@@ -4835,7 +4844,7 @@ private fun FileInputRow(
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) {
-                IntegratorInputField(value, placeholder, onValue = onValueWrapped)
+                IntegratorInputField(value, placeholder, onValue = onValueWrapped, fieldKey = label)
             }
             if (isPackable) {
                 Spacer(Modifier.width(6.dp))
@@ -5431,31 +5440,31 @@ private fun VersionSettingsContent(
 
                     versions.forEachIndexed { i, v ->
                         PvzInfoCard("版本 #${i + 1}") {
-                            IntegratorInputField(v.id, "版本ID（必填）") { v2 ->
+                            IntegratorInputField(v.id, "版本ID（必填）", fieldKey = "id") { v2 ->
                                 onUpdate(versions.toMutableList().also { it[i] = it[i].copy(id = v2) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(v.name, "版本名称") { v2 ->
+                            IntegratorInputField(v.name, "版本名称", fieldKey = "name") { v2 ->
                                 onUpdate(versions.toMutableList().also { it[i] = it[i].copy(name = v2) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(v.desc, "版本描述", multiline = true) { v2 ->
+                            IntegratorInputField(v.desc, "版本描述", multiline = true, fieldKey = "desc") { v2 ->
                                 onUpdate(versions.toMutableList().also { it[i] = it[i].copy(desc = v2) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            FileInputRow(v.icon, "图标路径", "*/*", "ver_${i}_icon", { v2 ->
+                            FileInputRow(v.icon, "图标路径（可选）", "*/*", "ver_${i}_icon", { v2 ->
                                 onUpdate(versions.toMutableList().also { it[i] = it[i].copy(icon = v2) })
-                            }, selectedFile = selectedFiles["ver_${i}_icon"], onImagePreview = onImagePreview, onPickFile = onPickFile, selectedFolder = selectedFolders["ver_${i}_icon"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("ver_${i}_icon") })
+                            }, selectedFile = selectedFiles["ver_${i}_icon"], onImagePreview = onImagePreview, onPickFile = onPickFile, selectedFolder = selectedFolders["ver_${i}_icon"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("ver_${i}_icon") }, label = "icon")
                             Spacer(Modifier.height(4.dp))
                             PvzCheckRow("默认版本", v.default) {
                                 onUpdate(versions.mapIndexed { j, w -> w.copy(default = j == i) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(v.assetPath, "资源路径（留空=默认 version/<id>/smf）") { v2 ->
+                            IntegratorInputField(v.assetPath, "资源路径（留空=默认 version/<id>/smf）", fieldKey = "assetPath") { v2 ->
                                 onUpdate(versions.toMutableList().also { it[i] = it[i].copy(assetPath = v2) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(v.baseAssetPath, "基础包路径（留空=全局）") { v2 ->
+                            IntegratorInputField(v.baseAssetPath, "基础包路径（留空=全局）", fieldKey = "baseAssetPath") { v2 ->
                                 onUpdate(versions.toMutableList().also { it[i] = it[i].copy(baseAssetPath = v2) })
                             }
                             Spacer(Modifier.height(4.dp))
@@ -5463,13 +5472,13 @@ private fun VersionSettingsContent(
                                 onUpdate(versions.toMutableList().also { it[i] = it[i].copy(forceOverride = !v.forceOverride) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(v.enterGameScript, "进入游戏 JS脚本（可选）", multiline = true) { v2 ->
+                            IntegratorInputField(v.enterGameScript, "进入游戏 JS脚本（可选）", multiline = true, fieldKey = "enterGameScript") { v2 ->
                                 onUpdate(versions.toMutableList().also { it[i] = it[i].copy(enterGameScript = v2) })
                             }
                             Spacer(Modifier.height(4.dp))
                             FileInputRow(v.enterGamePath, "进入游戏 JS 文件路径（可选）", "*/*", "ver_${i}_enterGamePath", { v2 ->
                                 onUpdate(versions.toMutableList().also { it[i] = it[i].copy(enterGamePath = v2) })
-                            }, onPickFile, selectedFolder = selectedFolders["ver_${i}_enterGamePath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("ver_${i}_enterGamePath") })
+                            }, onPickFile, selectedFolder = selectedFolders["ver_${i}_enterGamePath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("ver_${i}_enterGamePath") }, label = "enterGamePath")
                             Spacer(Modifier.height(4.dp))
                             ReorderButtons(versions, i, onUpdate, Modifier.fillMaxWidth())
                             Spacer(Modifier.height(4.dp))
@@ -5543,11 +5552,11 @@ private fun SectionSettingsContent(
 
                     sections.forEachIndexed { i, s ->
                         PvzInfoCard("栏目 · ${s.title.ifBlank { "(未命名)" }}") {
-                            IntegratorInputField(s.id, "栏目ID（必填）") { v ->
+                            IntegratorInputField(s.id, "栏目ID（必填）", fieldKey = "id") { v ->
                                 onUpdate(sections.toMutableList().also { it[i] = it[i].copy(id = v) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(s.title, "栏目标题") { v ->
+                            IntegratorInputField(s.title, "栏目标题", fieldKey = "title") { v ->
                                 onUpdate(sections.toMutableList().also { it[i] = it[i].copy(title = v) })
                             }
                             Spacer(Modifier.height(4.dp))
@@ -5566,29 +5575,29 @@ private fun SectionSettingsContent(
                                 onUpdate(sections.toMutableList().also { it[i] = it[i].copy(addItems = !s.addItems) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(s.confirmButtonText, "确认按钮文字（可选）") { v ->
+                            IntegratorInputField(s.confirmButtonText, "确认按钮文字（可选）", fieldKey = "confirmButtonText") { v ->
                                 onUpdate(sections.toMutableList().also { it[i] = it[i].copy(confirmButtonText = v) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(s.visibleOnVersionIds, "版本可见性（逗号分隔，空=全部）") { v ->
+                            IntegratorInputField(s.visibleOnVersionIds, "版本可见性（逗号分隔，空=全部）", fieldKey = "visibleOnVersionIds") { v ->
                                 onUpdate(sections.toMutableList().also { it[i] = it[i].copy(visibleOnVersionIds = v) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(s.targetPath, "资源解压路径（可选）") { v ->
+                            IntegratorInputField(s.targetPath, "资源解压路径（可选）", fieldKey = "targetPath") { v ->
                                 onUpdate(sections.toMutableList().also { it[i] = it[i].copy(targetPath = v) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(s.descriptionContent, "描述内容 (descriptionContent)", multiline = true) { v ->
+                            IntegratorInputField(s.descriptionContent, "描述内容 (descriptionContent)", multiline = true, fieldKey = "descriptionContent") { v ->
                                 onUpdate(sections.toMutableList().also { it[i] = it[i].copy(descriptionContent = v) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(s.jsScript, "栏目级 JS 脚本", multiline = true) { v ->
+                            IntegratorInputField(s.jsScript, "栏目级 JS 脚本", multiline = true, fieldKey = "jsScript") { v ->
                                 onUpdate(sections.toMutableList().also { it[i] = it[i].copy(jsScript = v) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            FileInputRow(s.jsPath, "栏目级 JS 文件路径", "*/*", "section_${i}_jsPath", { v ->
+                            FileInputRow(s.jsPath, "栏目级 JS 文件路径（可选）", "*/*", "section_${i}_jsPath", { v ->
                                 onUpdate(sections.toMutableList().also { it[i] = it[i].copy(jsPath = v) })
-                            }, onPickFile, selectedFolder = selectedFolders["section_${i}_jsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("section_${i}_jsPath") })
+                            }, onPickFile, selectedFolder = selectedFolders["section_${i}_jsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("section_${i}_jsPath") }, label = "jsPath")
                             Spacer(Modifier.height(6.dp))
                             ReorderButtons(sections, i, onUpdate, Modifier.fillMaxWidth())
                             Spacer(Modifier.height(6.dp))
@@ -5669,7 +5678,7 @@ private fun ItemSettingsContent(
                         PvzInfoCard("[${item.type}] $itemLabel") {
                             ReorderButtons(items, i, onUpdate = { newItems -> onUpdate(section.copy(items = newItems)) }, Modifier.fillMaxWidth())
                             Spacer(Modifier.height(6.dp))
-                            IntegratorInputField(item.id, "ID（必填）") { v ->
+                            IntegratorInputField(item.id, "ID（必填）", fieldKey = "id") { v ->
                                 onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(id = v) }))
                             }
                             Spacer(Modifier.height(4.dp))
@@ -5682,43 +5691,43 @@ private fun ItemSettingsContent(
                             }
                             Spacer(Modifier.height(6.dp))
                             // 通用字段
-                            IntegratorInputField(item.name, "name（支持 {{red:}} 复合文本）") { v ->
+                            IntegratorInputField(item.name, "name（支持 {{red:}} 复合文本）", fieldKey = "name") { v ->
                                 onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(name = v) }))
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(item.desc, "desc", multiline = true) { v ->
+                            IntegratorInputField(item.desc, "描述文字", multiline = true, fieldKey = "desc") { v ->
                                 onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(desc = v) }))
                             }
                             Spacer(Modifier.height(4.dp))
-                            FileInputRow(item.icon, "icon 路径（可选）", "*/*", "secitem_${sectionIndex}_${i}_icon", { v ->
+                            FileInputRow(item.icon, "图标路径（可选）", "*/*", "secitem_${sectionIndex}_${i}_icon", { v ->
                                 onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(icon = v) }))
-                            }, selectedFile = selectedFiles["secitem_${sectionIndex}_${i}_icon"], onImagePreview = onImagePreview, onPickFile = onPickFile, selectedFolder = selectedFolders["secitem_${sectionIndex}_${i}_icon"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("secitem_${sectionIndex}_${i}_icon") })
+                            }, selectedFile = selectedFiles["secitem_${sectionIndex}_${i}_icon"], onImagePreview = onImagePreview, onPickFile = onPickFile, selectedFolder = selectedFolders["secitem_${sectionIndex}_${i}_icon"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("secitem_${sectionIndex}_${i}_icon") }, label = "icon")
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(item.assetPath, "assetPath（可选）") { v ->
+                            IntegratorInputField(item.assetPath, "资源路径（可选）", fieldKey = "assetPath") { v ->
                                 onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(assetPath = v) }))
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(item.jsScript, "jsScript（可选）", multiline = true) { v ->
+                            IntegratorInputField(item.jsScript, "点击执行的 JS 脚本（可选）", multiline = true, fieldKey = "jsScript") { v ->
                                 onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(jsScript = v) }))
                             }
                             Spacer(Modifier.height(4.dp))
-                            FileInputRow(item.jsPath, "jsPath（可选）", "*/*", "secitem_${sectionIndex}_${i}_jsPath", { v ->
+                            FileInputRow(item.jsPath, "脚本文件路径（可选）", "*/*", "secitem_${sectionIndex}_${i}_jsPath", { v ->
                                 onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(jsPath = v) }))
-                            }, onPickFile, selectedFolder = selectedFolders["secitem_${sectionIndex}_${i}_jsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("secitem_${sectionIndex}_${i}_jsPath") })
+                            }, onPickFile, selectedFolder = selectedFolders["secitem_${sectionIndex}_${i}_jsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("secitem_${sectionIndex}_${i}_jsPath") }, label = "jsPath")
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(item.isShowFromJs, "isShowFromJs（可选）", multiline = true) { v ->
+                            IntegratorInputField(item.isShowFromJs, "可见性 JS 表达式（可选）", multiline = true, fieldKey = "isShowFromJs") { v ->
                                 onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(isShowFromJs = v) }))
                             }
                             Spacer(Modifier.height(4.dp))
-                            FileInputRow(item.isShowFromJsPath, "isShowFromJsPath（可选）", "*/*", "secitem_${sectionIndex}_${i}_isShowFromJsPath", { v ->
+                            FileInputRow(item.isShowFromJsPath, "可见性脚本路径（可选）", "*/*", "secitem_${sectionIndex}_${i}_isShowFromJsPath", { v ->
                                 onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(isShowFromJsPath = v) }))
-                            }, onPickFile, selectedFolder = selectedFolders["secitem_${sectionIndex}_${i}_isShowFromJsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("secitem_${sectionIndex}_${i}_isShowFromJsPath") })
+                            }, onPickFile, selectedFolder = selectedFolders["secitem_${sectionIndex}_${i}_isShowFromJsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("secitem_${sectionIndex}_${i}_isShowFromJsPath") }, label = "isShowFromJsPath")
 
                             // 类型特定字段
                             when (item.type) {
                                 "RADIO" -> {
                                     Spacer(Modifier.height(4.dp))
-                                    IntegratorInputField(item.groupId, "groupId（互斥组）") { v ->
+                                    IntegratorInputField(item.groupId, "互斥组 ID（单选互斥）", fieldKey = "groupId") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(groupId = v) }))
                                     }
                                     Spacer(Modifier.height(4.dp))
@@ -5734,31 +5743,31 @@ private fun ItemSettingsContent(
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(checkboxDefault = !item.checkboxDefault) }))
                                     }
                                     Spacer(Modifier.height(4.dp))
-                                    IntegratorInputField(item.smfList, "smfList（逗号分隔）") { v ->
+                                    IntegratorInputField(item.smfList, "关联 SMF 列表（逗号分隔）", fieldKey = "smfList") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(smfList = v) }))
                                     }
                                 }
                                 "SLIDER" -> {
                                     Spacer(Modifier.height(4.dp))
-                                    IntegratorInputField(item.minValue, "minValue") { v ->
+                                    IntegratorInputField(item.minValue, "最小值", fieldKey = "minValue") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(minValue = v) }))
                                     }
-                                    IntegratorInputField(item.maxValue, "maxValue") { v ->
+                                    IntegratorInputField(item.maxValue, "最大值", fieldKey = "maxValue") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(maxValue = v) }))
                                     }
-                                    IntegratorInputField(item.defaultValue, "defaultValue") { v ->
+                                    IntegratorInputField(item.defaultValue, "默认值", fieldKey = "defaultValue") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(defaultValue = v) }))
                                     }
-                                    IntegratorInputField(item.step, "step") { v ->
+                                    IntegratorInputField(item.step, "步进值", fieldKey = "step") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(step = v) }))
                                     }
-                                    IntegratorInputField(item.valueSuffix, "valueSuffix") { v ->
+                                    IntegratorInputField(item.valueSuffix, "数值后缀", fieldKey = "valueSuffix") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(valueSuffix = v) }))
                                     }
                                 }
                                 "BUTTON" -> {
                                     Spacer(Modifier.height(4.dp))
-                                    IntegratorInputField(item.buttonText, "buttonText（按钮文字）") { v ->
+                                    IntegratorInputField(item.buttonText, "按钮文字", fieldKey = "buttonText") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(buttonText = v) }))
                                     }
                                     Text("buttonColor:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5D4E37))
@@ -5770,16 +5779,16 @@ private fun ItemSettingsContent(
                                 }
                                 "INPUT" -> {
                                     Spacer(Modifier.height(4.dp))
-                                    IntegratorInputField(item.placeholder, "placeholder") { v ->
+                                    IntegratorInputField(item.placeholder, "占位提示文字", fieldKey = "placeholder") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(placeholder = v) }))
                                     }
-                                    IntegratorInputField(item.inputDefault, "inputDefault（初始值）") { v ->
+                                    IntegratorInputField(item.inputDefault, "输入框初始值", fieldKey = "inputDefault") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(inputDefault = v) }))
                                     }
                                 }
                                 "INFO" -> {
                                     Spacer(Modifier.height(4.dp))
-                                    IntegratorInputField(item.infoValue, "infoValue（静态默认值）", multiline = true) { v ->
+                                    IntegratorInputField(item.infoValue, "静态显示文本", multiline = true, fieldKey = "infoValue") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(infoValue = v) }))
                                     }
                                 }
