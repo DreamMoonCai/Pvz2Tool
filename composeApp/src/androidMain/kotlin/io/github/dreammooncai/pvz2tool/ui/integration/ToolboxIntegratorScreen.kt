@@ -2711,7 +2711,7 @@ fun ToolboxIntegratorScreen(
                                 UiInputCard("${ymlAssets}cgVideoPath", "开场 CG 视频文件名。选择文件时，将复制到 APK 对应路径。") {
                                     FileInputRow(cgVideoPath, "如 opening.mp4", "*/*", "cgVideoPath", { cgVideoPath = it }, selectedFolder = selectedFolders["cgVideoPath"], onPickFile = { label, mime -> pickAnyFile(label, mime) }, onPickFolder = { fk -> pickFolder(fk) }, onClearSelection = { clearFieldSelection("cgVideoPath") })
                                 }
-                                UiInputCard("${ymlAssets}cgVideoPoster-CG 加载超时或出错时的占位海报图。", "") {
+                                UiInputCard("CG 加载超时或出错时的占位海报图。（${ymlAssets}cgVideoPoster）", "") {
                                     FileInputRow(cgVideoPoster, "如 bg_main.jpg", "*/*", "cgVideoPoster", { cgVideoPoster = it },
                                         selectedFile = selectedFiles["cgVideoPoster"], selectedFolder = selectedFolders["cgVideoPoster"],
                                         onImagePreview = openImagePreview,
@@ -2720,7 +2720,7 @@ fun ToolboxIntegratorScreen(
                                         onClearSelection = { clearFieldSelection("cgVideoPoster") },
                                         targetApk = if (sourceMode == "update") targetApk else null)
                                 }
-                                UiInputCard("${ymlAssets}cgVideoLoadTimeout-CG 视频加载超时时间（毫秒），默认 5000。", "") {
+                                UiInputCard("CG 视频加载超时时间（毫秒），默认 5000。（${ymlAssets}cgVideoLoadTimeout）", "") {
                                     IntegratorInputField(cgVideoLoadTimeout, "如 5000") { cgVideoLoadTimeout = it }
                                 }
                             }
@@ -2732,14 +2732,14 @@ fun ToolboxIntegratorScreen(
                         PvzDialogCard(title = null) {
                             Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                                 UiSectionHeader("版本/作者/标题")
-                                UiInputCard("ui.versionLabel-版本号标签前缀", "") { IntegratorInputField(uiVersionLabel, "如 版本号：") { uiVersionLabel = it } }
-                                UiInputCard("ui.uiVersion-UI 版本号", "") { IntegratorInputField(uiUiVersion, "如 V2.5.1") { uiUiVersion = it } }
-                                UiInputCard("ui.authorInfo-作者信息", "") { IntegratorInputField(uiAuthorInfo, "作者信息", multiline = true) { uiAuthorInfo = it } }
-                                UiInputCard("ui.noValidDirTip-无有效目录提示", "") { IntegratorInputField(uiNoValidDirTip, "如 未选择有效目录") { uiNoValidDirTip = it } }
-                                UiInputCard("ui.title.topAppBar-顶栏标题", "") { IntegratorInputField(uiTitleTopAppBar, "顶栏标题") { uiTitleTopAppBar = it } }
-                                UiInputCard("ui.title.about-关于版本标签", "") { IntegratorInputField(uiTitleAbout, "如 关于版本") { uiTitleAbout = it } }
-                                UiInputCard("ui.title.coreFunction-核心功能标签", "") { IntegratorInputField(uiTitleCoreFunction, "如 核心功能") { uiTitleCoreFunction = it } }
-                                UiInputCard("ui.title.versionManage-版本管理标签", "") { IntegratorInputField(uiTitleVersionManage, "如 版本管理") { uiTitleVersionManage = it } }
+                                UiInputCard("版本号标签前缀（ui.versionLabel）", "") { IntegratorInputField(uiVersionLabel, "如 版本号：") { uiVersionLabel = it } }
+                                UiInputCard("UI 版本号（ui.uiVersion）", "") { IntegratorInputField(uiUiVersion, "如 V2.5.1") { uiUiVersion = it } }
+                                UiInputCard("作者信息（ui.authorInfo）", "") { IntegratorInputField(uiAuthorInfo, "作者信息", multiline = true) { uiAuthorInfo = it } }
+                                UiInputCard("无有效目录提示（ui.noValidDirTip）", "") { IntegratorInputField(uiNoValidDirTip, "如 未选择有效目录") { uiNoValidDirTip = it } }
+                                UiInputCard("顶栏标题（ui.title.topAppBar）", "") { IntegratorInputField(uiTitleTopAppBar, "顶栏标题") { uiTitleTopAppBar = it } }
+                                UiInputCard("关于版本标签（ui.title.about）", "") { IntegratorInputField(uiTitleAbout, "如 关于版本") { uiTitleAbout = it } }
+                                UiInputCard("核心功能标签（ui.title.coreFunction）", "") { IntegratorInputField(uiTitleCoreFunction, "如 核心功能") { uiTitleCoreFunction = it } }
+                                UiInputCard("版本管理标签（ui.title.versionManage）", "") { IntegratorInputField(uiTitleVersionManage, "如 版本管理") { uiTitleVersionManage = it } }
                             }
                         }
                         Spacer(Modifier.height(16.dp))
@@ -2757,7 +2757,7 @@ fun ToolboxIntegratorScreen(
                             Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                                 UiSectionHeader("背景/图标 (ui.assets)")
                                 if (!simplifiedLaunch) {
-                                    UiInputCard("ui.assets.bgImage-主界面背景图文件名或 URL。", "") {
+                                    UiInputCard("主界面背景图文件名或 URL。（ui.assets.bgImage）", "") {
                                         FileInputRow(
                                             bgImage,
                                             "如 bg_main.jpg",
@@ -2780,7 +2780,7 @@ fun ToolboxIntegratorScreen(
                                             isUseSolidColorBg = !isUseSolidColorBg
                                         }
                                     }
-                                    UiInputCard("ui.assets.sideBgImage-侧边背景图文件名或 URL。", "") {
+                                    UiInputCard("侧边背景图文件名或 URL。（ui.assets.sideBgImage）", "") {
                                         FileInputRow(
                                             sideBgImage,
                                             "如 game_side_bg.jpg",
@@ -2795,7 +2795,7 @@ fun ToolboxIntegratorScreen(
                                             onClearSelection = { clearFieldSelection("sideBgImage") },
                                             targetApk = if (sourceMode == "update") targetApk else null)
                                     }
-                                    UiInputCard("ui.assets.floatingBallIcon-悬浮球图标文件名。", "") {
+                                    UiInputCard("悬浮球图标文件名。（ui.assets.floatingBallIcon）", "") {
                                         FileInputRow(
                                             floatingBallIcon,
                                             "如 ic_floating_dave.png",
@@ -2841,7 +2841,7 @@ fun ToolboxIntegratorScreen(
                             PvzDialogCard(title = null) {
                                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                                     UiSectionHeader("音频 (ui.assets)")
-                                    UiInputCard("ui.assets.bgMusic-背景音乐文件名（相对于 assets/pvz2tool/sound/）。", "") {
+                                    UiInputCard("背景音乐文件名（相对于 assets/pvz2tool/sound/）。（ui.assets.bgMusic）", "") {
                                         FileInputRow(bgMusic, "如 bg_music.wav", "*/*", "bgMusic", { bgMusic = it }, selectedFolder = selectedFolders["bgMusic"], onPickFile = { label, mime -> pickAnyFile(label, mime) }, onPickFolder = { fk -> pickFolder(fk) }, onClearSelection = { clearFieldSelection("bgMusic") })
                                     }
                                     UiSwitchCard("ui.assets.isPlayBackgroundMusic", "是否默认播放背景音乐。") {
@@ -2868,7 +2868,7 @@ fun ToolboxIntegratorScreen(
                             PvzDialogCard(title = null) {
                                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                                     UiSectionHeader("错误提示 (ui.error.)")
-                                    UiInputCard("ui.error.gameActivityInvalid-游戏 Activity 设置有误时的提示文案。", "") {
+                                    UiInputCard("游戏 Activity 设置有误时的提示文案。（ui.error.gameActivityInvalid）", "") {
                                         IntegratorInputField(
                                             gameActivityInvalid,
                                             "如：设置的游戏Activity有误或不存在"
@@ -2884,16 +2884,16 @@ fun ToolboxIntegratorScreen(
                         PvzDialogCard(title = null) {
                             Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                                 UiSectionHeader("教程/按钮/对话框")
-                                UiInputCard("ui.tutorial-教程文本", "") { IntegratorInputField(uiTutorial, "教程内容", multiline = true) { uiTutorial = it } }
-                                UiInputCard("ui.button.enterGame-进入游戏按钮", "") { IntegratorInputField(uiBtnEnterGame, "如 进入游戏") { uiBtnEnterGame = it } }
-                                UiInputCard("ui.button.tutorial-教程按钮", "") { IntegratorInputField(uiBtnTutorial, "如 教程") { uiBtnTutorial = it } }
-                                UiInputCard("ui.button.resetData-重置数据按钮", "") { IntegratorInputField(uiBtnResetData, "如 重置数据包") { uiBtnResetData = it } }
-                                UiInputCard("ui.button.showFloatingWindow-悬浮窗按钮", "") { IntegratorInputField(uiBtnShowFW, "如 工具悬窗") { uiBtnShowFW = it } }
-                                UiInputCard("ui.button.confirmVersion-选定版本按钮", "") { IntegratorInputField(uiBtnConfirmVersion, "如 选定版本") { uiBtnConfirmVersion = it } }
-                                UiInputCard("ui.log.panelTitle-日志面板标题", "") { IntegratorInputField(uiLogPanelTitle, "如 JS 日志") { uiLogPanelTitle = it } }
-                                UiInputCard("ui.dialog.confirm-通用确认按钮", "") { IntegratorInputField(uiDialogConfirm, "如 确定") { uiDialogConfirm = it } }
-                                UiInputCard("ui.dialog.cancel-通用取消按钮", "") { IntegratorInputField(uiDialogCancel, "如 取消") { uiDialogCancel = it } }
-                                UiInputCard("ui.welcome.greeting-欢迎语模板", "") { IntegratorInputField(uiWelcomeGreeting, "如 欢迎您，%s") { uiWelcomeGreeting = it } }
+                                UiInputCard("教程文本（ui.tutorial）", "") { IntegratorInputField(uiTutorial, "教程内容", multiline = true) { uiTutorial = it } }
+                                UiInputCard("进入游戏按钮（ui.button.enterGame）", "") { IntegratorInputField(uiBtnEnterGame, "如 进入游戏") { uiBtnEnterGame = it } }
+                                UiInputCard("教程按钮（ui.button.tutorial）", "") { IntegratorInputField(uiBtnTutorial, "如 教程") { uiBtnTutorial = it } }
+                                UiInputCard("重置数据按钮（ui.button.resetData）", "") { IntegratorInputField(uiBtnResetData, "如 重置数据包") { uiBtnResetData = it } }
+                                UiInputCard("悬浮窗按钮（ui.button.showFloatingWindow）", "") { IntegratorInputField(uiBtnShowFW, "如 工具悬窗") { uiBtnShowFW = it } }
+                                UiInputCard("选定版本按钮（ui.button.confirmVersion）", "") { IntegratorInputField(uiBtnConfirmVersion, "如 选定版本") { uiBtnConfirmVersion = it } }
+                                UiInputCard("日志面板标题（ui.log.panelTitle）", "") { IntegratorInputField(uiLogPanelTitle, "如 JS 日志") { uiLogPanelTitle = it } }
+                                UiInputCard("通用确认按钮（ui.dialog.confirm）", "") { IntegratorInputField(uiDialogConfirm, "如 确定") { uiDialogConfirm = it } }
+                                UiInputCard("通用取消按钮（ui.dialog.cancel）", "") { IntegratorInputField(uiDialogCancel, "如 取消") { uiDialogCancel = it } }
+                                UiInputCard("欢迎语模板（ui.welcome.greeting）", "") { IntegratorInputField(uiWelcomeGreeting, "如 欢迎您，%s") { uiWelcomeGreeting = it } }
                             }
                         }
                     }
@@ -3649,7 +3649,7 @@ private fun PvzChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) 
             color = if (selected) PvzGreen else PvzBorderBrown
         )
         Spacer(Modifier.width(8.dp))
-        PvzRichText(formatFieldLabel(label), defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp)
+        PvzRichText(label, defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp)
     }
 }
 
@@ -3664,7 +3664,7 @@ private fun PvzCheckRow(title: String, checked: Boolean, onToggle: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         PvzRichText(
-            formatFieldLabel(title),
+            title,
             defaultStyle = PvzTextOliveStyleNoShadow,
             fontSize = 13.sp,
             modifier = Modifier.weight(1f)
@@ -3743,18 +3743,6 @@ private val LocalIntegratorFieldLabel = staticCompositionLocalOf<String?> { null
 // 输入框配色常量与描边缺口补丁已移至公共组件 ui/PvzInput.kt（按传入 theme 派生）。
 
 
-/**
- * 字段标题规范化：把**已写成** `键-友好文字` 形式的字面量翻转为 `友好文字（键）`。
- * 例如 `ui.versionLabel-版本号标签前缀` → `版本号标签前缀（ui.versionLabel）`。
- * - 不含 `-` 或首个字符即为 `-` 的字符串原样返回（纯友好文字 / 占位提示等不受影响）。
- * - 只负责「翻转历史写法」；键与友好文字分开传参时请直接拼 `"$友好文字（$键）"`，不要绕这里，
- *   否则键本身含 `-` 会被从第一个 `-` 处切断。
- */
-private fun formatFieldLabel(raw: String): String {
-    val idx = raw.indexOf('-')
-    if (idx <= 0) return raw
-    return raw.substring(idx + 1).trim() + "（" + raw.substring(0, idx).trim() + "）"
-}
 
 /**
  * 集成器统一文本输入框——[PvzInput] 的 GREEN 主题封装。
@@ -4197,7 +4185,7 @@ private fun UiInfoCard(label: String, content: @Composable () -> Unit) {
     Column(Modifier
         .fillMaxWidth()
         .padding(vertical = 4.dp)) {
-        PvzRichText(formatFieldLabel(label), defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        PvzRichText(label, defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(2.dp))
         content()
     }
@@ -4240,7 +4228,7 @@ private fun UiInputCard(label: String, desc: String, content: @Composable () -> 
             UiDescription(desc)
             Spacer(Modifier.height(4.dp))
         }
-        CompositionLocalProvider(LocalIntegratorFieldLabel provides formatFieldLabel(label)) {
+        CompositionLocalProvider(LocalIntegratorFieldLabel provides label) {
             content()
         }
     }
@@ -4258,7 +4246,7 @@ private fun UiSwitchCard(label: String, desc: String, content: @Composable () ->
             .border(1.dp, Color(0xFFD5CFA0), RoundedCornerShape(8.dp))
             .padding(10.dp)
     ) {
-        PvzRichText(formatFieldLabel(label), defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        PvzRichText(label, defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         UiDescription(desc)
         Spacer(Modifier.height(2.dp))
         content()
@@ -5071,7 +5059,7 @@ private fun FloatingWindowSettingsContent(
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     UiSectionHeader("悬浮窗基础设置 (ui.settings)")
                     if (!simplifiedLaunch)
-                        UiInputCard("showFloatingWindow-「开启悬浮窗」开关标签文本。", "") {
+                        UiInputCard("「开启悬浮窗」开关标签文本。（showFloatingWindow）", "") {
                             IntegratorInputField(showFloatingWindowLabel, "如：是否开启悬浮窗") { onShowFloatingWindowLabel(it) }
                         }
                     UiSwitchCard("isShowFloatingWindow", "默认是否开启悬浮窗（仅影响首次启动）。") {
@@ -5089,13 +5077,13 @@ private fun FloatingWindowSettingsContent(
                         PvzCheckRow("默认启用退出确认", isUseExitConfirm) { onIsUseExitConfirm(!isUseExitConfirm) }
                     }
                     if (!simplifiedLaunch) {
-                        UiInputCard("exitConfirmTitle-退出确认弹窗标题。", "") {
+                        UiInputCard("退出确认弹窗标题。（exitConfirmTitle）", "") {
                             IntegratorInputField(exitConfirmTitle, "如：退出游戏") { onExitConfirmTitle(it) }
                         }
-                        UiInputCard("exitConfirmMessage-退出确认弹窗内容。", "") {
+                        UiInputCard("退出确认弹窗内容。（exitConfirmMessage）", "") {
                             IntegratorInputField(exitConfirmMessage, "如：确定要退出游戏吗？") { onExitConfirmMessage(it) }
                         }
-                        UiInputCard("exitConfirmButtonText-退出确认按钮文字。", "") {
+                        UiInputCard("退出确认按钮文字。（exitConfirmButtonText）", "") {
                             IntegratorInputField(exitConfirmButtonText, "如：确认退出") { onExitConfirmButtonText(it) }
                         }
                     }
@@ -5108,20 +5096,20 @@ private fun FloatingWindowSettingsContent(
                 PvzDialogCard(title = null) {
                     Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                         UiSectionHeader("悬浮球退出确认 (ui.settings)")
-                        UiInputCard("floatingExitConfirmTitle-关闭悬浮球时确认弹窗标题。", "") {
+                        UiInputCard("关闭悬浮球时确认弹窗标题。（floatingExitConfirmTitle）", "") {
                             IntegratorInputField(floatingExitConfirmTitle, "如：确认退出") {
                                 onFloatingExitConfirmTitle(
                                     it
                                 )
                             }
                         }
-                        UiInputCard("floatingExitConfirmMessage-关闭悬浮球时确认弹窗内容。", "") {
+                        UiInputCard("关闭悬浮球时确认弹窗内容。（floatingExitConfirmMessage）", "") {
                             IntegratorInputField(
                                 floatingExitConfirmMessage,
                                 "如：确定要退出悬浮窗吗..."
                             ) { onFloatingExitConfirmMessage(it) }
                         }
-                        UiInputCard("floatingExitConfirmButtonText-关闭悬浮球时确认按钮文字。", "") {
+                        UiInputCard("关闭悬浮球时确认按钮文字。（floatingExitConfirmButtonText）", "") {
                             IntegratorInputField(
                                 floatingExitConfirmButtonText,
                                 "如：确认"
@@ -5137,10 +5125,10 @@ private fun FloatingWindowSettingsContent(
                 PvzDialogCard(title = null) {
                     Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                         UiSectionHeader("占位提示文案 (ui.floatingWindow)")
-                        UiInputCard("emptyTip-悬浮窗无内容时的占位提示。", "") {
+                        UiInputCard("悬浮窗无内容时的占位提示。（emptyTip）", "") {
                             IntegratorInputField(fwEmptyTip, "如：（悬浮窗暂无内容...）") { onFwEmptyTip(it) }
                         }
-                        UiInputCard("allHiddenTip-悬浮窗所有项被隐藏时的提示。", "") {
+                        UiInputCard("悬浮窗所有项被隐藏时的提示。（allHiddenTip）", "") {
                             IntegratorInputField(fwAllHiddenTip, "如：（当前没有可用的功能）") { onFwAllHiddenTip(it) }
                         }
                     }
@@ -5226,19 +5214,19 @@ private fun FwItemEditor(
             onFwItems(fwItems.toMutableList().also { it[index] = fw(it[index]) })
         }
 
-        UiInputCard("id-唯一标识（必填）", "") {
+        UiInputCard("唯一标识（必填）（id）", "") {
             IntegratorInputField(item.id, "如 vpn_toggle") { v -> update { it.copy(id = v) } }
         }
-        UiInputCard("name-按钮文字（优先级低于 buttonText）", "") {
+        UiInputCard("按钮文字（优先级低于 buttonText）（name）", "") {
             IntegratorInputField(item.name, "如 VPN 开关") { v -> update { it.copy(name = v) } }
         }
-        UiInputCard("buttonText-按钮文字（优先级高于 name）", "") {
+        UiInputCard("按钮文字（优先级高于 name）（buttonText）", "") {
             IntegratorInputField(item.buttonText, "如 断开VPN") { v -> update { it.copy(buttonText = v) } }
         }
-        UiInputCard("icon-左侧图标资源名（可选，相对于 assets/pvz2tool/images/）", "") {
+        UiInputCard("左侧图标资源名（可选，相对于 assets/pvz2tool/images/）（icon）", "") {
             IntegratorInputField(item.icon, "如 icons/fw_vpn.png") { v -> update { it.copy(icon = v) } }
         }
-        UiInputCard("desc-按钮下方的描述文字（可选）", "") {
+        UiInputCard("按钮下方的描述文字（可选）（desc）", "") {
             IntegratorInputField(item.desc, "如 VPN 开关说明", multiline = true) { v -> update { it.copy(desc = v) } }
         }
         // buttonColor 选择
@@ -5263,21 +5251,21 @@ private fun FwItemEditor(
                 }
             }
         }
-        UiInputCard("jsScript-点击执行的 JS 脚本（裸表达式）", "") {
+        UiInputCard("点击执行的 JS 脚本（裸表达式）（jsScript）", "") {
             IntegratorInputField(item.jsScript, "如 vpn.disconnect()", multiline = true) { v -> update { it.copy(jsScript = v) } }
         }
-        UiInputCard("jsPath-脚本文件路径（jsScript 为空时生效）", "") {
+        UiInputCard("脚本文件路径（jsScript 为空时生效）（jsPath）", "") {
             FileInputRow(item.jsPath, "如 script/fw_vpn.js", "*/*", "fw_item_${item.id}_jsPath", { v -> update { it.copy(jsPath = v) } }, onPickFile, selectedFolder = selectedFolders["fw_item_${item.id}_jsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("fw_item_${item.id}_jsPath") })
         }
-        UiInputCard("smfList-关联的 SMF 资源列表（逗号分隔）", "") {
+        UiInputCard("关联的 SMF 资源列表（逗号分隔）（smfList）", "") {
             IntegratorInputField(item.smfList.joinToString(", "), "如 activityconfig, dailyreward") { v ->
                 update { it.copy(smfList = v.split(",", "，").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }) }
             }
         }
-        UiInputCard("isShowFromJs-可见性判定 JS 表达式", "") {
+        UiInputCard("可见性判定 JS 表达式（isShowFromJs）", "") {
             IntegratorInputField(item.isShowFromJs, "如 vpn.isPrepared()", multiline = true) { v -> update { it.copy(isShowFromJs = v) } }
         }
-        UiInputCard("isShowFromJsPath-可见性判定脚本路径", "") {
+        UiInputCard("可见性判定脚本路径（isShowFromJsPath）", "") {
             FileInputRow(item.isShowFromJsPath, "如 script/fw_show.js", "*/*", "fw_item_${item.id}_isShowFromJsPath", { v -> update { it.copy(isShowFromJsPath = v) } }, onPickFile, selectedFolder = selectedFolders["fw_item_${item.id}_isShowFromJsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("fw_item_${item.id}_isShowFromJsPath") })
         }
     }
@@ -5382,37 +5370,37 @@ private fun TbiItemEditor(
             onUpdate(tbiItems.toMutableList().also { it[index] = fw(it[index]) })
         }
 
-        UiInputCard("id-唯一标识（必填）", "") {
+        UiInputCard("唯一标识（必填）（id）", "") {
             IntegratorInputField(item.id, "如 refresh_top") { v -> update { it.copy(id = v) } }
         }
-        UiInputCard("icon-正常态图标资源路径", "") {
+        UiInputCard("正常态图标资源路径（icon）", "") {
             FileInputRow(item.icon, "如 icons/refresh.png", "*/*", "tbi_item_${item.id}_icon", { v -> update { it.copy(icon = v) } }, selectedFile = selectedFiles["tbi_item_${item.id}_icon"], onImagePreview = onImagePreview, onPickFile = onPickFile, selectedFolder = selectedFolders["tbi_item_${item.id}_icon"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${item.id}_icon") })
         }
-        UiInputCard("iconPress-按下态图标（可选，回退到 icon）", "") {
+        UiInputCard("按下态图标（可选，回退到 icon）（iconPress）", "") {
             FileInputRow(item.iconPress, "如 icons/refresh_press.png", "*/*", "tbi_item_${item.id}_iconPress", { v -> update { it.copy(iconPress = v) } }, selectedFile = selectedFiles["tbi_item_${item.id}_iconPress"], onImagePreview = onImagePreview, onPickFile = onPickFile, selectedFolder = selectedFolders["tbi_item_${item.id}_iconPress"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${item.id}_iconPress") })
         }
-        UiInputCard("contentDescription-无障碍描述（可选）", "") {
+        UiInputCard("无障碍描述（可选）（contentDescription）", "") {
             IntegratorInputField(item.contentDescription, "如 刷新配置") { v -> update { it.copy(contentDescription = v) } }
         }
-        UiInputCard("jsScript-点击执行的 JS 脚本（裸表达式）", "") {
+        UiInputCard("点击执行的 JS 脚本（裸表达式）（jsScript）", "") {
             IntegratorInputField(item.jsScript, "如 native.reloadConfig()", multiline = true) { v -> update { it.copy(jsScript = v) } }
         }
-        UiInputCard("jsPath-脚本文件路径（jsScript 为空时生效）", "") {
+        UiInputCard("脚本文件路径（jsScript 为空时生效）（jsPath）", "") {
             FileInputRow(item.jsPath, "如 script/topbar_refresh.js", "*/*", "tbi_item_${item.id}_jsPath", { v -> update { it.copy(jsPath = v) } }, onPickFile, selectedFolder = selectedFolders["tbi_item_${item.id}_jsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${item.id}_jsPath") })
         }
-        UiInputCard("isShowFromJs-可见性判定 JS 表达式", "") {
+        UiInputCard("可见性判定 JS 表达式（isShowFromJs）", "") {
             IntegratorInputField(item.isShowFromJs, "如 !!prepareVpn", multiline = true) { v -> update { it.copy(isShowFromJs = v) } }
         }
-        UiInputCard("isShowFromJsPath-可见性判定脚本路径", "") {
+        UiInputCard("可见性判定脚本路径（isShowFromJsPath）", "") {
             FileInputRow(item.isShowFromJsPath, "如 script/topbar_show.js", "*/*", "tbi_item_${item.id}_isShowFromJsPath", { v -> update { it.copy(isShowFromJsPath = v) } }, onPickFile, selectedFolder = selectedFolders["tbi_item_${item.id}_isShowFromJsPath"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${item.id}_isShowFromJsPath") })
         }
-        UiInputCard("pressSound-按下音效文件名（可选）", "") {
+        UiInputCard("按下音效文件名（可选）（pressSound）", "") {
             FileInputRow(item.pressSound, "如 ui_click_press.wav", "*/*", "tbi_item_${item.id}_pressSound", { v -> update { it.copy(pressSound = v) } }, onPickFile, selectedFolder = selectedFolders["tbi_item_${item.id}_pressSound"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${item.id}_pressSound") })
         }
-        UiInputCard("releaseSound-释放音效文件名（可选）", "") {
+        UiInputCard("释放音效文件名（可选）（releaseSound）", "") {
             FileInputRow(item.releaseSound, "如 ui_click_release.wav", "*/*", "tbi_item_${item.id}_releaseSound", { v -> update { it.copy(releaseSound = v) } }, onPickFile, selectedFolder = selectedFolders["tbi_item_${item.id}_releaseSound"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("tbi_item_${item.id}_releaseSound") })
         }
-        UiInputCard("smfList-关联的 SMF 资源列表（逗号分隔）", "") {
+        UiInputCard("关联的 SMF 资源列表（逗号分隔）（smfList）", "") {
             IntegratorInputField(item.smfList.joinToString(", "), "如 activityconfig, dailyreward") { v ->
                 update { it.copy(smfList = v.split(",", "，").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }) }
             }
@@ -5706,7 +5694,7 @@ private fun ItemSettingsContent(
                                 "INFO" to "信息展示"
                             )
                             typeLabels.forEach { (t, label) ->
-                                PvzChoiceRow("$t-$label", item.type == t) {
+                                PvzChoiceRow("$label（$t）", item.type == t) {
                                     onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(type = t) }))
                                 }
                             }
@@ -5752,7 +5740,7 @@ private fun ItemSettingsContent(
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(groupId = v) }))
                                     }
                                     Spacer(Modifier.height(4.dp))
-                                    PvzCheckRow("radioDefault-默认选中", item.radioDefault) {
+                                    PvzCheckRow("默认选中（radioDefault）", item.radioDefault) {
                                         onUpdate(section.copy(items = items.mapIndexed { j, w ->
                                             w.copy(radioDefault = if (w.groupId == item.groupId) j == i else w.radioDefault)
                                         }))
@@ -5760,7 +5748,7 @@ private fun ItemSettingsContent(
                                 }
                                 "CHECKBOX" -> {
                                     Spacer(Modifier.height(4.dp))
-                                    PvzCheckRow("checkboxDefault-默认勾选", item.checkboxDefault) {
+                                    PvzCheckRow("默认勾选（checkboxDefault）", item.checkboxDefault) {
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(checkboxDefault = !item.checkboxDefault) }))
                                     }
                                     Spacer(Modifier.height(4.dp))
@@ -5794,7 +5782,7 @@ private fun ItemSettingsContent(
                                     Text("按钮颜色（buttonColor）", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5D4E37))
                                     val colorLabels = mapOf("blue" to "蓝色", "red" to "红色", "green" to "绿色", "orange" to "橙色", "purple" to "紫色")
                                     colorLabels.forEach { (c, label) ->
-                                        PvzChoiceRow("$c-$label", item.buttonColor == c) {
+                                        PvzChoiceRow("$label（$c）", item.buttonColor == c) {
                                             onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(buttonColor = c) }))
                                         }
                                     }
@@ -5908,19 +5896,19 @@ private fun UiAdvancedSettingsContent(
         PvzDialogCard(title = null) {
             Column(Modifier.padding(12.dp)) {
                 PvzSectionTitle("资源更新弹窗文本 (ui.extractor)")
-                UiInputCard("ui.extractor.dialogTitle-弹窗标题", "") { IntegratorInputField(uiExDialogTitle, "弹窗标题") { onUiExDialogTitle(it) } }
-                UiInputCard("ui.extractor.initialLoadingProgressTip-初始加载提示", "") { IntegratorInputField(uiExInitLoadTip, "清点物资") { onUiExInitLoadTip(it) } }
-                UiInputCard("ui.extractor.initialProgressTip-初始进度提示", "") { IntegratorInputField(uiExInitProgTip, "检测到更新") { onUiExInitProgTip(it) } }
-                UiInputCard("ui.extractor.noNeedExtractTip-无需更新提示", "") { IntegratorInputField(uiExNoNeedTip, "暂无更新") { onUiExNoNeedTip(it) } }
-                UiInputCard("ui.extractor.singleFileProcessingTip-单文件处理提示", "") { IntegratorInputField(uiExSingleFileTip, "整理物资") { onUiExSingleFileTip(it) } }
-                UiInputCard("ui.extractor.multiFileProcessingTip-多文件处理提示(%d=数量)", "") { IntegratorInputField(uiExMultiFileTip, "整理%d个物资") { onUiExMultiFileTip(it) } }
-                UiInputCard("ui.extractor.waitingTip-等待提示", "") { IntegratorInputField(uiExWaitingTip, "稍等片刻") { onUiExWaitingTip(it) } }
-                UiInputCard("ui.extractor.extractCompleteTip-完成提示(%s=版本)", "") { IntegratorInputField(uiExCompleteTip, "物资更新完毕") { onUiExCompleteTip(it) } }
-                UiInputCard("ui.extractor.extractFailTipPrefix-失败提示前缀", "") { IntegratorInputField(uiExFailPrefix, "出问题了") { onUiExFailPrefix(it) } }
-                UiInputCard("ui.extractor.fileSkipTipPrefix-跳过提示前缀", "") { IntegratorInputField(uiExSkipPrefix, "无需更新") { onUiExSkipPrefix(it) } }
-                UiInputCard("ui.extractor.continueButtonText-继续按钮", "") { IntegratorInputField(uiExContinueBtn, "继续") { onUiExContinueBtn(it) } }
-                UiInputCard("ui.extractor.completeButtonText-完成按钮", "") { IntegratorInputField(uiExCompleteBtn, "重返战场") { onUiExCompleteBtn(it) } }
-                UiInputCard("ui.extractor.toastErrorPrefix-Toast错误前缀", "") { IntegratorInputField(uiExToastErr, "更新失败") { onUiExToastErr(it) } }
+                UiInputCard("弹窗标题（ui.extractor.dialogTitle）", "") { IntegratorInputField(uiExDialogTitle, "弹窗标题") { onUiExDialogTitle(it) } }
+                UiInputCard("初始加载提示（ui.extractor.initialLoadingProgressTip）", "") { IntegratorInputField(uiExInitLoadTip, "清点物资") { onUiExInitLoadTip(it) } }
+                UiInputCard("初始进度提示（ui.extractor.initialProgressTip）", "") { IntegratorInputField(uiExInitProgTip, "检测到更新") { onUiExInitProgTip(it) } }
+                UiInputCard("无需更新提示（ui.extractor.noNeedExtractTip）", "") { IntegratorInputField(uiExNoNeedTip, "暂无更新") { onUiExNoNeedTip(it) } }
+                UiInputCard("单文件处理提示（ui.extractor.singleFileProcessingTip）", "") { IntegratorInputField(uiExSingleFileTip, "整理物资") { onUiExSingleFileTip(it) } }
+                UiInputCard("多文件处理提示(%d=数量)（ui.extractor.multiFileProcessingTip）", "") { IntegratorInputField(uiExMultiFileTip, "整理%d个物资") { onUiExMultiFileTip(it) } }
+                UiInputCard("等待提示（ui.extractor.waitingTip）", "") { IntegratorInputField(uiExWaitingTip, "稍等片刻") { onUiExWaitingTip(it) } }
+                UiInputCard("完成提示(%s=版本)（ui.extractor.extractCompleteTip）", "") { IntegratorInputField(uiExCompleteTip, "物资更新完毕") { onUiExCompleteTip(it) } }
+                UiInputCard("失败提示前缀（ui.extractor.extractFailTipPrefix）", "") { IntegratorInputField(uiExFailPrefix, "出问题了") { onUiExFailPrefix(it) } }
+                UiInputCard("跳过提示前缀（ui.extractor.fileSkipTipPrefix）", "") { IntegratorInputField(uiExSkipPrefix, "无需更新") { onUiExSkipPrefix(it) } }
+                UiInputCard("继续按钮（ui.extractor.continueButtonText）", "") { IntegratorInputField(uiExContinueBtn, "继续") { onUiExContinueBtn(it) } }
+                UiInputCard("完成按钮（ui.extractor.completeButtonText）", "") { IntegratorInputField(uiExCompleteBtn, "重返战场") { onUiExCompleteBtn(it) } }
+                UiInputCard("Toast错误前缀（ui.extractor.toastErrorPrefix）", "") { IntegratorInputField(uiExToastErr, "更新失败") { onUiExToastErr(it) } }
             }
         }
 
@@ -5928,16 +5916,16 @@ private fun UiAdvancedSettingsContent(
         PvzDialogCard(title = null) {
             Column(Modifier.padding(12.dp)) {
                 PvzSectionTitle("音效文件 (ui.sounds)")
-                UiInputCard("ui.sounds.switchClickPress-开关按下音效", "") { FileInputRow(uiSndSwitchPress, "*.wav", "audio/*", "uiSndSwitchPress", { onUiSndSwitchPress(it) }, onPickFile, selectedFolder = selectedFolders["uiSndSwitchPress"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndSwitchPress") }) }
-                UiInputCard("ui.sounds.switchClickRelease-开关释放音效", "") { FileInputRow(uiSndSwitchRelease, "*.wav", "audio/*", "uiSndSwitchRelease", { onUiSndSwitchRelease(it) }, onPickFile, selectedFolder = selectedFolders["uiSndSwitchRelease"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndSwitchRelease") }) }
-                UiInputCard("ui.sounds.buttonClickPress-按钮按下音效", "") { FileInputRow(uiSndBtnPress, "*.wav", "audio/*", "uiSndBtnPress", { onUiSndBtnPress(it) }, onPickFile, selectedFolder = selectedFolders["uiSndBtnPress"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndBtnPress") }) }
-                UiInputCard("ui.sounds.buttonClickRelease-按钮释放音效", "") { FileInputRow(uiSndBtnRelease, "*.wav", "audio/*", "uiSndBtnRelease", { onUiSndBtnRelease(it) }, onPickFile, selectedFolder = selectedFolders["uiSndBtnRelease"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndBtnRelease") }) }
-                UiInputCard("ui.sounds.buttonSettingsPress-设置按钮按下音效", "") { FileInputRow(uiSndSettingsPress, "*.wav", "audio/*", "uiSndSettingsPress", { onUiSndSettingsPress(it) }, onPickFile, selectedFolder = selectedFolders["uiSndSettingsPress"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndSettingsPress") }) }
-                UiInputCard("ui.sounds.buttonSettingsRelease-设置按钮释放音效", "") { FileInputRow(uiSndSettingsRelease, "*.wav", "audio/*", "uiSndSettingsRelease", { onUiSndSettingsRelease(it) }, onPickFile, selectedFolder = selectedFolders["uiSndSettingsRelease"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndSettingsRelease") }) }
-                UiInputCard("ui.sounds.buttonXClosePress-关闭按钮按下音效", "") { FileInputRow(uiSndXClosePress, "*.wav", "audio/*", "uiSndXClosePress", { onUiSndXClosePress(it) }, onPickFile, selectedFolder = selectedFolders["uiSndXClosePress"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndXClosePress") }) }
-                UiInputCard("ui.sounds.buttonXCloseRelease-关闭按钮释放音效", "") { FileInputRow(uiSndXCloseRelease, "*.wav", "audio/*", "uiSndXCloseRelease", { onUiSndXCloseRelease(it) }, onPickFile, selectedFolder = selectedFolders["uiSndXCloseRelease"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndXCloseRelease") }) }
-                UiInputCard("ui.sounds.collapsiblePanelPress-折叠面板按下音效", "") { FileInputRow(uiSndPanelPress, "*.wav", "audio/*", "uiSndPanelPress", { onUiSndPanelPress(it) }, onPickFile, selectedFolder = selectedFolders["uiSndPanelPress"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndPanelPress") }) }
-                UiInputCard("ui.sounds.collapsiblePanelRelease-折叠面板释放音效", "") { FileInputRow(uiSndPanelRelease, "*.wav", "audio/*", "uiSndPanelRelease", { onUiSndPanelRelease(it) }, onPickFile, selectedFolder = selectedFolders["uiSndPanelRelease"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndPanelRelease") }) }
+                UiInputCard("开关按下音效（ui.sounds.switchClickPress）", "") { FileInputRow(uiSndSwitchPress, "*.wav", "audio/*", "uiSndSwitchPress", { onUiSndSwitchPress(it) }, onPickFile, selectedFolder = selectedFolders["uiSndSwitchPress"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndSwitchPress") }) }
+                UiInputCard("开关释放音效（ui.sounds.switchClickRelease）", "") { FileInputRow(uiSndSwitchRelease, "*.wav", "audio/*", "uiSndSwitchRelease", { onUiSndSwitchRelease(it) }, onPickFile, selectedFolder = selectedFolders["uiSndSwitchRelease"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndSwitchRelease") }) }
+                UiInputCard("按钮按下音效（ui.sounds.buttonClickPress）", "") { FileInputRow(uiSndBtnPress, "*.wav", "audio/*", "uiSndBtnPress", { onUiSndBtnPress(it) }, onPickFile, selectedFolder = selectedFolders["uiSndBtnPress"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndBtnPress") }) }
+                UiInputCard("按钮释放音效（ui.sounds.buttonClickRelease）", "") { FileInputRow(uiSndBtnRelease, "*.wav", "audio/*", "uiSndBtnRelease", { onUiSndBtnRelease(it) }, onPickFile, selectedFolder = selectedFolders["uiSndBtnRelease"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndBtnRelease") }) }
+                UiInputCard("设置按钮按下音效（ui.sounds.buttonSettingsPress）", "") { FileInputRow(uiSndSettingsPress, "*.wav", "audio/*", "uiSndSettingsPress", { onUiSndSettingsPress(it) }, onPickFile, selectedFolder = selectedFolders["uiSndSettingsPress"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndSettingsPress") }) }
+                UiInputCard("设置按钮释放音效（ui.sounds.buttonSettingsRelease）", "") { FileInputRow(uiSndSettingsRelease, "*.wav", "audio/*", "uiSndSettingsRelease", { onUiSndSettingsRelease(it) }, onPickFile, selectedFolder = selectedFolders["uiSndSettingsRelease"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndSettingsRelease") }) }
+                UiInputCard("关闭按钮按下音效（ui.sounds.buttonXClosePress）", "") { FileInputRow(uiSndXClosePress, "*.wav", "audio/*", "uiSndXClosePress", { onUiSndXClosePress(it) }, onPickFile, selectedFolder = selectedFolders["uiSndXClosePress"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndXClosePress") }) }
+                UiInputCard("关闭按钮释放音效（ui.sounds.buttonXCloseRelease）", "") { FileInputRow(uiSndXCloseRelease, "*.wav", "audio/*", "uiSndXCloseRelease", { onUiSndXCloseRelease(it) }, onPickFile, selectedFolder = selectedFolders["uiSndXCloseRelease"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndXCloseRelease") }) }
+                UiInputCard("折叠面板按下音效（ui.sounds.collapsiblePanelPress）", "") { FileInputRow(uiSndPanelPress, "*.wav", "audio/*", "uiSndPanelPress", { onUiSndPanelPress(it) }, onPickFile, selectedFolder = selectedFolders["uiSndPanelPress"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndPanelPress") }) }
+                UiInputCard("折叠面板释放音效（ui.sounds.collapsiblePanelRelease）", "") { FileInputRow(uiSndPanelRelease, "*.wav", "audio/*", "uiSndPanelRelease", { onUiSndPanelRelease(it) }, onPickFile, selectedFolder = selectedFolders["uiSndPanelRelease"], onPickFolder = onPickFolder, onClearSelection = { clearFieldSelection("uiSndPanelRelease") }) }
             }
         }
 
@@ -5955,15 +5943,15 @@ private fun UiAdvancedSettingsContent(
         PvzDialogCard(title = null) {
             Column(Modifier.padding(12.dp)) {
                 PvzSectionTitle("设置扩展 (ui.settings)")
-                UiInputCard("ui.settings.title-设置弹窗标题", "") { IntegratorInputField(uiSetTitle, "设置") { onUiSetTitle(it) } }
-                UiInputCard("ui.settings.solidBackgroundMode-纯色背景模式标签", "") { IntegratorInputField(uiSetSolidBg, "纯色背景") { onUiSetSolidBg(it) } }
-                UiInputCard("ui.settings.playBackgroundMusic-播放背景音乐标签", "") { IntegratorInputField(uiSetPlayMusic, "播放背景音乐") { onUiSetPlayMusic(it) } }
-                UiInputCard("ui.settings.importSmfFile-导入SMF文件标签", "") { IntegratorInputField(uiSetImportSmf, "导入SMF") { onUiSetImportSmf(it) } }
-                UiInputCard("ui.settings.reloadConfig-重新读取配置标签", "") { IntegratorInputField(uiSetReload, "重新读取") { onUiSetReload(it) } }
-                UiInputCard("ui.settings.resetPacketDeepClearing-重置时删除SMF标签", "") { IntegratorInputField(uiSetResetSmf, "删除SMF") { onUiSetResetSmf(it) } }
-                UiInputCard("ui.settings.customGameDisplay-自定义游戏画面标签", "") { IntegratorInputField(uiSetCustomDisplay, "自定义画面") { onUiSetCustomDisplay(it) } }
-                UiInputCard("ui.settings.customGameDisplayTitle-游戏画面设置标题", "") { IntegratorInputField(uiSetDisplayTitle, "画面设置") { onUiSetDisplayTitle(it) } }
-                UiInputCard("ui.settings.applyButtonText-应用按钮文字", "") { IntegratorInputField(uiSetApplyBtn, "应用") { onUiSetApplyBtn(it) } }
+                UiInputCard("设置弹窗标题（ui.settings.title）", "") { IntegratorInputField(uiSetTitle, "设置") { onUiSetTitle(it) } }
+                UiInputCard("纯色背景模式标签（ui.settings.solidBackgroundMode）", "") { IntegratorInputField(uiSetSolidBg, "纯色背景") { onUiSetSolidBg(it) } }
+                UiInputCard("播放背景音乐标签（ui.settings.playBackgroundMusic）", "") { IntegratorInputField(uiSetPlayMusic, "播放背景音乐") { onUiSetPlayMusic(it) } }
+                UiInputCard("导入SMF文件标签（ui.settings.importSmfFile）", "") { IntegratorInputField(uiSetImportSmf, "导入SMF") { onUiSetImportSmf(it) } }
+                UiInputCard("重新读取配置标签（ui.settings.reloadConfig）", "") { IntegratorInputField(uiSetReload, "重新读取") { onUiSetReload(it) } }
+                UiInputCard("重置时删除SMF标签（ui.settings.resetPacketDeepClearing）", "") { IntegratorInputField(uiSetResetSmf, "删除SMF") { onUiSetResetSmf(it) } }
+                UiInputCard("自定义游戏画面标签（ui.settings.customGameDisplay）", "") { IntegratorInputField(uiSetCustomDisplay, "自定义画面") { onUiSetCustomDisplay(it) } }
+                UiInputCard("游戏画面设置标题（ui.settings.customGameDisplayTitle）", "") { IntegratorInputField(uiSetDisplayTitle, "画面设置") { onUiSetDisplayTitle(it) } }
+                UiInputCard("应用按钮文字（ui.settings.applyButtonText）", "") { IntegratorInputField(uiSetApplyBtn, "应用") { onUiSetApplyBtn(it) } }
             }
         }
 
@@ -5971,20 +5959,20 @@ private fun UiAdvancedSettingsContent(
         PvzDialogCard(title = null) {
             Column(Modifier.padding(12.dp)) {
                 PvzSectionTitle("错误/日志/对话框/欢迎 (ui.error/log/dialog/welcome)")
-                UiInputCard("ui.error.jsExecuteErrorTitle-JS错误标题", "") { IntegratorInputField(uiErrJsTitle, "JS执行出错") { onUiErrJsTitle(it) } }
-                UiInputCard("ui.error.unknownError-未知错误", "") { IntegratorInputField(uiErrUnknown, "未知错误") { onUiErrUnknown(it) } }
-                UiInputCard("ui.log.copyLogDesc-复制日志描述", "") { IntegratorInputField(uiLogCopyDesc, "复制日志") { onUiLogCopyDesc(it) } }
-                UiInputCard("ui.log.clearLogDesc-清空日志描述", "") { IntegratorInputField(uiLogClearDesc, "清空日志") { onUiLogClearDesc(it) } }
-                UiInputCard("ui.log.noLogText-无日志文本", "") { IntegratorInputField(uiLogNoLogText, "暂无日志") { onUiLogNoLogText(it) } }
-                UiInputCard("ui.log.presetSaveLabel-预设存档标签", "") { IntegratorInputField(uiLogPresetSaveLabel, "预设存档") { onUiLogPresetSaveLabel(it) } }
-                UiInputCard("ui.log.localSaveLabel-本地存档标签", "") { IntegratorInputField(uiLogLocalSaveLabel, "本地存档") { onUiLogLocalSaveLabel(it) } }
-                UiInputCard("ui.dialog.deleteSaveDesc-删除存档描述", "") { IntegratorInputField(uiDlgDelSave, "删除存档") { onUiDlgDelSave(it) } }
-                UiInputCard("ui.dialog.editUserNameDesc-编辑用户名描述", "") { IntegratorInputField(uiDlgEditUser, "编辑用户名") { onUiDlgEditUser(it) } }
-                UiInputCard("ui.dialog.shareSaveChooserTitle-分享存档选择器标题", "") { IntegratorInputField(uiDlgShareTitle, "分享存档") { onUiDlgShareTitle(it) } }
-                UiInputCard("ui.dialog.sharePackFailedTip-打包失败提示", "") { IntegratorInputField(uiDlgPackFail, "打包失败") { onUiDlgPackFail(it) } }
-                UiInputCard("ui.dialog.noShareableSaveTip-无可分享存档提示", "") { IntegratorInputField(uiDlgNoShare, "没有可分享的存档") { onUiDlgNoShare(it) } }
-                UiInputCard("ui.welcome.editUserNameTitle-修改用户名标题", "") { IntegratorInputField(uiWelcomeEditTitle, "修改用户名") { onUiWelcomeEditTitle(it) } }
-                UiInputCard("ui.welcome.editUserNameHint-修改用户名提示", "") { IntegratorInputField(uiWelcomeEditHint, "请输入新的用户名") { onUiWelcomeEditHint(it) } }
+                UiInputCard("JS错误标题（ui.error.jsExecuteErrorTitle）", "") { IntegratorInputField(uiErrJsTitle, "JS执行出错") { onUiErrJsTitle(it) } }
+                UiInputCard("未知错误（ui.error.unknownError）", "") { IntegratorInputField(uiErrUnknown, "未知错误") { onUiErrUnknown(it) } }
+                UiInputCard("复制日志描述（ui.log.copyLogDesc）", "") { IntegratorInputField(uiLogCopyDesc, "复制日志") { onUiLogCopyDesc(it) } }
+                UiInputCard("清空日志描述（ui.log.clearLogDesc）", "") { IntegratorInputField(uiLogClearDesc, "清空日志") { onUiLogClearDesc(it) } }
+                UiInputCard("无日志文本（ui.log.noLogText）", "") { IntegratorInputField(uiLogNoLogText, "暂无日志") { onUiLogNoLogText(it) } }
+                UiInputCard("预设存档标签（ui.log.presetSaveLabel）", "") { IntegratorInputField(uiLogPresetSaveLabel, "预设存档") { onUiLogPresetSaveLabel(it) } }
+                UiInputCard("本地存档标签（ui.log.localSaveLabel）", "") { IntegratorInputField(uiLogLocalSaveLabel, "本地存档") { onUiLogLocalSaveLabel(it) } }
+                UiInputCard("删除存档描述（ui.dialog.deleteSaveDesc）", "") { IntegratorInputField(uiDlgDelSave, "删除存档") { onUiDlgDelSave(it) } }
+                UiInputCard("编辑用户名描述（ui.dialog.editUserNameDesc）", "") { IntegratorInputField(uiDlgEditUser, "编辑用户名") { onUiDlgEditUser(it) } }
+                UiInputCard("分享存档选择器标题（ui.dialog.shareSaveChooserTitle）", "") { IntegratorInputField(uiDlgShareTitle, "分享存档") { onUiDlgShareTitle(it) } }
+                UiInputCard("打包失败提示（ui.dialog.sharePackFailedTip）", "") { IntegratorInputField(uiDlgPackFail, "打包失败") { onUiDlgPackFail(it) } }
+                UiInputCard("无可分享存档提示（ui.dialog.noShareableSaveTip）", "") { IntegratorInputField(uiDlgNoShare, "没有可分享的存档") { onUiDlgNoShare(it) } }
+                UiInputCard("修改用户名标题（ui.welcome.editUserNameTitle）", "") { IntegratorInputField(uiWelcomeEditTitle, "修改用户名") { onUiWelcomeEditTitle(it) } }
+                UiInputCard("修改用户名提示（ui.welcome.editUserNameHint）", "") { IntegratorInputField(uiWelcomeEditHint, "请输入新的用户名") { onUiWelcomeEditHint(it) } }
             }
         }
 
@@ -5992,10 +5980,10 @@ private fun UiAdvancedSettingsContent(
         PvzDialogCard(title = null) {
             Column(Modifier.padding(12.dp)) {
                 PvzSectionTitle("设置补充 (ui.settings / ui.sounds)")
-                UiInputCard("ui.settings.changeTheProfileReadLocation-切换存档读取位置标签", "") { IntegratorInputField(uiSetChangeProfile, "切换存档位置") { onUiSetChangeProfile(it) } }
-                UiInputCard("ui.settings.showNotUpdate-未检测更新也弹窗标签", "") { IntegratorInputField(uiSetShowNotUpdate, "未更新也弹窗") { onUiSetShowNotUpdate(it) } }
-                UiInputCard("ui.settings.exitConfirm-退出游戏二次确认标签", "") { IntegratorInputField(uiSetExitConfirm, "退出确认") { onUiSetExitConfirm(it) } }
-                UiInputCard("ui.sounds.switchClick-单击音效(无按下/释放区分)", "") { FileInputRow(uiSndSwitchClick, "*.wav", "audio/*", "uiSndSwitchClick", { onUiSndSwitchClick(it) }, onPickFile) }
+                UiInputCard("切换存档读取位置标签（ui.settings.changeTheProfileReadLocation）", "") { IntegratorInputField(uiSetChangeProfile, "切换存档位置") { onUiSetChangeProfile(it) } }
+                UiInputCard("未检测更新也弹窗标签（ui.settings.showNotUpdate）", "") { IntegratorInputField(uiSetShowNotUpdate, "未更新也弹窗") { onUiSetShowNotUpdate(it) } }
+                UiInputCard("退出游戏二次确认标签（ui.settings.exitConfirm）", "") { IntegratorInputField(uiSetExitConfirm, "退出确认") { onUiSetExitConfirm(it) } }
+                UiInputCard("单击音效(无按下/释放区分)（ui.sounds.switchClick）", "") { FileInputRow(uiSndSwitchClick, "*.wav", "audio/*", "uiSndSwitchClick", { onUiSndSwitchClick(it) }, onPickFile) }
             }
         }
 
@@ -6009,59 +5997,59 @@ private fun UiAdvancedSettingsContent(
         PvzDialogCard(title = null) {
             Column(Modifier.padding(12.dp)) {
                 PvzSectionTitle("存档管理 (ui.save)")
-                UiInputCard("ui.save.presetConfirmTitle-预设覆盖确认标题", "") { IntegratorInputField(saveDraft.presetConfirmTitle, "预设覆盖确认标题") { onSaveDraft(saveDraft.copy(presetConfirmTitle = it)) } }
-                UiInputCard("ui.save.presetConfirmMessage-预设覆盖确认内容", "") { IntegratorInputField(saveDraft.presetConfirmMessage, "预设覆盖确认内容") { onSaveDraft(saveDraft.copy(presetConfirmMessage = it)) } }
-                UiInputCard("ui.save.deleteConfirmTitle-删除确认标题", "") { IntegratorInputField(saveDraft.deleteConfirmTitle, "删除确认标题") { onSaveDraft(saveDraft.copy(deleteConfirmTitle = it)) } }
-                UiInputCard("ui.save.deleteConfirmMessage-删除确认内容", "") { IntegratorInputField(saveDraft.deleteConfirmMessage, "删除确认内容") { onSaveDraft(saveDraft.copy(deleteConfirmMessage = it)) } }
-                UiInputCard("ui.save.coverConfirmTitle-覆盖确认标题", "") { IntegratorInputField(saveDraft.coverConfirmTitle, "覆盖确认标题") { onSaveDraft(saveDraft.copy(coverConfirmTitle = it)) } }
-                UiInputCard("ui.save.coverConfirmMessage-覆盖确认内容", "") { IntegratorInputField(saveDraft.coverConfirmMessage, "覆盖确认内容") { onSaveDraft(saveDraft.copy(coverConfirmMessage = it)) } }
-                UiInputCard("ui.save.deleteGameSaveConfirmTitle-删除游玩存档确认标题", "") { IntegratorInputField(saveDraft.deleteGameSaveConfirmTitle, "删除游玩存档确认标题") { onSaveDraft(saveDraft.copy(deleteGameSaveConfirmTitle = it)) } }
-                UiInputCard("ui.save.deleteGameSaveConfirmMessage-删除游玩存档确认内容", "") { IntegratorInputField(saveDraft.deleteGameSaveConfirmMessage, "删除游玩存档确认内容") { onSaveDraft(saveDraft.copy(deleteGameSaveConfirmMessage = it)) } }
-                UiInputCard("ui.save.saveInfoTitle-存档信息标题", "") { IntegratorInputField(saveDraft.saveInfoTitle, "存档信息标题") { onSaveDraft(saveDraft.copy(saveInfoTitle = it)) } }
-                UiInputCard("ui.save.saveNameLabel-存档名称标签", "") { IntegratorInputField(saveDraft.saveNameLabel, "存档名称标签") { onSaveDraft(saveDraft.copy(saveNameLabel = it)) } }
-                UiInputCard("ui.save.saveDescLabel-存档描述标签", "") { IntegratorInputField(saveDraft.saveDescLabel, "存档描述标签") { onSaveDraft(saveDraft.copy(saveDescLabel = it)) } }
-                UiInputCard("ui.save.cancelButton-取消按钮", "") { IntegratorInputField(saveDraft.cancelButton, "取消按钮") { onSaveDraft(saveDraft.copy(cancelButton = it)) } }
-                UiInputCard("ui.save.confirmButton-确认按钮", "") { IntegratorInputField(saveDraft.confirmButton, "确认按钮") { onSaveDraft(saveDraft.copy(confirmButton = it)) } }
-                UiInputCard("ui.save.shareButton-分享按钮", "") { IntegratorInputField(saveDraft.shareButton, "分享按钮") { onSaveDraft(saveDraft.copy(shareButton = it)) } }
-                UiInputCard("ui.save.exportButton-导出按钮", "") { IntegratorInputField(saveDraft.exportButton, "导出按钮") { onSaveDraft(saveDraft.copy(exportButton = it)) } }
-                UiInputCard("ui.save.importButton-导入按钮", "") { IntegratorInputField(saveDraft.importButton, "导入按钮") { onSaveDraft(saveDraft.copy(importButton = it)) } }
-                UiInputCard("ui.save.backupButton-备份按钮", "") { IntegratorInputField(saveDraft.backupButton, "备份按钮") { onSaveDraft(saveDraft.copy(backupButton = it)) } }
-                UiInputCard("ui.save.coverLocalButton-覆盖本地按钮", "") { IntegratorInputField(saveDraft.coverLocalButton, "覆盖本地按钮") { onSaveDraft(saveDraft.copy(coverLocalButton = it)) } }
-                UiInputCard("ui.save.deleteGameSaveButton-删除游玩存档按钮", "") { IntegratorInputField(saveDraft.deleteGameSaveButton, "删除游玩存档按钮") { onSaveDraft(saveDraft.copy(deleteGameSaveButton = it)) } }
-                UiInputCard("ui.save.coverPresetButton-覆盖预设按钮", "") { IntegratorInputField(saveDraft.coverPresetButton, "覆盖预设按钮") { onSaveDraft(saveDraft.copy(coverPresetButton = it)) } }
-                UiInputCard("ui.save.saveNameEmptyTip-存档名为空提示", "") { IntegratorInputField(saveDraft.saveNameEmptyTip, "存档名为空提示") { onSaveDraft(saveDraft.copy(saveNameEmptyTip = it)) } }
-                UiInputCard("ui.save.noLocalSaveTip-无本地存档提示", "") { IntegratorInputField(saveDraft.noLocalSaveTip, "无本地存档提示") { onSaveDraft(saveDraft.copy(noLocalSaveTip = it)) } }
-                UiInputCard("ui.save.selectLocalSaveTip-选择本地存档提示", "") { IntegratorInputField(saveDraft.selectLocalSaveTip, "选择本地存档提示") { onSaveDraft(saveDraft.copy(selectLocalSaveTip = it)) } }
-                UiInputCard("ui.save.backupSuccessTip-备份成功提示", "") { IntegratorInputField(saveDraft.backupSuccessTip, "备份成功提示") { onSaveDraft(saveDraft.copy(backupSuccessTip = it)) } }
-                UiInputCard("ui.save.backupFailTipPrefix-备份失败前缀", "") { IntegratorInputField(saveDraft.backupFailTipPrefix, "备份失败前缀") { onSaveDraft(saveDraft.copy(backupFailTipPrefix = it)) } }
-                UiInputCard("ui.save.exportSuccessTip-导出成功提示", "") { IntegratorInputField(saveDraft.exportSuccessTip, "导出成功提示") { onSaveDraft(saveDraft.copy(exportSuccessTip = it)) } }
-                UiInputCard("ui.save.exportFailTipPrefix-导出失败前缀", "") { IntegratorInputField(saveDraft.exportFailTipPrefix, "导出失败前缀") { onSaveDraft(saveDraft.copy(exportFailTipPrefix = it)) } }
-                UiInputCard("ui.save.importSuccessTip-导入成功提示", "") { IntegratorInputField(saveDraft.importSuccessTip, "导入成功提示") { onSaveDraft(saveDraft.copy(importSuccessTip = it)) } }
-                UiInputCard("ui.save.importFailTipPrefix-导入失败前缀", "") { IntegratorInputField(saveDraft.importFailTipPrefix, "导入失败前缀") { onSaveDraft(saveDraft.copy(importFailTipPrefix = it)) } }
-                UiInputCard("ui.save.deleteSuccessTip-删除成功提示", "") { IntegratorInputField(saveDraft.deleteSuccessTip, "删除成功提示") { onSaveDraft(saveDraft.copy(deleteSuccessTip = it)) } }
-                UiInputCard("ui.save.deleteFailTipPrefix-删除失败前缀", "") { IntegratorInputField(saveDraft.deleteFailTipPrefix, "删除失败前缀") { onSaveDraft(saveDraft.copy(deleteFailTipPrefix = it)) } }
-                UiInputCard("ui.save.coverSuccessTip-覆盖成功提示", "") { IntegratorInputField(saveDraft.coverSuccessTip, "覆盖成功提示") { onSaveDraft(saveDraft.copy(coverSuccessTip = it)) } }
-                UiInputCard("ui.save.coverFailTipPrefix-覆盖失败前缀", "") { IntegratorInputField(saveDraft.coverFailTipPrefix, "覆盖失败前缀") { onSaveDraft(saveDraft.copy(coverFailTipPrefix = it)) } }
-                UiInputCard("ui.save.deleteGameSaveSuccessTip-删除游玩存档成功提示", "") { IntegratorInputField(saveDraft.deleteGameSaveSuccessTip, "删除游玩存档成功提示") { onSaveDraft(saveDraft.copy(deleteGameSaveSuccessTip = it)) } }
-                UiInputCard("ui.save.deleteGameSaveFailTipPrefix-删除游玩存档失败前缀", "") { IntegratorInputField(saveDraft.deleteGameSaveFailTipPrefix, "删除游玩存档失败前缀") { onSaveDraft(saveDraft.copy(deleteGameSaveFailTipPrefix = it)) } }
-                UiInputCard("ui.save.defaultImportNamePrefix-默认导入名前缀", "") { IntegratorInputField(saveDraft.defaultImportNamePrefix, "默认导入名前缀") { onSaveDraft(saveDraft.copy(defaultImportNamePrefix = it)) } }
-                UiInputCard("ui.save.defaultBackupDesc-默认备份描述", "") { IntegratorInputField(saveDraft.defaultBackupDesc, "默认备份描述") { onSaveDraft(saveDraft.copy(defaultBackupDesc = it)) } }
-                UiInputCard("ui.save.defaultImportDesc-默认导入描述", "") { IntegratorInputField(saveDraft.defaultImportDesc, "默认导入描述") { onSaveDraft(saveDraft.copy(defaultImportDesc = it)) } }
-                UiInputCard("ui.save.exportOptionTitle-导出选项标题", "") { IntegratorInputField(saveDraft.exportOptionTitle, "导出选项标题") { onSaveDraft(saveDraft.copy(exportOptionTitle = it)) } }
-                UiInputCard("ui.save.exportToFolderOption-导出到文件夹选项", "") { IntegratorInputField(saveDraft.exportToFolderOption, "导出到文件夹选项") { onSaveDraft(saveDraft.copy(exportToFolderOption = it)) } }
-                UiInputCard("ui.save.shareAsPackageOption-分享为存档包选项", "") { IntegratorInputField(saveDraft.shareAsPackageOption, "分享为存档包选项") { onSaveDraft(saveDraft.copy(shareAsPackageOption = it)) } }
-                UiInputCard("ui.save.gameSaveLabel-游玩存档区域标题", "") { IntegratorInputField(saveDraft.gameSaveLabel, "游玩存档区域标题") { onSaveDraft(saveDraft.copy(gameSaveLabel = it)) } }
-                UiInputCard("ui.save.gameSaveInfoTemplate-游玩存档信息模板(%s用户/%t时间)", "") { IntegratorInputField(saveDraft.gameSaveInfoTemplate, "游玩存档信息模板(%s用户/%t时间)") { onSaveDraft(saveDraft.copy(gameSaveInfoTemplate = it)) } }
-                UiInputCard("ui.save.gameSaveUnknownUser-游玩存档未知用户", "") { IntegratorInputField(saveDraft.gameSaveUnknownUser, "游玩存档未知用户") { onSaveDraft(saveDraft.copy(gameSaveUnknownUser = it)) } }
-                UiInputCard("ui.save.gameSaveNotExistTip-游玩存档不存在提示", "") { IntegratorInputField(saveDraft.gameSaveNotExistTip, "游玩存档不存在提示") { onSaveDraft(saveDraft.copy(gameSaveNotExistTip = it)) } }
-                UiInputCard("ui.save.retryButtonText-重试按钮", "") { IntegratorInputField(saveDraft.retryButtonText, "重试按钮") { onSaveDraft(saveDraft.copy(retryButtonText = it)) } }
-                UiInputCard("ui.save.opBackup-操作-备份", "") { IntegratorInputField(saveDraft.opBackup, "操作-备份") { onSaveDraft(saveDraft.copy(opBackup = it)) } }
-                UiInputCard("ui.save.opExport-操作-导出", "") { IntegratorInputField(saveDraft.opExport, "操作-导出") { onSaveDraft(saveDraft.copy(opExport = it)) } }
-                UiInputCard("ui.save.opImport-操作-导入", "") { IntegratorInputField(saveDraft.opImport, "操作-导入") { onSaveDraft(saveDraft.copy(opImport = it)) } }
-                UiInputCard("ui.save.opDelete-操作-删除", "") { IntegratorInputField(saveDraft.opDelete, "操作-删除") { onSaveDraft(saveDraft.copy(opDelete = it)) } }
-                UiInputCard("ui.save.opDeleteGameSave-操作-删除游玩存档", "") { IntegratorInputField(saveDraft.opDeleteGameSave, "操作-删除游玩存档") { onSaveDraft(saveDraft.copy(opDeleteGameSave = it)) } }
-                UiInputCard("ui.save.opCover-操作-覆盖", "") { IntegratorInputField(saveDraft.opCover, "操作-覆盖") { onSaveDraft(saveDraft.copy(opCover = it)) } }
-                UiInputCard("ui.save.opSaveMeta-操作-存档元数据", "") { IntegratorInputField(saveDraft.opSaveMeta, "操作-存档元数据") { onSaveDraft(saveDraft.copy(opSaveMeta = it)) } }
+                UiInputCard("预设覆盖确认标题（ui.save.presetConfirmTitle）", "") { IntegratorInputField(saveDraft.presetConfirmTitle, "预设覆盖确认标题") { onSaveDraft(saveDraft.copy(presetConfirmTitle = it)) } }
+                UiInputCard("预设覆盖确认内容（ui.save.presetConfirmMessage）", "") { IntegratorInputField(saveDraft.presetConfirmMessage, "预设覆盖确认内容") { onSaveDraft(saveDraft.copy(presetConfirmMessage = it)) } }
+                UiInputCard("删除确认标题（ui.save.deleteConfirmTitle）", "") { IntegratorInputField(saveDraft.deleteConfirmTitle, "删除确认标题") { onSaveDraft(saveDraft.copy(deleteConfirmTitle = it)) } }
+                UiInputCard("删除确认内容（ui.save.deleteConfirmMessage）", "") { IntegratorInputField(saveDraft.deleteConfirmMessage, "删除确认内容") { onSaveDraft(saveDraft.copy(deleteConfirmMessage = it)) } }
+                UiInputCard("覆盖确认标题（ui.save.coverConfirmTitle）", "") { IntegratorInputField(saveDraft.coverConfirmTitle, "覆盖确认标题") { onSaveDraft(saveDraft.copy(coverConfirmTitle = it)) } }
+                UiInputCard("覆盖确认内容（ui.save.coverConfirmMessage）", "") { IntegratorInputField(saveDraft.coverConfirmMessage, "覆盖确认内容") { onSaveDraft(saveDraft.copy(coverConfirmMessage = it)) } }
+                UiInputCard("删除游玩存档确认标题（ui.save.deleteGameSaveConfirmTitle）", "") { IntegratorInputField(saveDraft.deleteGameSaveConfirmTitle, "删除游玩存档确认标题") { onSaveDraft(saveDraft.copy(deleteGameSaveConfirmTitle = it)) } }
+                UiInputCard("删除游玩存档确认内容（ui.save.deleteGameSaveConfirmMessage）", "") { IntegratorInputField(saveDraft.deleteGameSaveConfirmMessage, "删除游玩存档确认内容") { onSaveDraft(saveDraft.copy(deleteGameSaveConfirmMessage = it)) } }
+                UiInputCard("存档信息标题（ui.save.saveInfoTitle）", "") { IntegratorInputField(saveDraft.saveInfoTitle, "存档信息标题") { onSaveDraft(saveDraft.copy(saveInfoTitle = it)) } }
+                UiInputCard("存档名称标签（ui.save.saveNameLabel）", "") { IntegratorInputField(saveDraft.saveNameLabel, "存档名称标签") { onSaveDraft(saveDraft.copy(saveNameLabel = it)) } }
+                UiInputCard("存档描述标签（ui.save.saveDescLabel）", "") { IntegratorInputField(saveDraft.saveDescLabel, "存档描述标签") { onSaveDraft(saveDraft.copy(saveDescLabel = it)) } }
+                UiInputCard("取消按钮（ui.save.cancelButton）", "") { IntegratorInputField(saveDraft.cancelButton, "取消按钮") { onSaveDraft(saveDraft.copy(cancelButton = it)) } }
+                UiInputCard("确认按钮（ui.save.confirmButton）", "") { IntegratorInputField(saveDraft.confirmButton, "确认按钮") { onSaveDraft(saveDraft.copy(confirmButton = it)) } }
+                UiInputCard("分享按钮（ui.save.shareButton）", "") { IntegratorInputField(saveDraft.shareButton, "分享按钮") { onSaveDraft(saveDraft.copy(shareButton = it)) } }
+                UiInputCard("导出按钮（ui.save.exportButton）", "") { IntegratorInputField(saveDraft.exportButton, "导出按钮") { onSaveDraft(saveDraft.copy(exportButton = it)) } }
+                UiInputCard("导入按钮（ui.save.importButton）", "") { IntegratorInputField(saveDraft.importButton, "导入按钮") { onSaveDraft(saveDraft.copy(importButton = it)) } }
+                UiInputCard("备份按钮（ui.save.backupButton）", "") { IntegratorInputField(saveDraft.backupButton, "备份按钮") { onSaveDraft(saveDraft.copy(backupButton = it)) } }
+                UiInputCard("覆盖本地按钮（ui.save.coverLocalButton）", "") { IntegratorInputField(saveDraft.coverLocalButton, "覆盖本地按钮") { onSaveDraft(saveDraft.copy(coverLocalButton = it)) } }
+                UiInputCard("删除游玩存档按钮（ui.save.deleteGameSaveButton）", "") { IntegratorInputField(saveDraft.deleteGameSaveButton, "删除游玩存档按钮") { onSaveDraft(saveDraft.copy(deleteGameSaveButton = it)) } }
+                UiInputCard("覆盖预设按钮（ui.save.coverPresetButton）", "") { IntegratorInputField(saveDraft.coverPresetButton, "覆盖预设按钮") { onSaveDraft(saveDraft.copy(coverPresetButton = it)) } }
+                UiInputCard("存档名为空提示（ui.save.saveNameEmptyTip）", "") { IntegratorInputField(saveDraft.saveNameEmptyTip, "存档名为空提示") { onSaveDraft(saveDraft.copy(saveNameEmptyTip = it)) } }
+                UiInputCard("无本地存档提示（ui.save.noLocalSaveTip）", "") { IntegratorInputField(saveDraft.noLocalSaveTip, "无本地存档提示") { onSaveDraft(saveDraft.copy(noLocalSaveTip = it)) } }
+                UiInputCard("选择本地存档提示（ui.save.selectLocalSaveTip）", "") { IntegratorInputField(saveDraft.selectLocalSaveTip, "选择本地存档提示") { onSaveDraft(saveDraft.copy(selectLocalSaveTip = it)) } }
+                UiInputCard("备份成功提示（ui.save.backupSuccessTip）", "") { IntegratorInputField(saveDraft.backupSuccessTip, "备份成功提示") { onSaveDraft(saveDraft.copy(backupSuccessTip = it)) } }
+                UiInputCard("备份失败前缀（ui.save.backupFailTipPrefix）", "") { IntegratorInputField(saveDraft.backupFailTipPrefix, "备份失败前缀") { onSaveDraft(saveDraft.copy(backupFailTipPrefix = it)) } }
+                UiInputCard("导出成功提示（ui.save.exportSuccessTip）", "") { IntegratorInputField(saveDraft.exportSuccessTip, "导出成功提示") { onSaveDraft(saveDraft.copy(exportSuccessTip = it)) } }
+                UiInputCard("导出失败前缀（ui.save.exportFailTipPrefix）", "") { IntegratorInputField(saveDraft.exportFailTipPrefix, "导出失败前缀") { onSaveDraft(saveDraft.copy(exportFailTipPrefix = it)) } }
+                UiInputCard("导入成功提示（ui.save.importSuccessTip）", "") { IntegratorInputField(saveDraft.importSuccessTip, "导入成功提示") { onSaveDraft(saveDraft.copy(importSuccessTip = it)) } }
+                UiInputCard("导入失败前缀（ui.save.importFailTipPrefix）", "") { IntegratorInputField(saveDraft.importFailTipPrefix, "导入失败前缀") { onSaveDraft(saveDraft.copy(importFailTipPrefix = it)) } }
+                UiInputCard("删除成功提示（ui.save.deleteSuccessTip）", "") { IntegratorInputField(saveDraft.deleteSuccessTip, "删除成功提示") { onSaveDraft(saveDraft.copy(deleteSuccessTip = it)) } }
+                UiInputCard("删除失败前缀（ui.save.deleteFailTipPrefix）", "") { IntegratorInputField(saveDraft.deleteFailTipPrefix, "删除失败前缀") { onSaveDraft(saveDraft.copy(deleteFailTipPrefix = it)) } }
+                UiInputCard("覆盖成功提示（ui.save.coverSuccessTip）", "") { IntegratorInputField(saveDraft.coverSuccessTip, "覆盖成功提示") { onSaveDraft(saveDraft.copy(coverSuccessTip = it)) } }
+                UiInputCard("覆盖失败前缀（ui.save.coverFailTipPrefix）", "") { IntegratorInputField(saveDraft.coverFailTipPrefix, "覆盖失败前缀") { onSaveDraft(saveDraft.copy(coverFailTipPrefix = it)) } }
+                UiInputCard("删除游玩存档成功提示（ui.save.deleteGameSaveSuccessTip）", "") { IntegratorInputField(saveDraft.deleteGameSaveSuccessTip, "删除游玩存档成功提示") { onSaveDraft(saveDraft.copy(deleteGameSaveSuccessTip = it)) } }
+                UiInputCard("删除游玩存档失败前缀（ui.save.deleteGameSaveFailTipPrefix）", "") { IntegratorInputField(saveDraft.deleteGameSaveFailTipPrefix, "删除游玩存档失败前缀") { onSaveDraft(saveDraft.copy(deleteGameSaveFailTipPrefix = it)) } }
+                UiInputCard("默认导入名前缀（ui.save.defaultImportNamePrefix）", "") { IntegratorInputField(saveDraft.defaultImportNamePrefix, "默认导入名前缀") { onSaveDraft(saveDraft.copy(defaultImportNamePrefix = it)) } }
+                UiInputCard("默认备份描述（ui.save.defaultBackupDesc）", "") { IntegratorInputField(saveDraft.defaultBackupDesc, "默认备份描述") { onSaveDraft(saveDraft.copy(defaultBackupDesc = it)) } }
+                UiInputCard("默认导入描述（ui.save.defaultImportDesc）", "") { IntegratorInputField(saveDraft.defaultImportDesc, "默认导入描述") { onSaveDraft(saveDraft.copy(defaultImportDesc = it)) } }
+                UiInputCard("导出选项标题（ui.save.exportOptionTitle）", "") { IntegratorInputField(saveDraft.exportOptionTitle, "导出选项标题") { onSaveDraft(saveDraft.copy(exportOptionTitle = it)) } }
+                UiInputCard("导出到文件夹选项（ui.save.exportToFolderOption）", "") { IntegratorInputField(saveDraft.exportToFolderOption, "导出到文件夹选项") { onSaveDraft(saveDraft.copy(exportToFolderOption = it)) } }
+                UiInputCard("分享为存档包选项（ui.save.shareAsPackageOption）", "") { IntegratorInputField(saveDraft.shareAsPackageOption, "分享为存档包选项") { onSaveDraft(saveDraft.copy(shareAsPackageOption = it)) } }
+                UiInputCard("游玩存档区域标题（ui.save.gameSaveLabel）", "") { IntegratorInputField(saveDraft.gameSaveLabel, "游玩存档区域标题") { onSaveDraft(saveDraft.copy(gameSaveLabel = it)) } }
+                UiInputCard("游玩存档信息模板(%s用户/%t时间)（ui.save.gameSaveInfoTemplate）", "") { IntegratorInputField(saveDraft.gameSaveInfoTemplate, "游玩存档信息模板(%s用户/%t时间)") { onSaveDraft(saveDraft.copy(gameSaveInfoTemplate = it)) } }
+                UiInputCard("游玩存档未知用户（ui.save.gameSaveUnknownUser）", "") { IntegratorInputField(saveDraft.gameSaveUnknownUser, "游玩存档未知用户") { onSaveDraft(saveDraft.copy(gameSaveUnknownUser = it)) } }
+                UiInputCard("游玩存档不存在提示（ui.save.gameSaveNotExistTip）", "") { IntegratorInputField(saveDraft.gameSaveNotExistTip, "游玩存档不存在提示") { onSaveDraft(saveDraft.copy(gameSaveNotExistTip = it)) } }
+                UiInputCard("重试按钮（ui.save.retryButtonText）", "") { IntegratorInputField(saveDraft.retryButtonText, "重试按钮") { onSaveDraft(saveDraft.copy(retryButtonText = it)) } }
+                UiInputCard("操作-备份（ui.save.opBackup）", "") { IntegratorInputField(saveDraft.opBackup, "操作-备份") { onSaveDraft(saveDraft.copy(opBackup = it)) } }
+                UiInputCard("操作-导出（ui.save.opExport）", "") { IntegratorInputField(saveDraft.opExport, "操作-导出") { onSaveDraft(saveDraft.copy(opExport = it)) } }
+                UiInputCard("操作-导入（ui.save.opImport）", "") { IntegratorInputField(saveDraft.opImport, "操作-导入") { onSaveDraft(saveDraft.copy(opImport = it)) } }
+                UiInputCard("操作-删除（ui.save.opDelete）", "") { IntegratorInputField(saveDraft.opDelete, "操作-删除") { onSaveDraft(saveDraft.copy(opDelete = it)) } }
+                UiInputCard("操作-删除游玩存档（ui.save.opDeleteGameSave）", "") { IntegratorInputField(saveDraft.opDeleteGameSave, "操作-删除游玩存档") { onSaveDraft(saveDraft.copy(opDeleteGameSave = it)) } }
+                UiInputCard("操作-覆盖（ui.save.opCover）", "") { IntegratorInputField(saveDraft.opCover, "操作-覆盖") { onSaveDraft(saveDraft.copy(opCover = it)) } }
+                UiInputCard("操作-存档元数据（ui.save.opSaveMeta）", "") { IntegratorInputField(saveDraft.opSaveMeta, "操作-存档元数据") { onSaveDraft(saveDraft.copy(opSaveMeta = it)) } }
             }
         }
         }
@@ -6071,18 +6059,18 @@ private fun UiAdvancedSettingsContent(
             Column(Modifier.padding(12.dp)) {
                 PvzSectionTitle("游戏画面设置 (ui.settings.gameDisplay)")
                 UiSwitchCard("ui.settings.gameDisplay.isUseCustomGameDisplay", "默认启用自定义画面总开关") { PvzCheckRow("默认启用自定义画面总开关", gameDisplay.isUseCustomGameDisplay) { onGameDisplay(gameDisplay.copy(isUseCustomGameDisplay = !gameDisplay.isUseCustomGameDisplay)) } }
-                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.allowRotation-允许翻转界面标签", "") { IntegratorInputField(gameDisplay.allowRotation, "允许翻转界面标签") { onGameDisplay(gameDisplay.copy(allowRotation = it)) } } }
+                if (!simplifiedLaunch) { UiInputCard("允许翻转界面标签（ui.settings.gameDisplay.allowRotation）", "") { IntegratorInputField(gameDisplay.allowRotation, "允许翻转界面标签") { onGameDisplay(gameDisplay.copy(allowRotation = it)) } } }
                 UiSwitchCard("ui.settings.gameDisplay.isAllowRotation", "默认允许翻转") { PvzCheckRow("默认允许翻转", gameDisplay.isAllowRotation) { onGameDisplay(gameDisplay.copy(isAllowRotation = !gameDisplay.isAllowRotation)) } }
-                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.customWindowSize-自定义窗口尺寸标签", "") { IntegratorInputField(gameDisplay.customWindowSize, "自定义窗口尺寸标签") { onGameDisplay(gameDisplay.copy(customWindowSize = it)) } } }
-                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.customWindowRatio-自定义窗口比例标签", "") { IntegratorInputField(gameDisplay.customWindowRatio, "自定义窗口比例标签") { onGameDisplay(gameDisplay.copy(customWindowRatio = it)) } } }
-                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.fullscreen-全屏标签", "") { IntegratorInputField(gameDisplay.fullscreen, "全屏标签") { onGameDisplay(gameDisplay.copy(fullscreen = it)) } } }
-                UiInputCard("ui.settings.gameDisplay.displayMode-显示模式(ratio/size/fullscreen)", "") { IntegratorInputField(gameDisplay.displayMode, "显示模式(ratio/size/fullscreen)") { onGameDisplay(gameDisplay.copy(displayMode = it)) } }
-                UiInputCard("ui.settings.gameDisplay.windowWidth-窗口宽度(px,0=屏幕宽)", "") { IntegratorInputField(gameDisplay.windowWidth.toString(), "窗口宽度(px,0=屏幕宽)") { onGameDisplay(gameDisplay.copy(windowWidth = it.toIntOrNull() ?: 0)) } }
-                UiInputCard("ui.settings.gameDisplay.windowHeight-窗口高度(px,0=屏幕高)", "") { IntegratorInputField(gameDisplay.windowHeight.toString(), "窗口高度(px,0=屏幕高)") { onGameDisplay(gameDisplay.copy(windowHeight = it.toIntOrNull() ?: 0)) } }
-                UiInputCard("ui.settings.gameDisplay.windowRatio-窗口比例(宽/高)", "") { IntegratorInputField(gameDisplay.windowRatio.toString(), "窗口比例(宽/高)") { onGameDisplay(gameDisplay.copy(windowRatio = it.toFloatOrNull() ?: 1.5f)) } }
-                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.ratioHint-比例输入提示", "") { IntegratorInputField(gameDisplay.ratioHint, "比例输入提示") { onGameDisplay(gameDisplay.copy(ratioHint = it)) } } }
-                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.widthHint-宽度输入提示", "") { IntegratorInputField(gameDisplay.widthHint, "宽度输入提示") { onGameDisplay(gameDisplay.copy(widthHint = it)) } } }
-                if (!simplifiedLaunch) { UiInputCard("ui.settings.gameDisplay.heightHint-高度输入提示", "") { IntegratorInputField(gameDisplay.heightHint, "高度输入提示") { onGameDisplay(gameDisplay.copy(heightHint = it)) } } }
+                if (!simplifiedLaunch) { UiInputCard("自定义窗口尺寸标签（ui.settings.gameDisplay.customWindowSize）", "") { IntegratorInputField(gameDisplay.customWindowSize, "自定义窗口尺寸标签") { onGameDisplay(gameDisplay.copy(customWindowSize = it)) } } }
+                if (!simplifiedLaunch) { UiInputCard("自定义窗口比例标签（ui.settings.gameDisplay.customWindowRatio）", "") { IntegratorInputField(gameDisplay.customWindowRatio, "自定义窗口比例标签") { onGameDisplay(gameDisplay.copy(customWindowRatio = it)) } } }
+                if (!simplifiedLaunch) { UiInputCard("全屏标签（ui.settings.gameDisplay.fullscreen）", "") { IntegratorInputField(gameDisplay.fullscreen, "全屏标签") { onGameDisplay(gameDisplay.copy(fullscreen = it)) } } }
+                UiInputCard("显示模式(ratio/size/fullscreen)（ui.settings.gameDisplay.displayMode）", "") { IntegratorInputField(gameDisplay.displayMode, "显示模式(ratio/size/fullscreen)") { onGameDisplay(gameDisplay.copy(displayMode = it)) } }
+                UiInputCard("窗口宽度(px,0=屏幕宽)（ui.settings.gameDisplay.windowWidth）", "") { IntegratorInputField(gameDisplay.windowWidth.toString(), "窗口宽度(px,0=屏幕宽)") { onGameDisplay(gameDisplay.copy(windowWidth = it.toIntOrNull() ?: 0)) } }
+                UiInputCard("窗口高度(px,0=屏幕高)（ui.settings.gameDisplay.windowHeight）", "") { IntegratorInputField(gameDisplay.windowHeight.toString(), "窗口高度(px,0=屏幕高)") { onGameDisplay(gameDisplay.copy(windowHeight = it.toIntOrNull() ?: 0)) } }
+                UiInputCard("窗口比例(宽/高)（ui.settings.gameDisplay.windowRatio）", "") { IntegratorInputField(gameDisplay.windowRatio.toString(), "窗口比例(宽/高)") { onGameDisplay(gameDisplay.copy(windowRatio = it.toFloatOrNull() ?: 1.5f)) } }
+                if (!simplifiedLaunch) { UiInputCard("比例输入提示（ui.settings.gameDisplay.ratioHint）", "") { IntegratorInputField(gameDisplay.ratioHint, "比例输入提示") { onGameDisplay(gameDisplay.copy(ratioHint = it)) } } }
+                if (!simplifiedLaunch) { UiInputCard("宽度输入提示（ui.settings.gameDisplay.widthHint）", "") { IntegratorInputField(gameDisplay.widthHint, "宽度输入提示") { onGameDisplay(gameDisplay.copy(widthHint = it)) } } }
+                if (!simplifiedLaunch) { UiInputCard("高度输入提示（ui.settings.gameDisplay.heightHint）", "") { IntegratorInputField(gameDisplay.heightHint, "高度输入提示") { onGameDisplay(gameDisplay.copy(heightHint = it)) } } }
             }
         }
 
@@ -6144,10 +6132,10 @@ private fun ScheduleSettingsContent(
                             fun update(fn: (ScheduleDraft) -> ScheduleDraft) {
                                 onUpdate(items.toMutableList().also { it[i] = fn(it[i]) })
                             }
-                            UiInputCard("id-唯一标识（必填）", "") {
+                            UiInputCard("唯一标识（必填）（id）", "") {
                                 IntegratorInputField(item.id, "如 daily_sign") { v -> update { it.copy(id = v) } }
                             }
-                            UiInputCard("name-显示名称", "") {
+                            UiInputCard("显示名称（name）", "") {
                                 IntegratorInputField(item.name, "如 每日签到提醒") { v -> update { it.copy(name = v) } }
                             }
                             // cron 预设选择
@@ -6216,13 +6204,13 @@ private fun ScheduleSettingsContent(
                                     IntegratorInputField(item.cron, "如 0 10 * * * 或 every 30m") { v -> update { it.copy(cron = v) } }
                                 }
                             }
-                            UiInputCard("jsScript-执行的 JS 脚本（内联代码，优先于 jsPath）", "") {
+                            UiInputCard("执行的 JS 脚本（内联代码，优先于 jsPath）（jsScript）", "") {
                                 IntegratorInputField(item.jsScript,
                                     "notifications.show('签到', '记得签到！');\ntimer.nextTrigger();",
                                     multiline = true
                                 ) { v -> update { it.copy(jsScript = v) } }
                             }
-                            UiInputCard("jsPath-JS 文件路径（jsScript 为空时生效）", "") {
+                            UiInputCard("JS 文件路径（jsScript 为空时生效）（jsPath）", "") {
                                 IntegratorInputField(item.jsPath, "如 js/daily_check.js") { v -> update { it.copy(jsPath = v) } }
                             }
                         }
