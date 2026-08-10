@@ -9,13 +9,10 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.documentfile.provider.DocumentFile
 import androidx.core.content.FileProvider
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +22,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,16 +30,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import io.github.dreammooncai.pvz2tool.ui.PvzInput
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -62,17 +53,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.dreammooncai.integration.ToolboxApkMerger
@@ -119,7 +105,6 @@ import android.content.Context
 import android.content.Intent
 import coil3.compose.AsyncImage
 import io.github.dreammooncai.pvz2tool.R
-import io.github.dreammooncai.pvz2tool.view.PvzSimpleCardBrown
 import io.github.dreammooncai.pvz2tool.view.PvzSimpleCardGreen
 import io.github.dreammooncai.pvz2tool.view.PvzRichText
 import io.github.dreammooncai.pvz2tool.view.PvzTextOliveStyle
@@ -1635,6 +1620,8 @@ fun ToolboxIntegratorScreen(
                             // 无描述文件视为旧版集成，示例项目默认关闭，pvz2tool 仅替换已有文件
                             includeExamples = false
                             appendUnreferencedAssets = false
+                            // 无描述文件时无从得知旧版是否注入过沉浸式主题，按新版默认开启（开关始终可见可改，且可逆）
+                            useImmersiveTheme = true
                         }
                     } else {
                         detectedInfo = null
@@ -1906,7 +1893,7 @@ fun ToolboxIntegratorScreen(
                     ToolboxApkMerger.preview(
                         sourceApk, t, dexStrategy, extraAssets, extraRes, excludedSmfAssets, removedTargetEntries,
                         version = sourceVersion, updateMode = isUpdateMode, dexStart = effStart, dexEnd = effEnd,
-                        overrideDreamYml = previewYml, preserveTargetResEntries = preserveTargetRes,
+                        overrideDreamYml = previewYml,
                         preserveTargetAssets = isUpdateMode, appendUnreferenced = !isUpdateMode || appendUnreferencedAssets,
                         useImmersiveTheme = useImmersiveTheme
                     )
@@ -1983,7 +1970,6 @@ fun ToolboxIntegratorScreen(
                         excludedSmfAssets = excludedSmfAssets,
                         removedTargetEntries = removedTargetEntries,
                         version = sourceVersion, updateMode = isUpdateMode, dexStart = effStart, dexEnd = effEnd, insertMode = updInsertMode,
-                        preserveTargetResEntries = preserveTargetRes,
                         simplifiedLaunch = simplifiedLaunch,
                         preserveTargetAssets = isUpdateMode,
                         appendUnreferenced = !isUpdateMode || appendUnreferencedAssets,
@@ -3444,12 +3430,14 @@ private fun StepTargetRight(
             Spacer(Modifier.height(6.dp))
             PvzCheckRow("启用简易模式", simplifiedLaunch) { onSimplifiedLaunch(!simplifiedLaunch) }
         }
-        // 游戏 Activity 沉浸式主题开关
-        PvzInfoCard("游戏 Activity 沉浸式主题") {
-            PvzBodyText("开启后把游戏主 Activity 的 android:theme 设为工具箱沉浸式主题（@io.github.dreammooncai.pvz2tool:style/Theme.DreamPvzApp），进入游戏即全屏沉浸。")
-            Spacer(Modifier.height(6.dp))
-            PvzCheckRow("游戏Activity使用工具箱沉浸式主题", useImmersiveTheme) { onUseImmersiveTheme(!useImmersiveTheme) }
-        }
+    }
+
+    // 游戏 Activity 沉浸式主题开关：改的是 manifest 属性、与 dream.yml 描述文件无关，
+    // 因此首次集成 / 更新模式（含无描述文件的老版 APK）都始终可改，且开关双向生效。
+    PvzInfoCard("游戏 Activity 沉浸式主题（useImmersiveTheme）") {
+        PvzBodyText("开启后把游戏主 Activity 的 android:theme 设为工具箱沉浸式主题（@io.github.dreammooncai.pvz2tool:style/Theme.DreamPvzApp），进入游戏即全屏沉浸；关闭则还原为游戏原主题（只还原此前由工具箱注入的，游戏自带主题不动）。")
+        Spacer(Modifier.height(6.dp))
+        PvzCheckRow("游戏Activity使用工具箱沉浸式主题", useImmersiveTheme) { onUseImmersiveTheme(!useImmersiveTheme) }
     }
 
     if (!simplifiedLaunch) {
