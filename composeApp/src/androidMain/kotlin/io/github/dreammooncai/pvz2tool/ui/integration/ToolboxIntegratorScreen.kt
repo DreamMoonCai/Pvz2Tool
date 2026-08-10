@@ -3649,7 +3649,7 @@ private fun PvzChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) 
             color = if (selected) PvzGreen else PvzBorderBrown
         )
         Spacer(Modifier.width(8.dp))
-        PvzRichText(label, defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp)
+        PvzRichText(formatFieldLabel(label), defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp)
     }
 }
 
@@ -3664,7 +3664,7 @@ private fun PvzCheckRow(title: String, checked: Boolean, onToggle: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         PvzRichText(
-            title,
+            formatFieldLabel(title),
             defaultStyle = PvzTextOliveStyleNoShadow,
             fontSize = 13.sp,
             modifier = Modifier.weight(1f)
@@ -3744,6 +3744,19 @@ private val LocalIntegratorFieldLabel = staticCompositionLocalOf<String?> { null
 
 
 /**
+ * 字段标题规范化：把**已写成** `键-友好文字` 形式的字面量翻转为 `友好文字（键）`。
+ * 例如 `ui.versionLabel-版本号标签前缀` → `版本号标签前缀（ui.versionLabel）`。
+ * - 不含 `-` 或首个字符即为 `-` 的字符串原样返回（纯友好文字 / 占位提示等不受影响）。
+ * - 只负责「翻转历史写法」；键与友好文字分开传参时请直接拼 `"$友好文字（$键）"`，不要绕这里，
+ *   否则键本身含 `-` 会被从第一个 `-` 处切断。
+ */
+private fun formatFieldLabel(raw: String): String {
+    val idx = raw.indexOf('-')
+    if (idx <= 0) return raw
+    return raw.substring(idx + 1).trim() + "（" + raw.substring(0, idx).trim() + "）"
+}
+
+/**
  * 集成器统一文本输入框——[PvzInput] 的 GREEN 主题封装。
  *
  * 仅做两件事：
@@ -3752,9 +3765,9 @@ private val LocalIntegratorFieldLabel = staticCompositionLocalOf<String?> { null
  *
  * 具体样式、描边缺口补丁、焦点描边逻辑都在公共组件 [PvzInput] 中维护，避免重复。
  *
- * @param placeholder 示例/提示值（如「如 5000」），只在聚焦且内容为空时显示，同时作为默认标题。
- * @param label 字段名。缺省时取 [LocalIntegratorFieldLabel]（由外层 UiInputCard 提供），
- *              再缺省才回退用 placeholder，保证标签任何情况下都不为空。
+ * @param placeholder 示例/提示值（如「如 5000」），只在聚焦且内容为空时显示，同时作为默认标题里的友好文字。
+ * @param label 完整标题。缺省时按 fieldKey 拼「友好文字（键）」，再缺省取 [LocalIntegratorFieldLabel]
+ *              （由外层 UiInputCard 提供），最后由 [PvzInput] 回退 placeholder，保证标签任何情况下都不为空。
  */
 @Composable
 private fun IntegratorInputField(
@@ -3762,14 +3775,14 @@ private fun IntegratorInputField(
     placeholder: String,
     multiline: Boolean = false,
     label: String? = null,
-    /** 字段名（yml 键）。提供后标题自动拼为「键-友好文字」，保证键永远在标题里。 */
+    /** 字段名（yml 键）。提供后标题自动拼为「友好文字（键）」，保证键永远在标题里。 */
     fieldKey: String? = null,
     onValue: (String) -> Unit
 ) {
-    // 标题统一为「键-友好文字」：显式 label 优先；其次 fieldKey 与友好文字(placeholder)组合；
-    // 再退化为外层 UiInputCard 下发的字段名；最后回退 placeholder。键永远在。
+    // 标题统一为「友好文字（键）」：显式 label 优先；其次 fieldKey 与友好文字(placeholder)直接拼；
+    // 再退化为外层 UiInputCard 下发的字段名（那边已规范化过）；最后由 PvzInput 回退 placeholder。键永远在。
     val effectiveLabel = label
-        ?: (if (fieldKey != null) "$fieldKey-$placeholder" else null)
+        ?: fieldKey?.let { if (placeholder.isBlank()) it else "$placeholder（$it）" }
         ?: LocalIntegratorFieldLabel.current
     PvzInput(
         value = value,
@@ -4184,7 +4197,7 @@ private fun UiInfoCard(label: String, content: @Composable () -> Unit) {
     Column(Modifier
         .fillMaxWidth()
         .padding(vertical = 4.dp)) {
-        PvzRichText(label, defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        PvzRichText(formatFieldLabel(label), defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(2.dp))
         content()
     }
@@ -4227,7 +4240,7 @@ private fun UiInputCard(label: String, desc: String, content: @Composable () -> 
             UiDescription(desc)
             Spacer(Modifier.height(4.dp))
         }
-        CompositionLocalProvider(LocalIntegratorFieldLabel provides label) {
+        CompositionLocalProvider(LocalIntegratorFieldLabel provides formatFieldLabel(label)) {
             content()
         }
     }
@@ -4245,7 +4258,7 @@ private fun UiSwitchCard(label: String, desc: String, content: @Composable () ->
             .border(1.dp, Color(0xFFD5CFA0), RoundedCornerShape(8.dp))
             .padding(10.dp)
     ) {
-        PvzRichText(label, defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        PvzRichText(formatFieldLabel(label), defaultStyle = PvzTextOliveStyleNoShadow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         UiDescription(desc)
         Spacer(Modifier.height(2.dp))
         content()
@@ -5682,10 +5695,18 @@ private fun ItemSettingsContent(
                                 onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(id = v) }))
                             }
                             Spacer(Modifier.height(4.dp))
-                            Text("类型 (type):", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5D4E37))
-                            val types = listOf("DESCRIPTION", "BUTTON", "CHECKBOX", "RADIO", "SLIDER", "INPUT", "INFO")
-                            types.forEach { t ->
-                                PvzChoiceRow(t, item.type == t) {
+                            Text("功能项类型（type）", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5D4E37))
+                            val typeLabels = mapOf(
+                                "DESCRIPTION" to "纯文本描述",
+                                "BUTTON" to "按钮",
+                                "CHECKBOX" to "勾选框",
+                                "RADIO" to "单选项",
+                                "SLIDER" to "滑块",
+                                "INPUT" to "文本输入",
+                                "INFO" to "信息展示"
+                            )
+                            typeLabels.forEach { (t, label) ->
+                                PvzChoiceRow("$t-$label", item.type == t) {
                                     onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(type = t) }))
                                 }
                             }
@@ -5731,7 +5752,7 @@ private fun ItemSettingsContent(
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(groupId = v) }))
                                     }
                                     Spacer(Modifier.height(4.dp))
-                                    PvzCheckRow("默认选中", item.radioDefault) {
+                                    PvzCheckRow("radioDefault-默认选中", item.radioDefault) {
                                         onUpdate(section.copy(items = items.mapIndexed { j, w ->
                                             w.copy(radioDefault = if (w.groupId == item.groupId) j == i else w.radioDefault)
                                         }))
@@ -5739,7 +5760,7 @@ private fun ItemSettingsContent(
                                 }
                                 "CHECKBOX" -> {
                                     Spacer(Modifier.height(4.dp))
-                                    PvzCheckRow("默认勾选", item.checkboxDefault) {
+                                    PvzCheckRow("checkboxDefault-默认勾选", item.checkboxDefault) {
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(checkboxDefault = !item.checkboxDefault) }))
                                     }
                                     Spacer(Modifier.height(4.dp))
@@ -5770,9 +5791,10 @@ private fun ItemSettingsContent(
                                     IntegratorInputField(item.buttonText, "按钮文字", fieldKey = "buttonText") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(buttonText = v) }))
                                     }
-                                    Text("buttonColor:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5D4E37))
-                                    listOf("blue", "red", "green", "orange", "purple").forEach { c ->
-                                        PvzChoiceRow(c, item.buttonColor == c) {
+                                    Text("按钮颜色（buttonColor）", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5D4E37))
+                                    val colorLabels = mapOf("blue" to "蓝色", "red" to "红色", "green" to "绿色", "orange" to "橙色", "purple" to "紫色")
+                                    colorLabels.forEach { (c, label) ->
+                                        PvzChoiceRow("$c-$label", item.buttonColor == c) {
                                             onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(buttonColor = c) }))
                                         }
                                     }
