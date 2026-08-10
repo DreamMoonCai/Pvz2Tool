@@ -1835,7 +1835,7 @@ private fun DynamicSectionComponent(
                                         onStateChange(newState)
                                     },
                                     placeholder = item.placeholder ?: "请输入...",
-                                    modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth(),
                                     theme = section.theme,
                                     multiline = true
                                 )
