@@ -38,6 +38,9 @@ object ToolboxApkMerger {
     private const val OUR_PKG_NAME = "io.github.dreammooncai.pvz2tool"
     private const val ANDROID_RES_URI = "http://schemas.android.com/apk/res/android"
 
+    /** `android:theme` 的属性名资源 id（framework attr）。删除该属性时按 id 匹配才可靠 */
+    private const val ANDROID_ID_THEME = 0x01010000
+
     /** 工具箱自身注入到 manifest 的 Activity 全限定名（定位游戏主 Activity 时必须排除） */
     private val OUR_ACTIVITY_NAMES = setOf(
         "$OUR_PKG_NAME.Pvz2InitializeActivity",
@@ -580,6 +583,14 @@ object ToolboxApkMerger {
 
         // 4. manifest
         val tm: AndroidManifestBlock = target.androidManifest
+        // 🔴 表结构刚被改过（移除旧 0x66 包 + merge 新包）。若 manifest 恰好挂在被移除的那个包块上
+        // （更新模式重复集成时很容易发生：ARSCLib 按 guessCurrentPackageId 挑包，可能挑中 0x66），
+        // 它的 packageBlock.getTableBlock() 会变成 null，后面 appendLauncherBlock 解析注入块
+        // 编码属性名时会直接 NPE。这里检测并重新挂接到当前表。
+        if (tm.packageBlock?.tableBlock == null) {
+            (tTable.pickOne(tm.guessCurrentPackageId()) ?: tTable.pickOne())
+                ?.let { tm.setPackageBlock(it) }
+        }
         // 游戏主 Activity 必须在 removeGameLauncher 之前定位：该函数会删掉 MAIN+LAUNCHER intent-filter，
         // 而 appendLauncherBlock 又会把工具箱自己的 Pvz2InitializeActivity 变成唯一 LAUNCHER，
         // 之后再查「MAIN+LAUNCHER 回退分支」就会误判成工具箱自身的 Activity。
@@ -595,7 +606,8 @@ object ToolboxApkMerger {
         // 此时 0x66 资源表已 merge 且 addExternalFramework 已登记，@package:style 引用才能正确编码）。
         // 无论开关开或关都要调用：关闭时负责把上次注入的沉浸式主题还原回游戏原主题。
         val originalGameTheme = applyGameActivityTheme(
-            tm, gameActivityName, targetPackage, useImmersiveTheme, prevInfo?.originalGameTheme
+            tm, gameActivityName, targetPackage, useImmersiveTheme,
+            prevInfo?.originalGameTheme, prevInfo?.useImmersiveTheme == true
         )
         // appendLauncherBlock 在原地修改 tm（目标原本的 manifest 对象，根元素 <manifest> 不变），
         // 因此 targetSdkVersion 直接作用在 tm 上；最后 setManifest 固化（覆盖 getter 可能返回副本的情况）。
@@ -968,9 +980,15 @@ object ToolboxApkMerger {
      *  - [enable] = true：记录当前主题为「原主题」后写入 `@OUR_PKG_NAME:style/Theme.DreamPvzApp`。
      *    若当前主题已经是工具箱主题（更新模式反复集成），则沿用 [recordedOriginal]，
      *    避免把自己记成原值导致永远还原不回去。
-     *  - [enable] = false：仅当当前主题**确实是工具箱注入的**（资源包 id == 0x66）才动手：
+     *  - [enable] = false：仅当当前主题**确实是工具箱注入的**才动手：
      *    有记录就还原成记录的资源 id，无记录就直接删掉 theme 属性（回到 application 主题）。
      *    游戏/用户自己的主题一律不碰。
+     *
+     * 「是不是工具箱注入的」判据（满足其一）：
+     *  1. [prevInjected]——上次集成的描述文件里 `useImmersiveTheme=true`，这是最权威的事实；
+     *  2. 引用型且资源包 id == 0x66——无描述文件（老版产物）时的启发式兜底。
+     * 只用第 2 条不够：`@pkg:style/...` 的编码结果不保证落在 0x66 包
+     * （游戏自身包若有同名资源会被优先命中），那时关闭开关就还原不回去了。
      *
      * 写入走 ARSCLib 的 [ResXmlAttribute.encode]——与 [appendLauncherBlock] 解析注入块底层同一套机制，
      * 能正确把 `@package:style/Theme.DreamPvzApp` 编码成资源引用；调用方需保证此时 0x66 资源表已 merge
@@ -979,6 +997,7 @@ object ToolboxApkMerger {
      *
      * @param gameActivity 游戏主 Activity 全限定名，必须在 removeGameLauncher 之前取得
      * @param recordedOriginal 上次集成记录的原主题（`0x` 十六进制串；空串=原本无 theme；null=无记录）
+     * @param prevInjected 上次集成是否开启过沉浸式主题（来自目标 APK 内的集成描述文件）
      * @return 本次应写入描述文件的「原主题」记录值（已还原/未注入时为 null）
      */
     private fun applyGameActivityTheme(
@@ -986,7 +1005,8 @@ object ToolboxApkMerger {
         gameActivity: String,
         targetPackage: String,
         enable: Boolean,
-        recordedOriginal: String?
+        recordedOriginal: String?,
+        prevInjected: Boolean
     ): String? {
         if (gameActivity.isEmpty()) return recordedOriginal
         var act: ResXmlElement? = null
@@ -1002,18 +1022,19 @@ object ToolboxApkMerger {
         val element = act ?: return recordedOriginal
 
         val current = element.attribute("theme")
-        // 工具箱主题的判据：引用类型且资源 id 落在我们的 0x66 包（比字符串比对稳，不受包名解析形态影响）
+        // 是不是工具箱注入的：描述文件的记录优先，0x66 包 id 作为无记录时的兜底启发式
         val currentIsOurs = current != null &&
             current.valueType == ValueType.REFERENCE &&
-            ((current.data ushr 24) and 0xFF) == OUR_PKG_ID
+            (prevInjected || ((current.data ushr 24) and 0xFF) == OUR_PKG_ID)
 
+        // 开启：无论 Activity 是否自带主题，一律强制替换为工具箱沉浸式主题（先清掉旧的，再写我们的）
         if (enable) {
             val original = when {
                 currentIsOurs -> recordedOriginal ?: ""
                 current != null && current.valueType == ValueType.REFERENCE -> "0x%08x".format(current.data)
                 else -> "" // 原本无 theme，或是非引用型（内联值），还原时按「删除属性」处理
             }
-            element.removeAttributesWithName("theme")
+            element.removeThemeAttribute()
             element.newAttribute().encode(
                 ANDROID_RES_URI, "android", "theme",
                 "@$OUR_PKG_NAME:style/Theme.DreamPvzApp", false
@@ -1023,7 +1044,7 @@ object ToolboxApkMerger {
 
         // 关闭：只还原工具箱注入的主题，游戏自身主题保持原样
         if (!currentIsOurs) return null
-        element.removeAttributesWithName("theme")
+        element.removeThemeAttribute()
         val originalId = recordedOriginal?.trim()?.takeIf { s -> s.isNotEmpty() }
             ?.removePrefix("0x")?.toLongOrNull(16)?.toInt()
         if (originalId != null) {
@@ -1188,6 +1209,21 @@ object ToolboxApkMerger {
     private val ResXmlElement.name: String get() = getName() ?: ""
 
     private fun ResXmlElement.attr(localName: String): String? = attribute(localName)?.getValueAsString()
+
+    /**
+     * 删除元素上的 `android:theme` 属性。
+     *
+     * 🔴 不能用 ARSCLib 的 `removeAttributesWithName("theme")`：它的判据是
+     * `getNameId() == 0 && equalsName(name)`——只删「没有属性资源 id」的属性。
+     * 而真实 manifest 里的 `android:theme` 属性名 id 恒为 `0x01010000`，
+     * 于是那个调用在任何正常 APK 上都是**空操作**，结果就是新旧两条 `android:theme` 并存
+     * （系统取第一条 → 沉浸式主题看起来「没生效」，关闭时也还原不掉）。
+     */
+    private fun ResXmlElement.removeThemeAttribute() {
+        removeAttributeIf { a ->
+            a.getNameId() == ANDROID_ID_THEME || (a.getNameId() == 0 && a.getName() == "theme")
+        }
+    }
 
     /** 按本地名（不含 android: 前缀）取属性对象，需要读原始 valueType/data 时用 */
     private fun ResXmlElement.attribute(localName: String): ResXmlAttribute? {

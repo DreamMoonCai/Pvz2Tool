@@ -36,7 +36,13 @@ class ToolboxApkMergerTest {
         return sourceApk
     }
 
-    private fun buildTargetApk(out: File, sourceDexFirst: ByteArray, gameActivityTheme: String? = null) {
+    /**
+     * android 框架里的某个 style 资源 id（包 id = 0x01）。
+     * 测试只关心「这是一条指向框架包的引用」，具体是哪个 style 不影响任何断言。
+     */
+    private val ANDROID_FRAMEWORK_STYLE_ID = 0x01030007
+
+    private fun buildTargetApk(out: File, sourceDexFirst: ByteArray, gameActivityThemeId: Int? = null) {
         // 以本应用 APK 为基底：其 0x66 包已正确挂接到 TableBlock，
         // 仅把包 id 改名为 0x7F、包名改为游戏包名，即可得到结构合法的 0x7F 目标。
         val module = ApkModule.loadApkFile(sourceApk)
@@ -45,7 +51,30 @@ class ToolboxApkMergerTest {
         pkg.setId(0x7F)
         pkg.setName("com.target.game")
 
-        val manifest = AndroidManifestBlock.empty()
+        module.setManifest(newGameManifest(module, pkg))
+
+        // 目标只保留 1 个 dex：用源首个 dex 的副本并改写末字节，使其与源 dex 内容可区分
+        module.listDexFiles().forEach { module.removeInputSource(it.name) }
+        val targetDex = sourceDexFirst.copyOf()
+            .apply { this[lastIndex] = (this[lastIndex].toInt() xor 0xFF).toByte() }
+        module.add(ByteInputSource(targetDex, "classes.dex"))
+        module.writeApk(out)
+
+        if (gameActivityThemeId != null) injectGameActivityTheme(out, gameActivityThemeId)
+    }
+
+    /**
+     * 造一份「游戏」manifest。
+     *
+     * 🔴 必须用 `AndroidManifestBlock()` 而不是 `AndroidManifestBlock.empty()`：
+     * `empty()` 会先建一个占位根元素 `<x/>`（`AndroidManifest.EMPTY_MANIFEST_TAG`），
+     * 随后 `parse()` 把真正的 `<manifest>` **追加成第二个顶层元素**。
+     * ARSCLib 的所有查询 API（`getActivities` / `getApplicationElement` / XMLPath）
+     * 只认第一个文档元素，于是全部返回空——合并器根本定位不到游戏 Activity，
+     * 测试会「假绿」（弱断言全过，实际什么都没改）。
+     */
+    private fun newGameManifest(module: ApkModule, pkg: com.reandroid.arsc.chunk.PackageBlock): AndroidManifestBlock {
+        val manifest = AndroidManifestBlock()
         manifest.setPackageBlock(pkg)
         manifest.setApkFile(module)
         val xml = """
@@ -57,9 +86,7 @@ class ToolboxApkMergerTest {
                 android:minSdkVersion="21"
                 android:targetSdkVersion="30">
                 <application android:label="GameApp">
-                    <activity android:name="com.target.game.MainActivity" android:exported="true"${
-                        gameActivityTheme?.let { " android:theme=\"$it\"" } ?: ""
-                    }>
+                    <activity android:name="com.target.game.MainActivity" android:exported="true">
                         <intent-filter>
                             <action android:name="android.intent.action.MAIN" />
                             <category android:name="android.intent.category.LAUNCHER" />
@@ -71,14 +98,38 @@ class ToolboxApkMergerTest {
         val parser = KXmlParser()
         parser.setInput(StringReader(xml))
         manifest.parse(parser)
-        module.setManifest(manifest)
+        // 兜底：若上游行为变化又冒出占位根元素，直接剔掉，保证 <manifest> 是唯一顶层元素
+        manifest.removeElementsIf { it.name != "manifest" }
+        check(manifest.documentElement.name == "manifest") {
+            "目标 manifest 根元素应为 <manifest>，实际 <${manifest.documentElement.name}>"
+        }
+        return manifest
+    }
 
-        // 目标只保留 1 个 dex：用源首个 dex 的副本并改写末字节，使其与源 dex 内容可区分
-        module.listDexFiles().forEach { module.removeInputSource(it.name) }
-        val targetDex = sourceDexFirst.copyOf()
-            .apply { this[lastIndex] = (this[lastIndex].toInt() xor 0xFF).toByte() }
-        module.add(ByteInputSource(targetDex, "classes.dex"))
-        module.writeApk(out)
+    /**
+     * 给已写出的目标 APK 的游戏 MainActivity 补一条 `android:theme` 资源引用。
+     *
+     * 为什么不在上面的 XML 文本里写 `android:theme="@android:style/xxx"`：
+     *  1. `@android:` 框架引用在未 `addExternalFramework` 时解析不出资源 id，属性会被静默丢弃；
+     *  2. `AndroidManifestBlock.parse()` 之后的内存树用 `getActivities()`（XMLPath 查询）查不到任何元素，
+     *     必须先落盘再重新加载才可查询。
+     * 所以改成「写出 → 重新加载 → 按资源 id 直接写属性 → 回写」，与生产代码操作真实 APK 的路径一致。
+     */
+    private fun injectGameActivityTheme(apk: File, themeId: Int) {
+        val module = ApkModule.loadApkFile(apk)
+        val act = module.androidManifest.getActivities(true).asSequence()
+            .firstOrNull { it.attrValue("name")?.endsWith("MainActivity") == true }
+            ?: error("目标 APK 内找不到 MainActivity，无法注入 theme")
+        val attr = act.newAttribute()
+        // 不用 encodeAttributeName：它需要注册 android framework 才能把 android:theme 解析成 0x01010000
+        attr.setNamespace("http://schemas.android.com/apk/res/android", "android")
+        attr.setName("theme", 0x01010000)
+        attr.setValueAsResourceId(themeId)
+
+        val tmp = File(apk.parentFile, apk.name + ".tmp")
+        module.writeApk(tmp)
+        module.close()
+        check(apk.delete() && tmp.renameTo(apk)) { "回写目标 APK 失败：${apk.absolutePath}" }
     }
 
     private fun ResXmlElement.attrValue(localName: String): String? {
@@ -255,7 +306,7 @@ class ToolboxApkMergerTest {
     /**
      * 回归测试：沉浸式主题开关在**更新模式**下必须双向生效。
      *
-     * 场景：游戏 MainActivity 原本带 `android:theme="@android:style/Theme.NoTitleBar.Fullscreen"`。
+     * 场景：游戏 MainActivity 原本带一条指向 android 框架包（0x01）的 `android:theme` 引用。
      *  1. 首次集成 useImmersiveTheme=true  → 主题被换成工具箱 0x66 主题，且描述文件记录原主题 id
      *  2. 更新模式 useImmersiveTheme=false → 主题必须**还原**为原来的 @android 主题
      *
@@ -270,10 +321,9 @@ class ToolboxApkMergerTest {
         val work = File(moduleDir, "build/tmp/integrator-test")
         work.mkdirs()
         val target = File(work, "target_theme.apk")
-        buildTargetApk(target, srcDexFirst, gameActivityTheme = "@android:style/Theme.NoTitleBar.Fullscreen")
+        buildTargetApk(target, srcDexFirst, gameActivityThemeId = ANDROID_FRAMEWORK_STYLE_ID)
 
         // 目标原主题 id（用于最终比对）
-        println("[DEBUG target manifest]\n" + ApkModule.loadApkFile(target).androidManifest.serializeToXml())
         val originalThemeId = ApkModule.loadApkFile(target).androidManifest
             .gameActivityThemeAttr()!!.getData()
         assertTrue(originalThemeId ushr 24 == 0x01,
@@ -284,9 +334,18 @@ class ToolboxApkMergerTest {
         ToolboxApkMerger.apply(src, target, DexStrategy.INSERT_BEFORE, on, useImmersiveTheme = true)
 
         val onModule = ApkModule.loadApkFile(on)
+        // 游戏 Activity 上不能出现两条 android:theme（ARSCLib 的 removeAttributesWithName 只删无 id 的属性，
+        // 曾导致新旧主题并存、系统取第一条 → 沉浸式主题看起来没生效）
+        assertEquals(1, onModule.androidManifest.gameActivityThemeAttrs().size,
+            "游戏 Activity 只能有一条 android:theme 属性")
         val onTheme = onModule.androidManifest.gameActivityThemeAttr()
-        assertTrue(onTheme != null && (onTheme.getData() ushr 24) == 0x66,
-            "开启后游戏 Activity 主题应指向工具箱 0x66 包，实际 ${onTheme?.getData()?.let { "0x%08x".format(it) }}")
+        // 判据用「与工具箱启动 Activity 同一个主题」而不是硬编码 0x66：
+        // 本测试的目标包是工具箱包的克隆（同名资源），@pkg:style 会解析到 0x7F 上。
+        val toolboxTheme = onModule.androidManifest.activityThemeAttr(OUR_LAUNCH_ACTIVITY)?.getData()
+        assertTrue(onTheme != null && toolboxTheme != null && onTheme.getData() == toolboxTheme,
+            "开启后游戏 Activity 主题应等于工具箱沉浸式主题 " +
+                "${toolboxTheme?.let { "0x%08x".format(it) }}，实际 ${onTheme?.getData()?.let { "0x%08x".format(it) }}")
+        assertTrue(onTheme.getData() != originalThemeId, "开启后主题不应还是游戏原主题")
         val onInfo = onModule.integratorInfo()
         assertEquals("0x%08x".format(originalThemeId), onInfo["originalGameTheme"],
             "描述文件应记录游戏原主题 id，供关闭时还原")
@@ -302,33 +361,94 @@ class ToolboxApkMergerTest {
             insertMode = DexStrategy.INSERT_BEFORE, useImmersiveTheme = false
         )
 
-        val offTheme = ApkModule.loadApkFile(off).androidManifest.gameActivityThemeAttr()
+        val offModule = ApkModule.loadApkFile(off)
+        assertEquals(1, offModule.androidManifest.gameActivityThemeAttrs().size,
+            "还原后游戏 Activity 只能有一条 android:theme 属性")
+        val offTheme = offModule.androidManifest.gameActivityThemeAttr()
         assertTrue(offTheme != null, "关闭后游戏 Activity 应还原出 theme 属性（原本就有）")
-        assertEquals(originalThemeId, offTheme!!.getData(),
+        assertEquals(originalThemeId, offTheme.getData(),
             "关闭后应还原为游戏原主题 0x%08x，实际 0x%08x".format(originalThemeId, offTheme.getData()))
 
         println("[IMMERSIVE THEME toggle] OK -> ${off.absolutePath}")
     }
 
-    /** 取游戏 MainActivity 上的 android:theme 属性（找不到返回 null） */
-    private fun AndroidManifestBlock.gameActivityThemeAttr(): ResXmlAttribute? {
-        val it = getActivities(true).iterator()
-        while (it.hasNext()) {
-            val act = it.next()
-            if (act.attrValue("name") != "com.target.game.MainActivity") continue
-            val ait = act.getAttributes()
-            while (ait.hasNext()) {
-                val a = ait.next()
-                if (a.getName() == "theme") return a
-            }
-            return null
-        }
-        return null
+    /**
+     * 回归测试：游戏主 Activity **原本没有** `android:theme` 时，开启沉浸式主题开关仍应注入工具箱主题。
+     *
+     * 对应需求「无论 Activity 是否有自己的主题都替换成我们的」的「无自带主题」分支：
+     *  1. 首次集成 useImmersiveTheme=true  → 即便 Activity 原本无 theme，也加一条指向工具箱 Theme.DreamPvzApp
+     *  2. 更新模式 useImmersiveTheme=false → 把注入的主题移除，回到「无 theme」的原状
+     */
+    @Test
+    fun `开启沉浸式主题即使游戏Activity无自带主题也注入工具箱主题`() {
+        val src = requireSource()
+        val srcDexFirst = readDex(ApkModule.loadApkFile(src), 0)
+
+        val work = File(moduleDir, "build/tmp/integrator-test")
+        work.mkdirs()
+        // 注意：不传 gameActivityThemeId → 目标 MainActivity 不带任何 android:theme
+        val target = File(work, "target_theme_none.apk")
+        buildTargetApk(target, srcDexFirst) // gameActivityThemeId 默认 null
+
+        // 前置：目标 Activity 确实无 theme
+        val preModule = ApkModule.loadApkFile(target)
+        assertEquals(0, preModule.androidManifest.gameActivityThemeAttrs().size,
+            "用例前提：目标 MainActivity 应无 android:theme")
+
+        // ---- 第 1 步：开启沉浸式主题 ----
+        val on = File(work, "out_theme_none_on.apk")
+        ToolboxApkMerger.apply(src, target, DexStrategy.INSERT_BEFORE, on, useImmersiveTheme = true)
+
+        val onModule = ApkModule.loadApkFile(on)
+        assertEquals(1, onModule.androidManifest.gameActivityThemeAttrs().size,
+            "无自带主题时开启开关，应注入且只注入一条 android:theme")
+        val onTheme = onModule.androidManifest.gameActivityThemeAttr()
+        val toolboxTheme = onModule.androidManifest.activityThemeAttr(OUR_LAUNCH_ACTIVITY)?.getData()
+        assertTrue(onTheme != null && toolboxTheme != null && onTheme.getData() == toolboxTheme,
+            "注入的主题应等于工具箱沉浸式主题")
+        // 无原主题 → 描述文件 originalGameTheme 应为空，供关闭时恢复成「无 theme」
+        assertEquals("", onModule.integratorInfo()["originalGameTheme"],
+            "无原主题时 originalGameTheme 应为空串")
+        assertEquals("com.target.game.MainActivity", onModule.integratorInfo()["gameActivity"])
+
+        // ---- 第 2 步：更新模式关闭沉浸式主题 → 回到「无 theme」 ----
+        val off = File(work, "out_theme_none_off.apk")
+        val srcDexCount = ApkModule.loadApkFile(src).listDexFiles().size
+        ToolboxApkMerger.apply(
+            src, on, DexStrategy.INSERT_BEFORE, off,
+            updateMode = true, dexStart = 0, dexEnd = srcDexCount - 1,
+            insertMode = DexStrategy.INSERT_BEFORE, useImmersiveTheme = false
+        )
+        val offModule = ApkModule.loadApkFile(off)
+        assertEquals(0, offModule.androidManifest.gameActivityThemeAttrs().size,
+            "关闭后应移除注入的主题，恢复「无 android:theme」原状")
+
+        println("[IMMERSIVE THEME no-pretheme] OK -> ${off.absolutePath}")
     }
+
+    /** 工具箱注入的启动 Activity 全限定名（其主题即 Theme.DreamPvzApp） */
+    private val OUR_LAUNCH_ACTIVITY = "io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity"
+
+    /** 取指定 Activity 上全部 android:theme 属性（用于检测重复注入） */
+    private fun AndroidManifestBlock.activityThemeAttrs(activityName: String): List<ResXmlAttribute> {
+        val act = getActivities(true).asSequence()
+            .firstOrNull { it.attrValue("name") == activityName } ?: return emptyList()
+        return act.getAttributes().asSequence().filter { it.getName() == "theme" }.toList()
+    }
+
+    private fun AndroidManifestBlock.activityThemeAttr(activityName: String): ResXmlAttribute? =
+        activityThemeAttrs(activityName).firstOrNull()
+
+    private fun AndroidManifestBlock.gameActivityThemeAttrs(): List<ResXmlAttribute> =
+        activityThemeAttrs("com.target.game.MainActivity")
+
+    /** 取游戏 MainActivity 上的 android:theme 属性（找不到返回 null） */
+    private fun AndroidManifestBlock.gameActivityThemeAttr(): ResXmlAttribute? =
+        gameActivityThemeAttrs().firstOrNull()
 
     /** 读取产物 APK 内的集成描述文件为 key→value */
     private fun ApkModule.integratorInfo(): Map<String, String> =
-        getInputSource("assets/pvz2tool/integrator_info.txt")!!.openStream().readBytes()
+        getInputSource("assets/pvz2tool/integrator_info.txt").openStream().readBytes()
             .toString(Charsets.UTF_8).lineSequence()
             .mapNotNull { line ->
                 val i = line.indexOf('=')
@@ -342,31 +462,7 @@ class ToolboxApkMergerTest {
         pkg.setId(0x7F)
         pkg.setName("com.target.game")
 
-        val manifest = AndroidManifestBlock.empty()
-        manifest.setPackageBlock(pkg)
-        manifest.setApkFile(module)
-        val xml = """
-            <?xml version="1.0" encoding="utf-8"?>
-            <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-                package="com.target.game"
-                android:versionCode="1"
-                android:versionName="1.0"
-                android:minSdkVersion="21"
-                android:targetSdkVersion="30">
-                <application android:label="GameApp">
-                    <activity android:name="com.target.game.MainActivity" android:exported="true">
-                        <intent-filter>
-                            <action android:name="android.intent.action.MAIN" />
-                            <category android:name="android.intent.category.LAUNCHER" />
-                        </intent-filter>
-                    </activity>
-                </application>
-            </manifest>
-        """.trimIndent()
-        val parser = KXmlParser()
-        parser.setInput(StringReader(xml))
-        manifest.parse(parser)
-        module.setManifest(manifest)
+        module.setManifest(newGameManifest(module, pkg))
 
         module.listDexFiles().forEach { module.removeInputSource(it.name) }
         for (i in 0 until dexCount) {
