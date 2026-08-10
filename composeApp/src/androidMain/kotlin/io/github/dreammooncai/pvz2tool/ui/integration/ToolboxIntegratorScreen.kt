@@ -1188,6 +1188,7 @@ fun ToolboxIntegratorScreen(
     // 全局基础资源包路径（onEnterGame 解压的通用资源目录，SMF/资源设置页可编辑，需与打包资源路径一致）
     var baseAssetPath by remember { mutableStateOf(defaults.baseAssetPath.ifBlank { "version/base/smf" }) }
     var simplifiedLaunch by remember { mutableStateOf(false) }
+    var useImmersiveTheme by remember { mutableStateOf(true) }
     // CG 设定（简易模式=根属性，非简易=ui.assets）
     var cgVideoPath by remember { mutableStateOf("opening.mp4") }
     var cgVideoPoster by remember { mutableStateOf("bg_main.jpg") }
@@ -1623,6 +1624,7 @@ fun ToolboxIntegratorScreen(
                             updInsertMode = if (di.insertMode == "after") DexStrategy.APPEND else DexStrategy.INSERT_BEFORE
                             includeExamples = di.includeExamples
                             simplifiedLaunch = di.simplifiedLaunch
+                            useImmersiveTheme = di.useImmersiveTheme
                         } ?: run {
                             // 无描述文件：扫描目标 APK 第一个 >20MB 的 DEX 序号作为默认值
                             val idx = findLargeDexIndex(out)
@@ -1905,7 +1907,8 @@ fun ToolboxIntegratorScreen(
                         sourceApk, t, dexStrategy, extraAssets, extraRes, excludedSmfAssets, removedTargetEntries,
                         version = sourceVersion, updateMode = isUpdateMode, dexStart = effStart, dexEnd = effEnd,
                         overrideDreamYml = previewYml, preserveTargetResEntries = preserveTargetRes,
-                        preserveTargetAssets = isUpdateMode, appendUnreferenced = !isUpdateMode || appendUnreferencedAssets
+                        preserveTargetAssets = isUpdateMode, appendUnreferenced = !isUpdateMode || appendUnreferencedAssets,
+                        useImmersiveTheme = useImmersiveTheme
                     )
                 }
             }
@@ -1983,7 +1986,8 @@ fun ToolboxIntegratorScreen(
                         preserveTargetResEntries = preserveTargetRes,
                         simplifiedLaunch = simplifiedLaunch,
                         preserveTargetAssets = isUpdateMode,
-                        appendUnreferenced = !isUpdateMode || appendUnreferencedAssets)
+                        appendUnreferenced = !isUpdateMode || appendUnreferencedAssets,
+                        useImmersiveTheme = useImmersiveTheme)
                 }
             }
             res.onFailure { errorMsg = "合并失败：${it.message}"; it.printStackTrace() }
@@ -2989,8 +2993,10 @@ fun ToolboxIntegratorScreen(
                                     2 -> StepTargetRight(
                                         simplifiedLaunch = simplifiedLaunch,
                                         includeExamples = includeExamples,
+                                        useImmersiveTheme = useImmersiveTheme,
                                         onSimplifiedLaunch = { simplifiedLaunch = it; if (it) includeExamples = false },
                                         onIncludeExamples = { includeExamples = it; if (!it) sections = sections.filter { s -> !s.id.startsWith("example_") } },
+                                        onUseImmersiveTheme = { useImmersiveTheme = it },
                                         onOpenUiSettings = { showUiSettings = true },
                                         onOpenAnnouncementSettings = { showAnnouncementSettings = true },
                                         onOpenFloatingWindowSettings = { showFloatingWindowSettings = true },
@@ -3414,8 +3420,10 @@ private fun StepTargetLeft(
 private fun StepTargetRight(
     simplifiedLaunch: Boolean,
     includeExamples: Boolean,
+    useImmersiveTheme: Boolean,
     onSimplifiedLaunch: (Boolean) -> Unit,
     onIncludeExamples: (Boolean) -> Unit,
+    onUseImmersiveTheme: (Boolean) -> Unit,
     onOpenUiSettings: () -> Unit,
     onOpenAnnouncementSettings: () -> Unit,
     onOpenFloatingWindowSettings: () -> Unit,
@@ -3435,6 +3443,12 @@ private fun StepTargetRight(
             PvzBodyText("开启后跳过完整主界面，只解压基础资源后直接进入游戏。")
             Spacer(Modifier.height(6.dp))
             PvzCheckRow("启用简易模式", simplifiedLaunch) { onSimplifiedLaunch(!simplifiedLaunch) }
+        }
+        // 游戏 Activity 沉浸式主题开关
+        PvzInfoCard("游戏 Activity 沉浸式主题") {
+            PvzBodyText("开启后把游戏主 Activity 的 android:theme 设为工具箱沉浸式主题（@io.github.dreammooncai.pvz2tool:style/Theme.DreamPvzApp），进入游戏即全屏沉浸。")
+            Spacer(Modifier.height(6.dp))
+            PvzCheckRow("游戏Activity使用工具箱沉浸式主题", useImmersiveTheme) { onUseImmersiveTheme(!useImmersiveTheme) }
         }
     }
 

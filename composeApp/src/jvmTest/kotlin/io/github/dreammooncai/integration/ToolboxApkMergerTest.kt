@@ -198,4 +198,100 @@ class ToolboxApkMergerTest {
         println("[APPEND] OK -> ${out.absolutePath}")
     }
 
+    /**
+     * 回归测试：更新模式删除「旧工具箱 DEX 区间」时，必须按数字序号排序，
+     * 不能按字典序。否则 classes10.dex 会排在 classes2.dex 前面，
+     * 导致删除窗口错位（误删尾部 classes10/11/12、保留前中部 classes3/4/5）。
+     *
+     * 复现用户现场：目标含 12 个 DEX，更新时删除前 5 个（索引 0..4），
+     * 正确结果应为保留 classes6..classes12（数字序），且 classes10/11/12 不得被误删。
+     */
+    @Test
+    fun `apply 更新模式按数字序删除DEX区间而非字典序`() {
+        val src = requireSource()
+        val srcModule = ApkModule.loadApkFile(src)
+        val srcDexCount = srcModule.listDexFiles().size
+        val srcDexFirst = readDex(srcModule, 0)
+
+        val work = File(moduleDir, "build/tmp/integrator-test")
+        work.mkdirs()
+        val target = File(work, "target_multidex.apk")
+        // 造一个含 12 个 DEX 的目标：每个 DEX 末尾附近写入唯一标记字节，便于事后识别。
+        // 标记值 = DEX 数字序号（classes.dex->1, classes2.dex->2, ... classes12.dex->12）。
+        buildTargetApkWithDexes(target, srcDexFirst, 12)
+
+        val out = File(work, "out_update_multidex.apk")
+        val result = ToolboxApkMerger.apply(
+            src, target, DexStrategy.INSERT_BEFORE, out,
+            updateMode = true, dexStart = 0, dexEnd = 4, insertMode = DexStrategy.INSERT_BEFORE
+        )
+
+        val reloaded = ApkModule.loadApkFile(result.outputApk)
+        val allDex = reloaded.listDexFiles()
+        // 总数 = 源 DEX 数 + 剩余目标 DEX 数(12-5=7)
+        assertEquals(srcDexCount + 7, allDex.size, "应合并为 ${srcDexCount + 7} 个 dex")
+
+        val markerOffset = 2000
+        fun markerOf(index: Int): Int {
+            val b = allDex[index].openStream().readBytes()
+            return b[markerOffset.coerceAtMost(b.lastIndex)].toInt() and 0xFF
+        }
+        // 产物前半是源（工具箱）DEX，后半是残留目标 DEX，按数字序应为标记 6..12
+        val tailMarkers = (srcDexCount until allDex.size).map { markerOf(it) }
+        assertEquals(
+            List(7) { it + 6 }, tailMarkers,
+            "数字序删除后应保留标记 6..12 的目标 DEX；修复前字典序会误删 10/11/12 并保留 3/4/5"
+        )
+        // 关键：classes10/11/12（标记 10/11/12）必须仍存在
+        assertTrue(tailMarkers.containsAll(listOf(10, 11, 12)), "classes10/11/12 不得被字典序误删")
+        // 被删的旧工具箱 DEX（标记 1..5）不得出现在残留目标中
+        assertTrue(tailMarkers.none { it in 1..5 }, "旧工具箱 DEX（标记 1..5）应已被删除")
+
+        println("[UPDATE multidex] OK -> ${out.absolutePath}")
+    }
+
+    private fun buildTargetApkWithDexes(out: File, baseDex: ByteArray, dexCount: Int) {
+        val module = ApkModule.loadApkFile(sourceApk)
+        val table = module.tableBlock
+        val pkg = table.listPackages().first { it.id == 0x66 }
+        pkg.setId(0x7F)
+        pkg.setName("com.target.game")
+
+        val manifest = AndroidManifestBlock.empty()
+        manifest.setPackageBlock(pkg)
+        manifest.setApkFile(module)
+        val xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+                package="com.target.game"
+                android:versionCode="1"
+                android:versionName="1.0"
+                android:minSdkVersion="21"
+                android:targetSdkVersion="30">
+                <application android:label="GameApp">
+                    <activity android:name="com.target.game.MainActivity" android:exported="true">
+                        <intent-filter>
+                            <action android:name="android.intent.action.MAIN" />
+                            <category android:name="android.intent.category.LAUNCHER" />
+                        </intent-filter>
+                    </activity>
+                </application>
+            </manifest>
+        """.trimIndent()
+        val parser = KXmlParser()
+        parser.setInput(StringReader(xml))
+        manifest.parse(parser)
+        module.setManifest(manifest)
+
+        module.listDexFiles().forEach { module.removeInputSource(it.name) }
+        for (i in 0 until dexCount) {
+            val copy = baseDex.copyOf()
+            val off = 2000.coerceAtMost(copy.lastIndex)
+            copy[off] = (i + 1).toByte()
+            val name = if (i == 0) "classes.dex" else "classes${i + 1}.dex"
+            module.add(ByteInputSource(copy, name))
+        }
+        module.writeApk(out)
+    }
+
 }

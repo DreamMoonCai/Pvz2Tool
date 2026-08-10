@@ -64,7 +64,9 @@ object ToolboxApkMerger {
         val dexEnd: Int,
         val insertMode: String,   // "before" | "after"
         val includeExamples: Boolean = true,
-        val simplifiedLaunch: Boolean = false
+        val simplifiedLaunch: Boolean = false,
+        /** 是否把游戏主 Activity 的主题设为工具箱沉浸式主题（@OUR_PKG_NAME:style/Theme.DreamPvzApp） */
+        val useImmersiveTheme: Boolean = true
     )
 
     /** 从目标 APK 读取集成描述文件（无则返回 null）。 */
@@ -87,7 +89,8 @@ object ToolboxApkMerger {
         val insertMode = map["insertMode"] ?: "before"
         val includeExamples = map["includeExamples"]?.toBooleanStrictOrNull() ?: true
         val simplifiedLaunch = map["simplifiedLaunch"]?.toBooleanStrictOrNull() ?: false
-        return IntegratorInfo(version, dexStart, dexEnd, insertMode, includeExamples, simplifiedLaunch)
+        val useImmersiveTheme = map["useImmersiveTheme"]?.toBooleanStrictOrNull() ?: false
+        return IntegratorInfo(version, dexStart, dexEnd, insertMode, includeExamples, simplifiedLaunch, useImmersiveTheme)
     }
 
     data class IntegrateReport(
@@ -193,14 +196,17 @@ object ToolboxApkMerger {
         /** 保留目标已有 assets/pvz2tool 文件 */
         preserveTargetAssets: Boolean = false,
         /** 附加目标未包含的源文件 */
-        appendUnreferenced: Boolean = true
+        appendUnreferenced: Boolean = true,
+        /** 是否把游戏主 Activity 的主题设为工具箱沉浸式主题 */
+        useImmersiveTheme: Boolean = false
     ): IntegrateReport {
         val source = ApkModule.loadApkFile(sourceApk)
         val target = ApkModule.loadApkFile(targetApk)
         return try {
             computeReport(source, target, dexStrategy, sourceApk.name, targetApk.name, extraResources, extraResResources, excludedSmfAssets, removedTargetEntries,
                 updateMode, dexStart, dexEnd, overrideDreamYml = overrideDreamYml,
-                preserveTargetAssets = preserveTargetAssets, appendUnreferenced = appendUnreferenced)
+                preserveTargetAssets = preserveTargetAssets, appendUnreferenced = appendUnreferenced,
+                useImmersiveTheme = useImmersiveTheme)
         } finally {
             source.close()
             target.close()
@@ -238,15 +244,19 @@ object ToolboxApkMerger {
         /** 简易模式开关（写入描述文件，供下次更新识别） */
         simplifiedLaunch: Boolean = false,
         preserveTargetAssets: Boolean = false,
-        appendUnreferenced: Boolean = true
+        appendUnreferenced: Boolean = true,
+        /** 是否把游戏主 Activity 的主题设为工具箱沉浸式主题 */
+        useImmersiveTheme: Boolean = false
     ): MergeResult {
         val source = ApkModule.loadApkFile(sourceApk)
         val target = ApkModule.loadApkFile(targetApk)
         val report: IntegrateReport
         source.use { source ->
-            report = computeReport(source, target, dexStrategy, sourceApk.name, targetApk.name, extraResources, extraResResources, excludedSmfAssets, removedTargetEntries, overrideDreamYml = overrideDreamYml)
+            report = computeReport(source, target, dexStrategy, sourceApk.name, targetApk.name, extraResources, extraResResources, excludedSmfAssets, removedTargetEntries, overrideDreamYml = overrideDreamYml,
+                useImmersiveTheme = useImmersiveTheme)
             doMerge(source, target, dexStrategy, report.targetPackage, includeExamples, overrideDreamYml, extraResources, extraResResources, excludedSmfAssets, removedTargetEntries,
-                version, updateMode, dexStart, dexEnd, insertMode, simplifiedLaunch = simplifiedLaunch, preserveTargetAssets = preserveTargetAssets, appendUnreferenced = appendUnreferenced)
+                version, updateMode, dexStart, dexEnd, insertMode, simplifiedLaunch = simplifiedLaunch, preserveTargetAssets = preserveTargetAssets, appendUnreferenced = appendUnreferenced,
+                useImmersiveTheme = useImmersiveTheme)
         }
         target.use {
             outApk.parentFile?.mkdirs()
@@ -274,7 +284,9 @@ object ToolboxApkMerger {
         /** 实际写入的 dream.yml 文本（向导生成的完整配置）；为空则回退为源 APK 的 dream.yml。用于报告差异统计 */
         overrideDreamYml: String? = null,
         preserveTargetAssets: Boolean = false,
-        appendUnreferenced: Boolean = true
+        appendUnreferenced: Boolean = true,
+        /** 是否把游戏主 Activity 的主题设为工具箱沉浸式主题（仅影响报告说明，实际改动在 doMerge） */
+        useImmersiveTheme: Boolean = false
     ): IntegrateReport {
         val srcDex = source.listDexFiles().size
         val tgtDex = target.listDexFiles().size
@@ -325,6 +337,7 @@ object ToolboxApkMerger {
             val ts = target.androidManifest.targetSdkVersion
             if (ts == null || ts < 21) add("targetSdkVersion 调整至 21（当前 ${ts ?: "未设置"}）")
             else add("targetSdkVersion 保持 $ts（已 ≥21）")
+            if (useImmersiveTheme) add("游戏主 Activity 主题设为工具箱沉浸式主题（@$OUR_PKG_NAME:style/Theme.DreamPvzApp）")
         }
         val arscAfter = (target.tableBlock.listPackages() + source.tableBlock.listPackages())
             .distinctBy { it.id }
@@ -527,7 +540,9 @@ object ToolboxApkMerger {
                   /** 简易模式开关（写入描述文件，供下次更新识别） */
                   simplifiedLaunch: Boolean = false,
                   preserveTargetAssets: Boolean = false,
-                  appendUnreferenced: Boolean = true) {
+                  appendUnreferenced: Boolean = true,
+                  /** 是否把游戏主 Activity 的主题设为工具箱沉浸式主题 */
+                  useImmersiveTheme: Boolean = false) {
         // 1. 「选择后删除」：先移除目标 APK 中被用户勾选的原始条目。
         //    放在所有注入之前 —— 若某条目既被勾选删除又被重新注入，则以注入为准（用户明确选择的资源保留）。
         //    受保护条目（manifest/arsc/dex/res/META-INF/assets/pvz2tool）在此静默跳过，UI 侧也已拦截。
@@ -546,6 +561,9 @@ object ToolboxApkMerger {
         // 更新模式：先清除旧版工具箱的 manifest 条目（避免重复/冲突）
         if (updateMode) removePreviousToolboxEntries(tm, targetPackage)
         appendLauncherBlock(tm, source, target, targetPackage)
+        // 可选：把游戏主 Activity 的主题设为工具箱沉浸式主题（需在 appendLauncherBlock 之后，
+        // 此时 0x66 资源表已 merge 且 addExternalFramework 已登记，@package:style 引用才能正确编码）。
+        if (useImmersiveTheme) applyGameActivityTheme(tm, target, targetPackage)
         // appendLauncherBlock 在原地修改 tm（目标原本的 manifest 对象，根元素 <manifest> 不变），
         // 因此 targetSdkVersion 直接作用在 tm 上；最后 setManifest 固化（覆盖 getter 可能返回副本的情况）。
         val ts = tm.targetSdkVersion
@@ -613,6 +631,7 @@ object ToolboxApkMerger {
             appendLine("insertMode=$infoInsert")
             appendLine("includeExamples=$includeExamples")
             appendLine("simplifiedLaunch=$simplifiedLaunch")
+            appendLine("useImmersiveTheme=$useImmersiveTheme")
         }
         target.removeInputSource("assets/pvz2tool/integrator_info.txt")
         target.add(ByteInputSource(infoText.toByteArray(Charsets.UTF_8), "assets/pvz2tool/integrator_info.txt"))
@@ -631,8 +650,8 @@ object ToolboxApkMerger {
         target: ApkModule,
         dexStrategy: DexStrategy
     ): Pair<Int, Int> {
-        val srcDex = source.listDexFiles().sortedBy { it.name }
-        val tgtDex = target.listDexFiles().sortedBy { it.name }
+        val srcDex = source.listDexFiles().sortedBy { dexFileIndex(it.name) }
+        val tgtDex = target.listDexFiles().sortedBy { dexFileIndex(it.name) }
         val ordered = if (dexStrategy == DexStrategy.INSERT_BEFORE) srcDex + tgtDex else tgtDex + srcDex
         target.listDexFiles().forEach { target.removeInputSource(it.name) }
 
@@ -657,8 +676,8 @@ object ToolboxApkMerger {
         dexEnd: Int,
         insertMode: DexStrategy
     ): Pair<Int, Int> {
-        val srcDex = source.listDexFiles().sortedBy { it.name }
-        val tgtDex = target.listDexFiles().sortedBy { it.name }
+        val srcDex = source.listDexFiles().sortedBy { dexFileIndex(it.name) }
+        val tgtDex = target.listDexFiles().sortedBy { dexFileIndex(it.name) }
         val count = tgtDex.size
         if (count == 0) {
             return renumberDex(source, target, insertMode)
@@ -668,7 +687,7 @@ object ToolboxApkMerger {
         // 1. 删除旧版工具箱 DEX 区间
         tgtDex.filterIndexed { i, _ -> i in start..end }.forEach { target.removeInputSource(it.name) }
         // 2. 顺序重排剩余目标 DEX
-        val remaining = target.listDexFiles().sortedBy { it.name }
+        val remaining = target.listDexFiles().sortedBy { dexFileIndex(it.name) }
         val ordered = if (insertMode == DexStrategy.INSERT_BEFORE) srcDex + remaining else remaining + srcDex
         target.listDexFiles().forEach { target.removeInputSource(it.name) }
         // 3. 重新编号写入
@@ -686,6 +705,14 @@ object ToolboxApkMerger {
 
     private fun dexName(index: Int): String =
         if (index == 0) "classes.dex" else "classes${index + 1}.dex"
+
+    /** DEX 文件按数字序号排序（而非字典序，否则 classes10.dex 会排在 classes2.dex 前面）。
+     *  classes.dex -> 1, classes2.dex -> 2, classes10.dex -> 10；无法解析的排到最后。 */
+    private fun dexFileIndex(name: String): Int {
+        val num = name.removePrefix("classes").removeSuffix(".dex")
+        if (num.isEmpty()) return 1 // classes.dex（无数字后缀）排在最前
+        return num.toIntOrNull() ?: Int.MAX_VALUE
+    }
 
     // ---- manifest ----
 
@@ -890,6 +917,40 @@ object ToolboxApkMerger {
             name.startsWith(".") -> targetPackage + name
             '.' !in name -> "$targetPackage.$name"
             else -> name
+        }
+    }
+
+    /**
+     * 可选：把游戏主 Activity 的 `android:theme` 设为工具箱沉浸式主题，
+     * 让进入游戏时复用工具箱的全屏沉浸样式（与 launcher 块的 Pvz2InitializeActivity 同源）。
+     *
+     * 通过 ARSCLib 的 [ResXmlAttribute.encode] 写入——与 [appendLauncherBlock] 解析注入块底层
+     * 用的是同一套机制，能正确把 `@package:style/Theme.DreamPvzApp` 编码成资源引用。
+     * 调用方需保证此时 0x66 资源表已 merge 且已 addExternalFramework（即在本函数之前调过 appendLauncherBlock）。
+     *
+     * 幂等：更新模式下重复调用只会覆盖同名 theme 属性，不会重复追加。
+     */
+    private fun applyGameActivityTheme(tm: AndroidManifestBlock, target: ApkModule, targetPackage: String) {
+        val gameAct = findGameActivity(target, targetPackage)
+        if (gameAct.isEmpty()) return
+        val activities = tm.getActivities(true)
+        val it: Iterator<ResXmlElement> = activities.iterator()
+        while (it.hasNext()) {
+            val act = it.next()
+            val name = act.attr("name") ?: continue
+            if (sanitizeActivityName(name, targetPackage) == gameAct) {
+                // 先移除已有 theme（无论是否我们写入），再写入沉浸式主题，保证幂等
+                act.removeAttributesWithName("theme")
+                val attr: ResXmlAttribute = act.newAttribute()
+                attr.encode(
+                    "http://schemas.android.com/apk/res/android",
+                    "android",
+                    "theme",
+                    "@$OUR_PKG_NAME:style/Theme.DreamPvzApp",
+                    false
+                )
+                return
+            }
         }
     }
 
