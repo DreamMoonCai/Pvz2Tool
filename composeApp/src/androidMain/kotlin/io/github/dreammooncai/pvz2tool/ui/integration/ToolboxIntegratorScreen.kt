@@ -144,6 +144,19 @@ private val PvzBorderBrown = Color(0xFFAA9A5F)  // 卡片描边棕
 private val PvzCreamCard = Color(0xFFF0ECD0)    // 奶油卡片底
 private val PvzCream = Color(0xFFFCF9E8)        // 奶油面
 
+// 主题枚举值 → 中文显示名（单选标签用「友好文字（键）」格式）
+private val THEME_DISPLAY = mapOf(
+    "BROWN" to "棕色",
+    "BLUE" to "蓝色",
+    "GREEN" to "绿色",
+    "RED" to "红色",
+    "PURPLE" to "紫色",
+    "ORANGE" to "橙色",
+    "TEAL" to "青色",
+    "GOLD" to "金色",
+    "GRAY" to "灰色"
+)
+
 // 列表中单条 item 的奶油色圆角卡片容器（统一边框/内边距），替代散落的重复布局
 @Composable
 private fun PvzItemCard(
@@ -4970,7 +4983,7 @@ private fun AnnouncementSettingsContent(
                                 onUpdate(announcements.toMutableList().also { it[i] = it[i].copy(title = v) })
                             }
                             Spacer(Modifier.height(4.dp))
-                            IntegratorInputField(a.content, "支持 {{red:}} 等复合颜色文本", multiline = true, label = "公告 #${i + 1} 内容") { v ->
+                            IntegratorInputField(a.content, "支持复合颜色文本", multiline = true, label = "公告 #${i + 1} 内容") { v ->
                                 onUpdate(announcements.toMutableList().also { it[i] = it[i].copy(content = v) })
                             }
                         }
@@ -5516,8 +5529,8 @@ private fun VersionSettingsContent(
                     PvzCheckRow("默认展开版本面板 (isExpandedVersions)", isExpandedVersions) { onIsExpandedVersions(!isExpandedVersions) }
                     Spacer(Modifier.height(6.dp))
                     Text("版本面板主题色 (versionsTheme):", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5D4E37))
-                    listOf("BROWN", "BLUE", "GREEN", "RED", "PURPLE", "ORANGE", "TEAL", "GOLD", "GRAY").forEach { theme ->
-                        PvzChoiceRow(theme, versionsTheme == theme) { onVersionsTheme(theme) }
+                    THEME_DISPLAY.forEach { (value, name) ->
+                        PvzChoiceRow("$name（$value）", versionsTheme == value) { onVersionsTheme(value) }
                     }
                 }
             }
@@ -5562,9 +5575,9 @@ private fun SectionSettingsContent(
                             }
                             Spacer(Modifier.height(4.dp))
                             Text("栏目面板主题色 (theme):", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5D4E37))
-                            listOf("BROWN", "BLUE", "GREEN", "RED", "PURPLE", "ORANGE", "TEAL", "GOLD", "GRAY").forEach { theme ->
-                                PvzChoiceRow(theme, s.theme == theme) {
-                                    onUpdate(sections.toMutableList().also { it[i] = it[i].copy(theme = theme) })
+                            THEME_DISPLAY.forEach { (value, name) ->
+                                PvzChoiceRow("$name（$value）", s.theme == value) {
+                                    onUpdate(sections.toMutableList().also { it[i] = it[i].copy(theme = value) })
                                 }
                             }
                             Spacer(Modifier.height(4.dp))
@@ -5700,7 +5713,7 @@ private fun ItemSettingsContent(
                             }
                             Spacer(Modifier.height(6.dp))
                             // 通用字段
-                            IntegratorInputField(item.name, "name（支持 {{red:}} 复合文本）", fieldKey = "name") { v ->
+                            IntegratorInputField(item.name, "功能名称", fieldKey = "name") { v ->
                                 onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(name = v) }))
                             }
                             Spacer(Modifier.height(4.dp))
