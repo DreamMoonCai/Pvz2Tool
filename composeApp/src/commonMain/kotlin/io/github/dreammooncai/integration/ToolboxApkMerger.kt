@@ -1047,10 +1047,21 @@ object ToolboxApkMerger {
                 else -> "" // 原本无 theme，或是非引用型（内联值），还原时按「删除属性」处理
             }
             element.removeThemeAttribute()
-            element.newAttribute().encode(
-                ANDROID_RES_URI, "android", "theme",
-                "@$OUR_PKG_NAME:style/Theme.DreamPvzApp", false
-            )
+            // 🔴 编码 @OUR_PKG_NAME:style/Theme.DreamPvzApp 时，getPackageBlock() 返回的
+            // context 包可能在「主表+外部框架」两处 0x66 资源间产生不一致解析。
+            // 作为兜底，直接从 appendLauncherBlock 刚注入的 Pvz2InitializeActivity 读取其
+            // 已正确编码的主题资源 id 回写——绕过 encode() 的二次解析，确保与工具箱启动 Activity 一致。
+            val ourThemeId = resolveOurThemeId(tm)
+            if (ourThemeId != null) {
+                val attr = element.newAttribute()
+                attr.encodeAttributeName(ANDROID_RES_URI, "android", "theme")
+                attr.setValueAsResourceId(ourThemeId)
+            } else {
+                element.newAttribute().encode(
+                    ANDROID_RES_URI, "android", "theme",
+                    "@$OUR_PKG_NAME:style/Theme.DreamPvzApp", false
+                )
+            }
             return original
         }
 
@@ -1243,6 +1254,27 @@ object ToolboxApkMerger {
         while (it.hasNext()) {
             val a = it.next()
             if (a.getName() == localName) return a
+        }
+        return null
+    }
+
+    /**
+     * 从 manifest 中定位工具箱 Pvz2InitializeActivity 的 `android:theme` 资源 id。
+     * [appendLauncherBlock] 刚通过 [ResXmlElement.parse] 将 LAUNCHER_BLOCK_XML 注入，
+     * Pvz2InitializeActivity 的 theme 已经在 parse 期由 ARSCLib 正确编码为当前 0x66 包
+     * 的 Theme.DreamPvzApp 资源 id。直接复用这个 id 比在 applyGameActivityTheme 里重新
+     * 调 [ResXmlAttribute.encode] 再解析一次更可靠（避免 context package 在主表/外部框架
+     * 之间解析不一致）。
+     */
+    private fun resolveOurThemeId(tm: AndroidManifestBlock): Int? {
+        val it: Iterator<ResXmlElement> = tm.getActivities(true).iterator()
+        while (it.hasNext()) {
+            val act = it.next()
+            if (act.attr("name") == "io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity") {
+                val theme = act.attribute("theme") ?: return null
+                if (theme.valueType == ValueType.REFERENCE) return theme.data
+                return null
+            }
         }
         return null
     }
