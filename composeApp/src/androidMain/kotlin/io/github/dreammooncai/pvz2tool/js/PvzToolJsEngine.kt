@@ -118,6 +118,7 @@ object PvzToolJsEngine {
         )
 
         val job = JSFunction(
+            name = "root",
             isAsync = true,
             body = Expression { rt ->
                 // 注入工具上下文（path, rton, rsb, ptx 等）
