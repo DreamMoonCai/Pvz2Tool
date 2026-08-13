@@ -535,12 +535,6 @@ val jsContent = section.readJs(version)
     android:configChanges="density|keyboardHidden|layoutDirection|navigation|orientation|screenLayout|screenSize|smallestScreenSize"
     android:windowSoftInputMode="stateAlwaysHidden">
     <intent-filter>
-        <action android:name="android.intent.action.VIEW" />
-        <data android:scheme="com.sexyactioncool.bejeweledblitz" />
-        <category android:name="android.intent.category.DEFAULT" />
-        <category android:name="android.intent.category.BROWSABLE" />
-    </intent-filter>
-    <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
     </intent-filter>

@@ -109,6 +109,23 @@ class ToolboxApkMergerRealTargetTest {
         }
         assertTrue(bad66.isEmpty(), "以下 0x66 引用在产物中不存在：$bad66")
 
+        // 2c-2. 沉浸式主题：游戏主 Activity（带 bejeweledblitz scheme）的主题应等于工具箱启动 Activity 主题。
+        // 这是用户报告「游戏 Activity 主题改不掉」的直接断言。
+        val gameAct = reloaded.androidManifest.getActivities(true).asSequence().firstOrNull { act ->
+            act.getElements().asSequence().any { f ->
+                f.name == "intent-filter" && f.getElements().asSequence().any { d ->
+                    d.name == "data" && d.refOrString("scheme", table).contains("bejeweledblitz", ignoreCase = true)
+                }
+            }
+        }
+        val gameTheme = gameAct?.getAttributeTheme(table)
+        val toolboxTheme = reloaded.androidManifest.getActivities(true).asSequence()
+            .firstOrNull { it.androidName(table) == "io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity" }
+            ?.getAttributeTheme(table)
+        println("[真实目标] 游戏Activity主题=0x%08X, 工具箱启动Activity主题=0x%08X".format(gameTheme ?: 0, toolboxTheme ?: 0))
+        assertTrue(gameTheme != null && toolboxTheme != null && gameTheme == toolboxTheme,
+            "游戏主 Activity 主题应等于工具箱沉浸式主题（0x%08X），实际 0x%08X".format(toolboxTheme ?: 0, gameTheme ?: 0))
+
         // 3. targetSdkVersion >= 21
         val ts = reloaded.androidManifest.targetSdkVersion ?: 0
         assertTrue(ts >= 21, "targetSdkVersion 应 >= 21，当前 $ts")
@@ -132,9 +149,76 @@ class ToolboxApkMergerRealTargetTest {
         println("  arsc 合并后包：${result.report.arscTargetPackagesAfter}")
         println("  👉 请用 MT 管理器对该 APK 签名后安装。")
     }
+
+    /**
+     * 真实目标「更新模式」沉浸式主题跟随验证（用户报告「游戏 Activity 主题改不掉」的权威复现）。
+     *
+     * 真实目标若已含 integrator_info.txt（即已是合并产物），按更新模式重合并：
+     *   - 读取旧 dex 区间作为 dexStart/dexEnd
+     *   - updateMode=true, useImmersiveTheme=true
+     * 否则按首次集成（useImmersiveTheme=true）。
+     * 断言：游戏主 Activity（带 bejeweledblitz scheme）的主题 == 工具箱启动 Activity 主题。
+     */
+    @Test
+    fun `真实目标更新模式沉浸式主题跟随新工具箱`() {
+        if (!sourceApk.exists()) { println("跳过：源 APK 不存在 ${sourceApk.absolutePath}"); return }
+        if (!targetApk.exists()) { println("跳过：目标 APK 不存在 ${targetApk.absolutePath}"); return }
+
+        val prev = ToolboxApkMerger.detectIntegratorInfo(targetApk)
+        println("[真实目标-更新] prevInfo=$prev")
+        val srcDexCount = ApkModule.loadApkFile(sourceApk).listDexFiles().size
+        val out = File(moduleDir, "build/integrator-out/${targetApk.nameWithoutExtension}_update_pvz2tool.apk")
+
+        if (prev != null) {
+            ToolboxApkMerger.apply(
+                sourceApk, targetApk, DexStrategy.INSERT_BEFORE, out,
+                updateMode = true, dexStart = prev.dexStart, dexEnd = prev.dexEnd,
+                insertMode = DexStrategy.INSERT_BEFORE, useImmersiveTheme = true
+            )
+        } else {
+            ToolboxApkMerger.apply(sourceApk, targetApk, DexStrategy.INSERT_BEFORE, out, useImmersiveTheme = true)
+        }
+
+        val reloaded = ApkModule.loadApkFile(out)
+        val table = reloaded.tableBlock
+        // 复用与 findGameActivity 一致的「跳过工具箱自身 Activity」逻辑，避免命中旧版合并残留的、
+        // 同样带 bejeweledblitz scheme 的 Pvz2InitializeActivity（否则会误把工具箱 Activity 当游戏主 Activity）。
+        val toolboxNames = setOf(
+            "io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity",
+            "io.github.dreammooncai.pvz2tool.RestartPhoenixActivity"
+        )
+        val gameAct = reloaded.androidManifest.getActivities(true).asSequence().firstOrNull { act ->
+            val n = act.androidName(table)
+            n !in toolboxNames && act.getElements().asSequence().any { f ->
+                f.name == "intent-filter" && f.getElements().asSequence().any { d ->
+                    d.name == "data" && d.refOrString("scheme", table).contains("bejeweledblitz", ignoreCase = true)
+                }
+            }
+        }
+        val gameTheme = gameAct?.getAttributeTheme(table)
+        // 取【最后一个】Pvz2InitializeActivity 的主题：appendLauncherBlock 在 <application> 末尾追加，
+        // 新注入的启动 Activity 才是本次合并写入的正确 0x66 资源 id；若目标 APK 已是旧版合并产物
+        // （旧 Pvz2InitializeActivity 仍带 bejeweledblitz 排在前），取第一个会命中旧 id 导致「假绿」。
+        val toolboxTheme = reloaded.androidManifest.getActivities(true).asSequence()
+            .filter { it.androidName(table) == "io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity" }
+            .lastOrNull()
+            ?.getAttributeTheme(table)
+        println("[真实目标-更新] 游戏Activity主题=0x%08X, 工具箱启动Activity主题(末)=0x%08X".format(gameTheme ?: 0, toolboxTheme ?: 0))
+        assertEquals(toolboxTheme, gameTheme,
+            "更新模式后游戏主 Activity 主题应等于工具箱沉浸式主题（0x%08X），实际 0x%08X".format(toolboxTheme ?: 0, gameTheme ?: 0))
+    }
 }
 
 // ---- 测试辅助 ----
+
+private fun ResXmlElement.getAttributeTheme(table: TableBlock): Int? {
+    val it: Iterator<ResXmlAttribute> = getAttributes()
+    while (it.hasNext()) {
+        val a = it.next()
+        if (a.getName() == "theme" && a.getValueType() == ValueType.REFERENCE) return a.getData()
+    }
+    return null
+}
 
 private val ResXmlElement.name: String get() = getName() ?: ""
 

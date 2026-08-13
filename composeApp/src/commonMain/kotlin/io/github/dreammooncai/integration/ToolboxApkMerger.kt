@@ -923,10 +923,15 @@ object ToolboxApkMerger {
         val tm = target.androidManifest
 
         // 优先级 1：查找含 data scheme="com.sexyactioncool.bejeweledblitz" 的 Activity
+        // 🔴 必须跳过工具箱自身 Activity：旧版合并产物里被注入的 Pvz2InitializeActivity 也可能带
+        // 这个 scheme（历史块里曾把它写成深链 Activity），它通常排在游戏主 Activity 之前，
+        // 不排它就会把「游戏主 Activity」误判成工具箱自身 → 沉浸式主题打到错误的 Activity 上。
         val activities = tm.getActivities(true)
         val it1: Iterator<ResXmlElement> = activities.iterator()
         while (it1.hasNext()) {
             val act = it1.next()
+            val actName = act.attr("name")?.let { sanitizeActivityName(it, targetPackage) }
+            if (actName != null && actName in OUR_ACTIVITY_NAMES) continue
             val children: Iterator<ResXmlElement> = act.getElements().iterator()
             while (children.hasNext()) {
                 val child = children.next()
@@ -1032,7 +1037,6 @@ object ToolboxApkMerger {
             }
         }
         val element = act ?: return recordedOriginal
-
         val current = element.attribute("theme")
         // 是不是工具箱注入的：描述文件的记录优先，0x66 包 id 作为无记录时的兜底启发式
         val currentIsOurs = current != null &&
@@ -1267,16 +1271,20 @@ object ToolboxApkMerger {
      * 之间解析不一致）。
      */
     private fun resolveOurThemeId(tm: AndroidManifestBlock): Int? {
+        // 返回【最后一个】Pvz2InitializeActivity 的主题 id：appendLauncherBlock 总是在 <application>
+        // 末尾追加新注入的启动 Activity，所以末尾那个才是本次合并写入的正确 0x66 资源 id；
+        // 若目标 APK 是「上次合并的产物」且本次走了首合并不清理旧条目（或清理前就定位），
+        // 旧的 Pvz2InitializeActivity 可能仍排在前面（甚至也带了 bejeweledblitz scheme），取最后一个避开它。
+        var result: Int? = null
         val it: Iterator<ResXmlElement> = tm.getActivities(true).iterator()
         while (it.hasNext()) {
             val act = it.next()
             if (act.attr("name") == "io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity") {
-                val theme = act.attribute("theme") ?: return null
-                if (theme.valueType == ValueType.REFERENCE) return theme.data
-                return null
+                val theme = act.attribute("theme") ?: continue
+                if (theme.valueType == ValueType.REFERENCE) result = theme.data
             }
         }
-        return null
+        return result
     }
 
     // ---- 启动器组件块（README 4.2，游戏包名占位符 %PKG%，资源引用用 @app66: 全限定） ----

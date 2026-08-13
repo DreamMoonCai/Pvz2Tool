@@ -499,6 +499,273 @@ class ToolboxApkMergerTest {
         println("[UPDATE no-dup] OK -> ${out2.absolutePath}")
     }
 
+    /**
+     * 回归测试：游戏主 Activity 位于【子包】（Activity 全限定名与 APK package 不同，
+     * 如真实游戏 com.popcap.pvz2mgtz 的 com.popcap.pvz2cmhd.SexyAppActivity）时，
+     * 开启沉浸式主题开关仍应正确把该游戏 Activity 的主题替换为工具箱主题。
+     *
+     * 此前所有用例都用同包 Activity（com.target.game.MainActivity），从未覆盖「子包 Activity 名」，
+     * 而这是真实游戏 APK 的常态结构，正是用户报告「游戏 Activity 主题改不掉」的高风险路径。
+     */
+    @Test
+    fun `开启沉浸式主题对子包游戏Activity也生效`() {
+        val src = requireSource()
+        val srcDexFirst = readDex(ApkModule.loadApkFile(src), 0)
+
+        val work = File(moduleDir, "build/tmp/integrator-test")
+        work.mkdirs()
+        val target = File(work, "target_subpkg.apk")
+        buildSubPackageTarget(target, srcDexFirst, ANDROID_FRAMEWORK_STYLE_ID)
+
+        // 前置：游戏 Activity 当前是框架主题（模拟游戏原主题）
+        val preModule = ApkModule.loadApkFile(target)
+        val originalThemeId = preModule.androidManifest
+            .activityThemeAttr("com.popcap.pvz2cmhd.SexyAppActivity")?.getData()
+            ?: error("前置：子包游戏 Activity 应有框架主题")
+        assertTrue((originalThemeId ushr 24) and 0xFF == 0x01,
+            "前置：原主题应属框架包 0x01，实际 0x%08x".format(originalThemeId))
+
+        // 开启沉浸式主题（首次集成）
+        val on = File(work, "out_subpkg_on.apk")
+        ToolboxApkMerger.apply(src, target, DexStrategy.INSERT_BEFORE, on, useImmersiveTheme = true)
+
+        val onModule = ApkModule.loadApkFile(on)
+        val onTheme = onModule.androidManifest.activityThemeAttr("com.popcap.pvz2cmhd.SexyAppActivity")
+        val toolboxTheme = onModule.androidManifest.activityThemeAttr(OUR_LAUNCH_ACTIVITY)?.getData()
+        assertTrue(onTheme != null && toolboxTheme != null && onTheme.getData() == toolboxTheme,
+            "子包游戏 Activity 主题应等于工具箱沉浸式主题 " +
+                "${toolboxTheme?.let { "0x%08x".format(it) }}，实际 ${onTheme?.getData()?.let { "0x%08x".format(it) }}")
+        assertTrue(onTheme.getData() != originalThemeId, "开启后主题不应还是游戏原主题")
+
+        println("[IMMERSIVE THEME subpkg] OK -> ${on.absolutePath}")
+    }
+
+    /**
+     * 复现用户真实 bug：目标 APK 是「上次合并的产物」，其 manifest 里已经有一个
+     * Pvz2InitializeActivity（工具箱启动 Activity），且它**也携带了 bejeweledblitz 深链 scheme**，
+     * 并且排位在真正的游戏主 Activity 之前。
+     *
+     * 这种情况下 findGameActivity 的「优先级1：首个带 bejeweledblitz scheme 的 Activity」会命中
+     * 工具箱自己的 Pvz2InitializeActivity，把「游戏主 Activity」误判成工具箱自身 → 沉浸式主题
+     * 打到错误的 Activity 上，真正的游戏主 Activity 主题纹丝不动。
+     *
+     * 修复后：优先级1 必须跳过工具箱自身 Activity（OUR_ACTIVITY_NAMES），才能正确命中游戏主 Activity。
+     * 本用例断言：合并后【游戏主 Activity】的主题确实变成了工具箱沉浸式主题（0x66 包引用），
+     * 且等于新注入的 Pvz2InitializeActivity 主题。
+     */
+    @Test
+    fun `沉浸式主题在工具箱Activity也带bejeweledblitz时只作用于游戏Activity`() {
+        val src = requireSource()
+        val srcDexFirst = readDex(ApkModule.loadApkFile(src), 0)
+
+        val work = File(moduleDir, "build/tmp/integrator-test")
+        work.mkdirs()
+        val target = File(work, "target_stale_merged.apk")
+        buildStaleMergedTarget(target, srcDexFirst, ANDROID_FRAMEWORK_STYLE_ID)
+
+        // 前置：游戏主 Activity 当前是框架主题（模拟游戏原主题）
+        val preModule = ApkModule.loadApkFile(target)
+        val originalThemeId = preModule.androidManifest
+            .activityThemeAttr("com.popcap.pvz2cmhd.SexyAppActivity")?.getData()
+            ?: error("前置：游戏主 Activity 应有框架主题")
+
+        // 首合并不清理旧条目（复刻用户「对已是合并产物的 APK 再次合并」的场景）
+        val on = File(work, "out_stale_merged_on.apk")
+        ToolboxApkMerger.apply(src, target, DexStrategy.INSERT_BEFORE, on, useImmersiveTheme = true)
+
+        val onModule = ApkModule.loadApkFile(on)
+        // 关键断言：游戏主 Activity 必须被换成工具箱沉浸式主题，而非保持原框架主题。
+        // 注：本用例的 target 是由源 APK 改名（0x66→0x7f）构造的，其 0x7f 包也含 Theme.DreamPvzApp，
+        // 解析 @OUR_PKG_NAME:style/Theme.DreamPvzApp 时会被「当前包 0x7f」抢先命中，得到 0x7f11012f；
+        // 真实游戏 APK 的 0x7f 包不含该资源，会正确落到工具箱 0x66 包（见真实目标测试 0x6611012f）。
+        // 所以这里只校验「确被换成沉浸式主题（引用型且≠原框架主题）」+「与工具箱启动 Activity 主题一致」。
+        val gameTheme = onModule.androidManifest.activityThemeAttr("com.popcap.pvz2cmhd.SexyAppActivity")
+            ?: error("合并后游戏主 Activity 应带 theme")
+        val gameThemeId = gameTheme.getData()
+        assertTrue((gameThemeId ushr 24) and 0xFF != 0x01,
+            "游戏主 Activity 主题不应还是框架包 0x01，实际 0x%08x".format(gameThemeId))
+        assertTrue(gameThemeId != originalThemeId,
+            "合并后游戏主 Activity 主题不应还是游戏原主题 0x%08x".format(originalThemeId))
+
+        // 且应等于新注入的（末尾那个）Pvz2InitializeActivity 主题
+        val newToolboxTheme = onModule.androidManifest.lastPvz2InitializeActivityTheme()
+            ?: error("应存在新注入的 Pvz2InitializeActivity")
+        assertEquals(newToolboxTheme, gameThemeId,
+            "游戏主 Activity 主题应等于工具箱启动 Activity 主题")
+    }
+
+    /** 造一份「已是合并产物」的 target：manifest 里工具箱 Pvz2InitializeActivity（带 bejeweledblitz）排在游戏 Activity 之前 */
+    private fun buildStaleMergedTarget(out: File, sourceDexFirst: ByteArray, gameActivityThemeId: Int) {
+        val module = ApkModule.loadApkFile(sourceApk)
+        val table = module.tableBlock
+        val pkg = table.listPackages().first { it.id == 0x66 }
+        pkg.setId(0x7F)
+        pkg.setName("com.popcap.pvz2mgtz")
+        module.setManifest(newStaleMergedManifest(module))
+        module.listDexFiles().forEach { module.removeInputSource(it.name) }
+        val targetDex = sourceDexFirst.copyOf()
+            .apply { this[lastIndex] = (this[lastIndex].toInt() xor 0xFF).toByte() }
+        module.add(ByteInputSource(targetDex, "classes.dex"))
+        module.writeApk(out)
+        injectGameActivityThemeByName(out, gameActivityThemeId, "com.popcap.pvz2cmhd.SexyAppActivity")
+    }
+
+    /** 同 newSubPackageManifest，但额外在游戏 Activity 之前加入一个「带 bejeweledblitz scheme 的工具箱 Pvz2InitializeActivity」，模拟已是合并产物的 APK */
+    private fun newStaleMergedManifest(module: ApkModule): AndroidManifestBlock {
+        val manifest = AndroidManifestBlock()
+        manifest.setPackageBlock(module.tableBlock.listPackages().first { it.id == 0x7F })
+        manifest.setApkFile(module)
+        val xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+                package="com.popcap.pvz2mgtz"
+                android:versionCode="1"
+                android:versionName="1.0"
+                android:minSdkVersion="21"
+                android:targetSdkVersion="30">
+                <application android:label="GameApp">
+                    <activity android:name="io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity" android:exported="true">
+                        <intent-filter>
+                            <action android:name="android.intent.action.VIEW" />
+                            <data android:scheme="com.sexyactioncool.bejeweledblitz" />
+                            <category android:name="android.intent.category.DEFAULT" />
+                            <category android:name="android.intent.category.BROWSABLE" />
+                        </intent-filter>
+                    </activity>
+                    <activity android:name="com.popcap.pvz2cmhd.SexyAppActivity" android:exported="true">
+                        <intent-filter>
+                            <action android:name="android.intent.action.MAIN" />
+                            <category android:name="android.intent.category.LAUNCHER" />
+                        </intent-filter>
+                        <intent-filter>
+                            <action android:name="android.intent.action.VIEW" />
+                            <data android:scheme="com.sexyactioncool.bejeweledblitz" />
+                            <category android:name="android.intent.category.DEFAULT" />
+                            <category android:name="android.intent.category.BROWSABLE" />
+                        </intent-filter>
+                    </activity>
+                </application>
+            </manifest>
+        """.trimIndent()
+        val parser = KXmlParser()
+        parser.setInput(StringReader(xml))
+        manifest.parse(parser)
+        manifest.removeElementsIf { it.name != "manifest" }
+        check(manifest.documentElement.name == "manifest") {
+            "stale-merged 目标 manifest 根元素应为 <manifest>，实际 <${manifest.documentElement.name}>"
+        }
+        return manifest
+    }
+
+    /** 取【最后一个】Pvz2InitializeActivity 的 theme id（appendLauncherBlock 追加在末尾，即本次新注入的那个） */
+    private fun AndroidManifestBlock.lastPvz2InitializeActivityTheme(): Int? {
+        var result: Int? = null
+        getActivities(true).asSequence().forEach { act ->
+            if (act.attrValue("name") == OUR_LAUNCH_ACTIVITY) {
+                act.getAttributes().asSequence()
+                    .firstOrNull { it.getName() == "theme" }
+                    ?.let { result = it.getData() }
+            }
+        }
+        return result
+    }
+
+    /** 造一份「子包游戏」target：APK 包名 com.popcap.pvz2mgtz，游戏 Activity 在子包 com.popcap.pvz2cmhd 下 */
+    private fun buildSubPackageTarget(out: File, sourceDexFirst: ByteArray, gameActivityThemeId: Int) {
+        val module = ApkModule.loadApkFile(sourceApk)
+        val table = module.tableBlock
+        val pkg = table.listPackages().first { it.id == 0x66 }
+        pkg.setId(0x7F)
+        pkg.setName("com.popcap.pvz2mgtz")
+        module.setManifest(newSubPackageManifest(module))
+        module.listDexFiles().forEach { module.removeInputSource(it.name) }
+        val targetDex = sourceDexFirst.copyOf()
+            .apply { this[lastIndex] = (this[lastIndex].toInt() xor 0xFF).toByte() }
+        module.add(ByteInputSource(targetDex, "classes.dex"))
+        module.writeApk(out)
+        injectGameActivityThemeByName(out, gameActivityThemeId, "com.popcap.pvz2cmhd.SexyAppActivity")
+    }
+
+    /** 与 newGameManifest 同款，但游戏 Activity 用子包全限定名 + bejeweledblitz scheme，模拟真实游戏 */
+    private fun newSubPackageManifest(module: ApkModule): AndroidManifestBlock {
+        val manifest = AndroidManifestBlock()
+        manifest.setPackageBlock(module.tableBlock.listPackages().first { it.id == 0x7F })
+        manifest.setApkFile(module)
+        val xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+                package="com.popcap.pvz2mgtz"
+                android:versionCode="1"
+                android:versionName="1.0"
+                android:minSdkVersion="21"
+                android:targetSdkVersion="30">
+                <application android:label="GameApp">
+                    <activity android:name="com.popcap.pvz2cmhd.SexyAppActivity" android:exported="true">
+                        <intent-filter>
+                            <action android:name="android.intent.action.MAIN" />
+                            <category android:name="android.intent.category.LAUNCHER" />
+                        </intent-filter>
+                        <intent-filter>
+                            <action android:name="android.intent.action.VIEW" />
+                            <data android:scheme="com.sexyactioncool.bejeweledblitz" />
+                            <category android:name="android.intent.category.DEFAULT" />
+                            <category android:name="android.intent.category.BROWSABLE" />
+                        </intent-filter>
+                    </activity>
+                </application>
+            </manifest>
+        """.trimIndent()
+        val parser = KXmlParser()
+        parser.setInput(StringReader(xml))
+        manifest.parse(parser)
+        manifest.removeElementsIf { it.name != "manifest" }
+        check(manifest.documentElement.name == "manifest") {
+            "子包目标 manifest 根元素应为 <manifest>，实际 <${manifest.documentElement.name}>"
+        }
+        return manifest
+    }
+
+    private fun injectGameActivityThemeByName(apk: File, themeId: Int, activityName: String) {
+        val module = ApkModule.loadApkFile(apk)
+        val act = module.androidManifest.getActivities(true).asSequence()
+            .firstOrNull { it.attrValue("name") == activityName }
+            ?: error("目标 APK 内找不到 $activityName，无法注入 theme")
+        val attr = act.newAttribute()
+        attr.setNamespace("http://schemas.android.com/apk/res/android", "android")
+        attr.setName("theme", 0x01010000)
+        attr.setValueAsResourceId(themeId)
+        val tmp = File(apk.parentFile, apk.name + ".tmp")
+        module.writeApk(tmp)
+        module.close()
+        check(apk.delete() && tmp.renameTo(apk)) { "回写目标 APK 失败：${apk.absolutePath}" }
+    }
+
+    /**
+     * 仅本地复现的诊断：加载真实游戏 APK，列出所有带 bejeweledblitz scheme 的 Activity，
+     * 复刻 findGameActivity 优先级1（首个带该 scheme 的 Activity）会命中的是哪个。
+     * 若命中者不是真正的游戏主 Activity，则沉浸式主题会被打到错误 Activity 上。
+     */
+    @Test
+    fun `诊断真实APK游戏Activity定位`() {
+        val realApk = File("/Users/macbookpro/Downloads/植物大战僵尸2迷宫拓展版.apk")
+        if (!realApk.exists()) return  // 仅本地复现，CI 跳过
+        val module = ApkModule.loadApkFile(realApk)
+        val tm = module.androidManifest
+        val schemeActs = tm.getActivities(true).asSequence().filter { act ->
+            act.getElements().asSequence().any { f ->
+                f.name == "intent-filter" && f.getElements().asSequence().any { d ->
+                    d.name == "data" && d.attrValue("scheme") == "com.sexyactioncool.bejeweledblitz"
+                }
+            }
+        }.mapNotNull { it.attrValue("name") }.toList()
+        println("[DIAG] 带 bejeweledblitz scheme 的 Activity 列表: $schemeActs")
+        println("[DIAG] findGameActivity 优先级1 会命中: ${schemeActs.firstOrNull()}")
+        // 真正的游戏主 Activity 主题
+        val real = tm.activityThemeAttr("com.popcap.pvz2cmhd.SexyAppActivity")?.getData()
+        val init = tm.activityThemeAttr(OUR_LAUNCH_ACTIVITY)?.getData()
+        println("[DIAG] SexyAppActivity theme=0x%08x, Pvz2InitializeActivity theme=0x%08x".format(real ?: 0, init ?: 0))
+    }
+
     /** 工具箱注入的启动 Activity 全限定名（其主题即 Theme.DreamPvzApp） */
     private val OUR_LAUNCH_ACTIVITY = "io.github.dreammooncai.pvz2tool.Pvz2InitializeActivity"
 
