@@ -2541,6 +2541,7 @@ private fun DraggableChoiceCell(
     stepPx: Float,
     modifier: Modifier = Modifier,
     onStep: (Int) -> Boolean,
+    onDragStart: () -> Unit = {},
     onDragEnd: () -> Unit,
     content: @Composable () -> Unit
 ) {
@@ -2566,6 +2567,7 @@ private fun DraggableChoiceCell(
                         onDragStart = {
                             acc = 0f
                             dragging = true
+                            onDragStart()
                         },
                         onDragEnd = {
                             dragging = false
@@ -2621,6 +2623,11 @@ private fun FoldedChoicesRow(
     var order by remember(state) { mutableStateOf(all.map { it.first }) }
     // 同时只展开一行的「更多」（多行各展开一个会互相挤）
     var expandedGroup by remember(state) { mutableStateOf(-1) }
+    // 🔴 拖动期间冻结「分组」：否则格子一挪进 limit 之后就被塞进胶囊、当场消失。
+    //    冻结后组内顺序仍实时变化（其它格子让位），松手再按新顺序重新分组。
+    var frozenGroups by remember(state) { mutableStateOf<List<List<Int>>?>(null) }
+    val groups = frozenGroups?.map { g -> g.sortedBy { order.indexOf(it) } }
+        ?: order.chunked(groupSize)
 
     var cellPx by remember { mutableIntStateOf(0) }
     // 每行胶囊的内容区宽各自一份（共用会被另一行覆盖 → 格子宽算错、最后一个露一半）
@@ -2649,7 +2656,7 @@ private fun FoldedChoicesRow(
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        order.chunked(groupSize).forEachIndexed { groupIdx, groupIds ->
+        groups.forEachIndexed { groupIdx, groupIds ->
             val headIds = groupIds.take(limit)
             val tailIds = groupIds.drop(limit)
             val expanded = expandedGroup == groupIdx
@@ -2679,7 +2686,11 @@ private fun FoldedChoicesRow(
                                 .weight(1f)
                                 .onSizeChanged { if (it.width > 0 && groupIdx == 0) cellPx = it.width },
                             onStep = { step -> moveOrder(id, step) },
-                            onDragEnd = { onOrderChange(order) }
+                            onDragStart = { frozenGroups = order.chunked(groupSize) },
+                            onDragEnd = {
+                                frozenGroups = null
+                                onOrderChange(order)
+                            }
                         ) {
                             GridChoiceCell(
                                 modifier = Modifier.fillMaxWidth(),
@@ -2726,7 +2737,11 @@ private fun FoldedChoicesRow(
                                             .width(tailCellWidth.coerceAtLeast(36.dp))
                                             .animateItem(),
                                         onStep = { step -> moveOrder(id, step) },
-                                        onDragEnd = { onOrderChange(order) }
+                                        onDragStart = { frozenGroups = order.chunked(groupSize) },
+                                        onDragEnd = {
+                                            frozenGroups = null
+                                            onOrderChange(order)
+                                        }
                                     ) {
                                         GridChoiceCell(
                                             modifier = Modifier.fillMaxWidth(),
