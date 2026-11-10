@@ -16,6 +16,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -63,6 +64,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -2558,22 +2560,30 @@ private fun ChoiceSearchField(
  * 🔴 手势走 [PointerEventPass.Initial] 并 consume：否则手指往上下（外层竖向滚动）
  * 或往胶囊里（横滚）移动会被抢走，表现为「一移就跟松手了一样」。
  */
+/**
+ * 可拖动的格子外壳（与 `ReorderableItemGrid` 同一套机制：**矩形命中**，不是步进）。
+ *
+ * 长按 → 放大 + 跟手平移；每帧把「被拖格子中心 + 位移」交给 [onDragMove]，
+ * 由上层用所有格子的 `boundsInRoot` 命中目标 → 直接重排，所以能随便跨行、跨「更多」。
+ *
+ * 🔴 位移用每帧 `positionChange()` 累加，且必须在 `consume()` **之前**读（consume 后恒为 0）。
+ *    不要用 `change.position` 绝对值：graphicsLayer 平移会反向改变指针局部坐标，形成正反馈直接飞走。
+ * 🔴 手势走 [PointerEventPass.Initial] 并 consume，否则往上下/往胶囊里移动会被外层滚动抢走。
+ */
 @Composable
 private fun DraggableChoiceCell(
     id: Int,
     reorderable: Boolean,
-    stepPx: Float,
     modifier: Modifier = Modifier,
-    onStep: (Int) -> Boolean,
+    onBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
+    onDragMove: (Offset, androidx.compose.ui.geometry.Rect) -> Unit = { _, _ -> },
     onDragStart: () -> Unit = {},
     onDragEnd: () -> Unit,
     content: @Composable () -> Unit
 ) {
     val offX = remember(id) { Animatable(0f) }
     val offY = remember(id) { Animatable(0f) }
-    // 用**自身**宽度做换位阈值：首行格子与胶囊内格子宽度不同，用全局值会累积漂移
-    var selfWidthPx by remember(id) { mutableIntStateOf(0) }
-    val selfStepPx = if (selfWidthPx > 0) selfWidthPx.toFloat() else stepPx
+    val selfBounds = remember(id) { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
     var dragging by remember(id) { mutableStateOf(false) }
     val dragScope = rememberCoroutineScope()
     val scale by animateFloatAsState(
@@ -2583,7 +2593,11 @@ private fun DraggableChoiceCell(
     )
     Box(
         modifier = modifier
-            .onSizeChanged { if (it.width > 0) selfWidthPx = it.width }
+            .onGloballyPositioned {
+                val b = it.boundsInRoot()
+                selfBounds.value = b
+                onBounds(b)
+            }
             .graphicsLayer {
                 translationX = offX.value
                 translationY = offY.value
@@ -2591,7 +2605,7 @@ private fun DraggableChoiceCell(
                 scaleY = scale
             }
             .then(
-                if (!reorderable) Modifier else Modifier.pointerInput(id, stepPx) {
+                if (!reorderable) Modifier else Modifier.pointerInput(id) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val longPress = awaitLongPressOrCancellation(down.id)
@@ -2603,22 +2617,14 @@ private fun DraggableChoiceCell(
                             val event = awaitPointerEvent(PointerEventPass.Initial)
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             if (!change.pressed) break
-                            // 相对格子的绝对位移（换位后自动补偿，不会漂）
-                            // 🔴 必须在 consume **之前**读 positionChange（consume 后恒为 0）；
-                            //    也不能用 position 绝对值——节点被 graphicsLayer 平移后，
-                            //    指针的局部坐标会随之反向变化，形成正反馈直接「飞出去」。
                             val delta = change.positionChange()
                             change.consume()
                             if (delta.x != 0f || delta.y != 0f) {
-                                dragScope.launch { offX.snapTo(offX.value + delta.x) }
-                                dragScope.launch { offY.snapTo(offY.value + delta.y) }
-                                val step = (offX.value / selfStepPx).toInt()
-                                if (step != 0) {
-                                    if (onStep(step)) {
-                                        // 换位后格子自身移了一个槽位，跟手位移同步扣掉
-                                        dragScope.launch { offX.snapTo(offX.value - step * selfStepPx) }
-                                    }
-                                }
+                                val nx = offX.value + delta.x
+                                val ny = offY.value + delta.y
+                                dragScope.launch { offX.snapTo(nx) }
+                                dragScope.launch { offY.snapTo(ny) }
+                                onDragMove(Offset(nx, ny), selfBounds.value)
                             }
                         }
                         dragging = false
@@ -2666,27 +2672,28 @@ private fun FoldedChoicesRow(
         ?: order.chunked(groupSize)
 
     var cellPx by remember { mutableIntStateOf(0) }
+    var rowHeightPx by remember { mutableIntStateOf(0) }
     // 每行胶囊的内容区宽各自一份（共用会被另一行覆盖 → 格子宽算错、最后一个露一半）
     var contentPxMap by remember { mutableStateOf(emptyMap<Int, Int>()) }
     val tailSpacing = 4.dp
     val stepPx = cellPx.toFloat().coerceAtLeast(1f)
 
-    /** 把某格挪 [step] 个槽位；返回是否真的换了位（换位后跟手位移要扣一个槽位） */
-    val moveOrder: (Int, Int) -> Boolean = { id, step ->
-        val cur = order.indexOf(id)
-        if (cur < 0) {
-            false
-        } else {
-            val target = (cur + step).coerceIn(0, order.lastIndex)
-            if (target == cur) {
-                false
-            } else {
+    // 所有可见格子的根坐标矩形（首屏 + 胶囊内），拖动时用来命中目标（和普通网格同一套）
+    val cellBounds = remember(state) { mutableStateMapOf<Int, androidx.compose.ui.geometry.Rect>() }
+
+    /** 命中重排：被拖格子中心落到谁的矩形里，就插到谁的位置（可任意跨行 / 跨胶囊） */
+    val handleDragMove: (Int, Offset, androidx.compose.ui.geometry.Rect) -> Unit = { id, offset, self ->
+        if (self.width > 0f) {
+            val center = self.center + offset
+            val targetId = cellBounds.entries
+                .firstOrNull { (other, rect) -> other != id && rect.contains(center) }
+                ?.key
+            if (targetId != null && order.indexOf(id) != order.indexOf(targetId)) {
                 order = ItemOrder.move(
                     order.map { it.toString() },
                     id.toString(),
-                    order[target].toString()
+                    targetId.toString()
                 ).mapNotNull { it.toIntOrNull() }
-                true
             }
         }
     }
@@ -2708,7 +2715,9 @@ private fun FoldedChoicesRow(
             )
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onSizeChanged { if (it.height > 0 && groupIdx == 0) rowHeightPx = it.height },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 headIds.forEach { id ->
@@ -2717,11 +2726,11 @@ private fun FoldedChoicesRow(
                         DraggableChoiceCell(
                             id = id,
                             reorderable = state.reorderable,
-                            stepPx = stepPx,
                             modifier = Modifier
                                 .weight(1f)
                                 .onSizeChanged { if (it.width > 0 && groupIdx == 0) cellPx = it.width },
-                            onStep = { step -> moveOrder(id, step) },
+                            onBounds = { cellBounds[id] = it },
+                            onDragMove = { offset, self -> handleDragMove(id, offset, self) },
                             onDragStart = { frozenGroups = order.chunked(groupSize) },
                             onDragEnd = {
                                 frozenGroups = null
@@ -2768,11 +2777,11 @@ private fun FoldedChoicesRow(
                                     DraggableChoiceCell(
                                         id = id,
                                         reorderable = state.reorderable,
-                                        stepPx = stepPx,
-                                        modifier = Modifier
+                                                    modifier = Modifier
                                             .width(tailCellWidth.coerceAtLeast(36.dp))
                                             .animateItem(),
-                                        onStep = { step -> moveOrder(id, step) },
+                                        onBounds = { cellBounds[id] = it },
+                                        onDragMove = { offset, self -> handleDragMove(id, offset, self) },
                                         onDragStart = { frozenGroups = order.chunked(groupSize) },
                                         onDragEnd = {
                                             frozenGroups = null
