@@ -2583,13 +2583,17 @@ private fun DraggableChoiceCell(
                         dragging = true
                         onDragStart()
                         var acc = 0f
+                        // 🔴 用**绝对坐标差**而不是 positionChange()：
+                        //    长按后的 change 已被 consume，positionChange() 会恒为 0（表现为「原地不动」）
+                        var lastX = longPress.position.x
                         while (true) {
                             val event = awaitPointerEvent(PointerEventPass.Initial)
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             if (!change.pressed) break
                             // 关键：Initial 通道消费，外层滚动/胶囊横滚都收不到
                             change.consume()
-                            val dx = change.positionChange().x
+                            val dx = change.position.x - lastX
+                            lastX = change.position.x
                             if (dx != 0f) {
                                 acc += dx
                                 dragScope.launch { offsetX.snapTo(offsetX.value + dx) }
