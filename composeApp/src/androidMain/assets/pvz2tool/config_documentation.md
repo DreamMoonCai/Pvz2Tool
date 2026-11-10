@@ -553,6 +553,31 @@ ui:
   uiVersion:       # UI 版本号
   authorInfo:      # 作者信息
   tutorial:        # 教程内容
+  choiceActions:   # 多选弹窗右上角「全选 / 搜索」等文案
+```
+
+##### 多选弹窗文案（ui.choiceActions）
+
+`ui.multiSelect()` 弹窗右上角的胶囊按钮、搜索框与空结果提示都用这里配置，方便换语言/换措辞：
+
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `selectAll` | `全选` | 有未选项时「全选」胶囊的文字 |
+| `unselectAll` | `取消` | 已全选时同一个胶囊的文字（点击取消全选） |
+| `search` | `搜索` | 「搜索」胶囊文字 |
+| `searchClose` | `关闭` | 搜索框展开后同一位置显示的文字（点击清空并收起） |
+| `searchHint` | `搜索…` | 搜索框占位文字 |
+| `searchEmpty` | `没有匹配的条目` | 过滤后没有结果时的提示 |
+
+```yaml
+ui:
+  choiceActions:
+    selectAll: "全选"
+    unselectAll: "取消"
+    search: "搜索"
+    searchClose: "关闭"
+    searchHint: "搜索…"
+    searchEmpty: "没有匹配的条目"
 ```
 
 **资源路径 URL、绝对路径与占位符支持说明：**

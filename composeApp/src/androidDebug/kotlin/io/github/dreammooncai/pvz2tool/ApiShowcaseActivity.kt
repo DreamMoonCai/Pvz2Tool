@@ -433,7 +433,8 @@ private val DEMO_MORE_CHOICES = DEMO_GRID_CHOICES + listOf(
     JsChoiceItem(name = "解锁商店", value = "shop", icon = "ic_floating_dave.png"),
     JsChoiceItem(name = "无限能量", value = "energy", icon = "auto_collect.png"),
     JsChoiceItem(name = "去广告", value = "noads", icon = "save_icon.png"),
-    JsChoiceItem(name = "全植物满级", value = "maxlevel", icon = "new_version_icon.png")
+    JsChoiceItem(name = "全植物满级", value = "maxlevel", icon = "new_version_icon.png"),
+    JsChoiceItem(name = "无限星币", value = "star", icon = "old_version_icon.png")
 )
 
 /** 演示用按钮 */

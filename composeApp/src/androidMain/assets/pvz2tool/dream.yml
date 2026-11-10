@@ -2977,6 +2977,14 @@ ui:
     showFloatingWindow: "工具悬窗"
     confirmVersion: "选定版本"
 
+  choiceActions: # 多选弹窗右上角「全选 / 搜索」等文案
+    selectAll: "全选"
+    unselectAll: "取消"
+    search: "搜索"
+    searchClose: "关闭"
+    searchHint: "搜索…"
+    searchEmpty: "没有匹配的条目"
+
   extractor:
     dialogTitle:  "戴夫的工具箱 | 资源更新"
     initialLoadingProgressTip: "戴夫正在清点物资清单..."

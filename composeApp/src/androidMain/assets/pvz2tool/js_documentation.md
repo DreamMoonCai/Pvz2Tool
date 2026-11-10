@@ -1999,7 +1999,7 @@ var t = ui.select("难度", ["简单", "普通", "困难"]);
 | `quantity` | boolean \| object | false | 显示数量输入行（`Min − 数值 + Max`；单击步进、长按连续、`Min`/`Max` 直达边界）。传 `true` 用默认范围，传对象可自定义：`{min, max, step, default, suffix}` |
 | `reorderable` | boolean | false | 长按拖动排序（列表拖行尾「≡」，网格拖图标），松手换位并回调 `onReorder` |
 | `orderKey` | string | 标题 | 排序持久化键：同一个 key 下次打开沿用上次顺序；传 `""` 表示不持久化 |
-| `more` | boolean \| object | 无 | 网格「更多」折叠：首行只显示前 `limit` 个，其余收进三段式胶囊，展开后在同一行里横滚显示 |
+| `more` | boolean \| object | 无 | 网格「更多」折叠：**每行**只显示前 `limit` 个，其余收进该行末尾的三段式胶囊，展开后在同一行里横滚显示 |
 
 **返回**：
 - 未开启 `selectAll` / `searchable` / `quantity` 时：`string[]` —— 选中条目的 `value` 数组（未选为空数组，保持旧行为）
@@ -2019,7 +2019,7 @@ var t = ui.select("难度", ["简单", "普通", "困难"]);
 ```javascript
 ui.multiSelect("全部功能", items12, {
     columns: 5,
-    more: { text: "更多", limit: 5, visible: 4 }
+    more: { text: "更多", limit: 5, hidden: 5, visible: 3 }
 });
 ```
 
@@ -2040,8 +2040,8 @@ ui.multiSelect("全部功能", items12, {
 - 展开：`[格子 × limit] [文字 │ 该行剩余格子（横滚） │ ◀]`，
   图标与文字整体缩小（否则文字会被截断），收起后自动放大回原尺寸；
 - 只有第三段（箭头按钮）能收起，点文字段/内容段不收起（内容段里的格子留给自己点）；
-- 首屏与胶囊**共用一条顺序**：长按图标可拖动换位，能跨行、也能在「外面 ↔ 更多里」双向移动，
-  松手后顺序持久化到 `orderKey`，和「一行平铺 N 个」的拖动语义完全一致；
+- ⚠️ 开了 `more` 时**不支持拖动排序**（`reorderable` 会被忽略）：顺序按配置（及 `orderKey` 已存顺序）排列，
+  想做拖动排序请去掉 `more`，改用平铺网格/列表；
 - 某行剩余条目为 0（不足 `limit` 个）时该行不出现胶囊。
 
 **示例**：
