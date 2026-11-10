@@ -2571,6 +2571,9 @@ private fun DraggableChoiceCell(
 ) {
     val offX = remember(id) { Animatable(0f) }
     val offY = remember(id) { Animatable(0f) }
+    // 用**自身**宽度做换位阈值：首行格子与胶囊内格子宽度不同，用全局值会累积漂移
+    var selfWidthPx by remember(id) { mutableIntStateOf(0) }
+    val selfStepPx = if (selfWidthPx > 0) selfWidthPx.toFloat() else stepPx
     var dragging by remember(id) { mutableStateOf(false) }
     val dragScope = rememberCoroutineScope()
     val scale by animateFloatAsState(
@@ -2580,6 +2583,7 @@ private fun DraggableChoiceCell(
     )
     Box(
         modifier = modifier
+            .onSizeChanged { if (it.width > 0) selfWidthPx = it.width }
             .graphicsLayer {
                 translationX = offX.value
                 translationY = offY.value
@@ -2599,15 +2603,22 @@ private fun DraggableChoiceCell(
                             val event = awaitPointerEvent(PointerEventPass.Initial)
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             if (!change.pressed) break
-                            change.consume()
                             // 相对格子的绝对位移（换位后自动补偿，不会漂）
-                            val dx = change.position.x - down.position.x
-                            val dy = change.position.y - down.position.y
-                            dragScope.launch { offX.snapTo(dx) }
-                            dragScope.launch { offY.snapTo(dy) }
-                            val step = (dx / stepPx).toInt()
-                            if (step != 0) {
-                                onStep(step)
+                            // 🔴 必须在 consume **之前**读 positionChange（consume 后恒为 0）；
+                            //    也不能用 position 绝对值——节点被 graphicsLayer 平移后，
+                            //    指针的局部坐标会随之反向变化，形成正反馈直接「飞出去」。
+                            val delta = change.positionChange()
+                            change.consume()
+                            if (delta.x != 0f || delta.y != 0f) {
+                                dragScope.launch { offX.snapTo(offX.value + delta.x) }
+                                dragScope.launch { offY.snapTo(offY.value + delta.y) }
+                                val step = (offX.value / selfStepPx).toInt()
+                                if (step != 0) {
+                                    if (onStep(step)) {
+                                        // 换位后格子自身移了一个槽位，跟手位移同步扣掉
+                                        dragScope.launch { offX.snapTo(offX.value - step * selfStepPx) }
+                                    }
+                                }
                             }
                         }
                         dragging = false
