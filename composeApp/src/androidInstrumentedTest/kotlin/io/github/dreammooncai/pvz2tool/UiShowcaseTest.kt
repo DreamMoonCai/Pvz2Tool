@@ -44,7 +44,7 @@ class UiShowcaseTest {
             instrumentation.runOnMainSync {
                 ApiShowcaseState.tab = 1
                 ApiShowcaseState.step =
-                    "① 多选弹窗：右上角「全选 / 搜索」，下方数量「±」（可手动点按体验）"
+                    "① 多选弹窗：右上角「全选 / 搜索」、数量「±」、长按条目可拖动排序"
             }
             instrumentation.waitForIdleSync()
 
@@ -64,6 +64,7 @@ class UiShowcaseTest {
                         quantityStep = 1,
                         quantityDefault = 3,
                         quantitySuffix = "个",
+                        reorderable = true,
                         forceMaxForm = true
                     ).await()
                 }

@@ -223,7 +223,7 @@ data class DynamicSectionState(
     /** INFO 类型的动态值：itemId -> displayValue（JS 执行结果） */
     val infoValues: Map<String, String> = emptyMap(),
     /** DESCRIPTION 类型的动态值：itemId -> descValue（JS 执行结果） */
-    val descriptionValues: Map<String, String> = emptyMap()
+    val descriptionValues: Map<String, String> = emptyMap(),
 )
 
 // ======================== 3. 通用UI组件 ========================
@@ -1370,7 +1370,7 @@ private fun handleSaveLocalSaveMeta(
 }
 
 @Composable
-private fun DynamicSectionComponent(
+internal fun DynamicSectionComponent(
     section: DynamicSection,
     state: DynamicSectionState,
     onStateChange: (DynamicSectionState) -> Unit,
@@ -1471,651 +1471,15 @@ private fun DynamicSectionComponent(
                     sectionStates = sectionStates,
                     updateSectionState = updateSectionState
                 )) {
-                    when (item.type) {
-                        SectionType.RADIO -> {
-                            val isSelected = state.selectedPresetItemIds[item.groupId] == item.id
-                            val jsExtractor = rememberAssetExtractor(
-                                context = LocalContext.current
-                            )
-
-                            val uiState by jsExtractor.extractor.uiState
-                            PvzExtractorDialog(uiState = uiState,SettingsDialogState.isUseShowNotUpdate, onDismissRequest = { jsExtractor.extractor.dismiss() })
-
-                            RadioButtonItem(
-                                label = item.name,
-                                subLabel = item.desc,
-                                selected = isSelected,
-                                leadingIconPath = item.icon?.let { JsFileResolver.resolvePlaceholders(it) },
-                                theme = theme,
-                                onSelect = {
-                                    val newState = state.copy(
-                                        selectedPresetItemIds = state.selectedPresetItemIds + (item.groupId to item.id)
-                                    )
-
-                                    onStateChange(newState)
-
-                                    val jsScript = item.readJs(section,version)
-                                    if (jsScript != null) {
-                                        JsUiManager.runUserScript(key = "js:${section.id}:${item.id}") {
-                                            PvzToolJsEngine.executeScript(
-                                                extractor = jsExtractor,
-                                                script = jsScript,
-                                                section = section,
-                                                item = item,
-                                                version = version,
-                                                sectionStates = sectionStates,
-                                                updateSectionState = updateSectionState
-                                            )
-                                        }
-                                    }
-                                }
-                            )
-                        }
-
-                        SectionType.CHECKBOX -> {
-                            val isChecked = state.checkedItemIds.contains(item.id)
-                            val jsExtractor = rememberAssetExtractor(
-                                context = LocalContext.current
-                            )
-
-                            val uiState by jsExtractor.extractor.uiState
-                            PvzExtractorDialog(uiState = uiState,SettingsDialogState.isUseShowNotUpdate, onDismissRequest = { jsExtractor.extractor.dismiss() })
-
-                            SectionSwitchItem(
-                                item = item,
-                                checked = isChecked,
-                                theme = theme,
-                                onCheckedChange = { checked ->
-                                    val newIds = if (checked) state.checkedItemIds + item.id else state.checkedItemIds - item.id
-                                    val newState = state.copy(checkedItemIds = newIds)
-
-                                    onStateChange(newState)
-                                    Log.d("CheckboxSave", "功能[${item.name}]状态变更，立即部分保存")
-
-                                    val jsScript = item.readJs(section,version)
-                                    // 如果有 jsScript 或 jsPath，执行 JS 并传入选中状态
-                                    if (jsScript != null) {
-                                        JsUiManager.runUserScript(key = "js:${section.id}:${item.id}") {
-                                            PvzToolJsEngine.executeScript(
-                                                extractor = jsExtractor,
-                                                script = jsScript,
-                                                section = section,
-                                                item = item,
-                                                version = version,
-                                                sectionStates = sectionStates,
-                                                updateSectionState = updateSectionState
-                                            )
-                                        }
-                                    }
-                                },
-                            )
-                        }
-
-                        SectionType.DESCRIPTION -> {
-                            // 读取 JS 脚本
-                            val jsScript = item.readJs(section, version)
-
-                            val currentDescriptionValue = state.descriptionValues[item.id] ?: item.desc.orEmpty().ifEmpty { item.name }
-
-                            // 创建 extractor
-                            val jsExtractor = rememberAssetExtractor(
-                                context = LocalContext.current
-                            )
-
-                            val uiState by jsExtractor.extractor.uiState
-                            PvzExtractorDialog(uiState = uiState, SettingsDialogState.isUseShowNotUpdate, onDismissRequest = { jsExtractor.extractor.dismiss() })
-
-                            // 首次加载或重新加载时执行 JS
-                            LaunchedEffect(item.id, version.id, jsScript) {
-                                if (jsScript != null) {
-                                    PvzToolJsEngine.executeScript(
-                                        extractor = jsExtractor,
-                                        script = jsScript,
-                                        section = section,
-                                        item = item,
-                                        version = version,
-                                        sectionStates = sectionStates,
-                                        updateSectionState = updateSectionState
-                                    )
-                                }
-                            }
-
-                            if (!currentDescriptionValue.isNullOrBlank()) {
-                                // DESCRIPTION 同样支持 maxLines 限高 + 内部滚动（行高 16sp）
-                                val descMaxLines = item.maxLines ?: 0
-                                if (descMaxLines > 0) {
-                                    val descScrollState = rememberScrollState()
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .heightIn(max = (16 * descMaxLines).dp)
-                                            .verticalScroll(descScrollState)
-                                    ) {
-                                        PvzRichText(
-                                            text = currentDescriptionValue,
-                                            fontSize = 12.sp,
-                                            lineHeight = 16.sp,
-                                            defaultStyle = PvzTextStyle(section.theme.secondaryTextColor),
-                                            modifier = Modifier.padding(4.dp)
-                                        )
-                                    }
-                                } else {
-                                    PvzRichText(
-                                        text = currentDescriptionValue,
-                                        fontSize = 12.sp,
-                                        lineHeight = 16.sp,
-                                        defaultStyle = PvzTextStyle(section.theme.secondaryTextColor),
-                                        modifier = Modifier.padding(4.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        SectionType.BUTTON -> {
-                            val buttonScope = rememberCoroutineScope()
-
-                            SectionButtonItem(
-                                item = item,
-                                section = section,
-                                version = version,
-                                sectionStates = sectionStates,
-                                scope = buttonScope,
-                                theme = theme,
-                                updateSectionState = updateSectionState
-                            )
-                        }
-
-                        SectionType.SLIDER -> {
-                            val currentValue = state.sliderValues[item.id] ?: item.defaultValue ?: item.minValue
-                            val displayValue = item.valueSuffix?.let { "${"%.2f".format(currentValue)}$it" } ?: currentValue.toString()
-                            val sliderSteps = ((item.maxValue - item.minValue) / item.step).toInt() - 1
-                            // 从主题获取 Slider 颜色和文字颜色
-                            val activeColor = section.theme.sliderActiveColor
-                            val inactiveColor = section.theme.sliderInactiveColor
-                            val primaryTextStyle = PvzTextStyle(section.theme.primaryTextColor)
-                            val secondaryTextStyle = PvzTextStyle(section.theme.secondaryTextColor)
-
-                            // 计算填充色的渐变版本（上亮下暗）
-                            val activeGradientTop = activeColor.copy(
-                                red = (activeColor.red * 1.2f).coerceAtMost(1f),
-                                green = (activeColor.green * 1.2f).coerceAtMost(1f),
-                                blue = (activeColor.blue * 1.2f).coerceAtMost(1f)
-                            )
-                            val activeGradientBottom = activeColor.copy(
-                                red = (activeColor.red * 0.7f),
-                                green = (activeColor.green * 0.7f),
-                                blue = (activeColor.blue * 0.7f)
-                            )
-
-                            // 计算轨道背景的渐变版本（内凹感）
-                            val inactiveGradientTop = inactiveColor.copy(
-                                red = (inactiveColor.red * 1.2f).coerceAtMost(1f),
-                                green = (inactiveColor.green * 1.2f).coerceAtMost(1f),
-                                blue = (inactiveColor.blue * 1.2f).coerceAtMost(1f)
-                            )
-                            val inactiveGradientBottom = inactiveColor.copy(
-                                red = (inactiveColor.red * 0.7f),
-                                green = (inactiveColor.green * 0.7f),
-                                blue = (inactiveColor.blue * 0.7f)
-                            )
-
-                            // 齿轮旋转角度 = 进度 * 360度
-                            val rotationAngle = ((currentValue - item.minValue) / (item.maxValue - item.minValue)) * 360f
-
-                            // 单行布局：标题/说明独占上方，下面一行是「Min − [轨道] + Max」
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                            item.name?.let {
-                                PvzRichText(
-                                    text = "$it ($displayValue)",
-                                    fontSize = 14.sp,
-                                    lineHeight = 18.sp,
-                                    defaultStyle = primaryTextStyle,
-                                )
-                            }
-                            item.desc?.let {
-                                PvzRichText(
-                                    text = "[${"%.2f".format(item.minValue)}~${"%.2f".format(item.maxValue)}${item.valueSuffix ?: ""}] $it",
-                                    fontSize = 11.sp,
-                                    lineHeight = 14.sp,
-                                    defaultStyle = secondaryTextStyle,
-                                )
-                            }
-
-                            val stepColors = pvzStepColors(section.theme)
-                            val stepLo = item.minValue
-                            val stepHi = item.maxValue
-                            val stepSize = if (item.step <= 0f) 1f else item.step
-                            // ⚠️ rememberAssetExtractor 是 @Composable，必须提前取好（局部函数里不能调 Composable）
-                            val stepExtractor = rememberAssetExtractor(context = LocalContext.current)
-
-                            // 步进后立刻写状态并执行该条目脚本；连点由 runUserScript 的 key 取消旧任务
-                            fun applyStep(next: Float) {
-                                val clamped = next.coerceIn(stepLo, stepHi)
-                                onStateChange(state.copy(sliderValues = state.sliderValues + (item.id to clamped)))
-                                val jsScript = item.readJs(section, version) ?: return
-                                JsUiManager.runUserScript(key = "js:${section.id}:${item.id}") {
-                                    PvzToolJsEngine.executeScript(
-                                        extractor = stepExtractor,
-                                        script = jsScript,
-                                        section = section,
-                                        item = item,
-                                        version = version,
-                                        sectionStates = sectionStates,
-                                        updateSectionState = updateSectionState
-                                    )
-                                }
-                            }
-
-                            // 单行：Min − [齿轮轨道] + Max
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .height(40.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (item.showStepButtons) {
-                                    PvzJumpButton(
-                                        label = "Min",
-                                        enabled = currentValue > stepLo,
-                                        colors = stepColors,
-                                        height = 30.dp,
-                                        width = 40.dp,
-                                        onClick = { applyStep(stepLo) }
-                                    )
-                                    PvzStepButton(
-                                        symbol = "−",
-                                        enabled = currentValue > stepLo,
-                                        colors = stepColors,
-                                        width = 36.dp,
-                                        fontSize = 16,
-                                        height = 30.dp,
-                                        onStep = { applyStep(currentValue - stepSize) }
-                                    )
-                                }
-                                val density = LocalDensity.current
-                                BoxWithConstraints(
-                                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                                ) {
-                                    // 轨道高度和齿轮大小
-                                    val trackHeight = 20.dp
-                                    val gearSize = 32.dp
-
-                                    // 进度比例
-                                    val progress = ((currentValue - item.minValue) / (item.maxValue - item.minValue)).coerceIn(0f, 1f)
-
-                                    // 计算齿轮中心位置（齿轮中心正好在填充色/轨道色交界处）
-                                    val trackWidthPx = constraints.maxWidth.toFloat()
-                                    val gearCenterPx = progress * trackWidthPx
-                                    val gearLeftOffset = with(density) { gearCenterPx.toDp() } - gearSize / 2
-
-                                    Box(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        // 轨道容器（圆角胶囊形状）
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(trackHeight)
-                                                .clip(RoundedCornerShape(trackHeight / 2))
-                                        ) {
-                                            // 轨道背景（内凹感）
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .background(
-                                                        Brush.verticalGradient(
-                                                            colors = listOf(
-                                                                inactiveGradientTop,
-                                                                inactiveColor,
-                                                                inactiveGradientBottom
-                                                            )
-                                                        )
-                                                    )
-                                            )
-
-                                            // 选中部分（圆柱立体感）
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth(progress)
-                                                    .fillMaxHeight()
-                                                    .background(
-                                                        Brush.verticalGradient(
-                                                            colors = listOf(
-                                                                activeGradientTop,
-                                                                activeColor,
-                                                                activeGradientBottom
-                                                            )
-                                                        )
-                                                    )
-                                            )
-                                        }
-
-                                        // 齿轮作为滑块（中心对准填充色/轨道色交界处）
-                                        Box(
-                                            modifier = Modifier
-                                                .size(gearSize)
-                                                .align(Alignment.CenterStart)
-                                                .offset(x = gearLeftOffset)
-                                        ) {
-                                            Image(
-                                                painter = rememberVectorPainter(Pvz2Icon.Gear),
-                                                contentDescription = "Slider thumb",
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .graphicsLayer {
-                                                        rotationZ = rotationAngle
-                                                    }
-                                            )
-                                        }
-
-                                        val jsExtractor = rememberAssetExtractor(
-                                            context = LocalContext.current
-                                        )
-
-                                        val uiState by jsExtractor.extractor.uiState
-                                        PvzExtractorDialog(uiState = uiState,SettingsDialogState.isUseShowNotUpdate, onDismissRequest = { jsExtractor.extractor.dismiss() })
-
-                                        // 完全透明的 Slider 用于处理交互
-                                        Slider(
-                                            value = currentValue,
-                                            onValueChange = { newValue ->
-                                                val clampedValue = (newValue / item.step).toInt() * item.step
-                                                val finalValue = clampedValue.coerceIn(item.minValue, item.maxValue)
-                                                val newState = state.copy(sliderValues = state.sliderValues + (item.id to finalValue))
-                                                onStateChange(newState)
-                                            },
-                                            onValueChangeFinished = {
-                                                val finalState = state.copy(sliderValues = state.sliderValues + (item.id to currentValue))
-                                                onStateChange(finalState)
-
-                                                val jsScript = item.readJs(section,version)
-                                                // 如果有 jsScript 或 jsPath，拖动结束后执行
-                                                if (jsScript != null) {
-                                                    JsUiManager.runUserScript(key = "js:${section.id}:${item.id}") {
-                                                        PvzToolJsEngine.executeScript(
-                                                            extractor = jsExtractor,
-                                                            script = jsScript,
-                                                            section = section,
-                                                            item = item,
-                                                            version = version,
-                                                            sectionStates = sectionStates,
-                                                            updateSectionState = updateSectionState
-                                                        )
-                                                    }
-                                                }
-                                            },
-                                            valueRange = item.minValue..item.maxValue,
-                                            steps = sliderSteps.coerceAtLeast(0),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(48.dp),
-                                            colors = SliderDefaults.colors(
-                                                thumbColor = Color.Transparent,
-                                                activeTrackColor = Color.Transparent,
-                                                inactiveTrackColor = Color.Transparent,
-                                                activeTickColor = Color.Transparent,
-                                                inactiveTickColor = Color.Transparent
-                                            )
-                                        )
-                                    }
-                                }
-                                if (item.showStepButtons) {
-                                    PvzStepButton(
-                                        symbol = "+",
-                                        enabled = currentValue < stepHi,
-                                        colors = stepColors,
-                                        width = 36.dp,
-                                        fontSize = 16,
-                                        height = 30.dp,
-                                        onStep = { applyStep(currentValue + stepSize) }
-                                    )
-                                    PvzJumpButton(
-                                        label = "Max",
-                                        enabled = currentValue < stepHi,
-                                        colors = stepColors,
-                                        height = 30.dp,
-                                        width = 40.dp,
-                                        onClick = { applyStep(stepHi) }
-                                    )
-                                }
-                            } // Column（标题/说明 + 单行 Min − 轨道 + Max）
-                            } // Column（上一行「标题 | 滑块」+ 本行步进）
-                        }
-
-                        SectionType.INPUT -> {
-                            val currentValue = state.inputValues[item.id] ?: item.inputDefault ?: ""
-                            val primaryTextStyle = PvzTextStyle(section.theme.primaryTextColor)
-                            val secondaryTextStyle = PvzTextStyle(section.theme.secondaryTextColor)
-
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                // 标签
-                                item.name?.let {
-                                    PvzRichText(
-                                        text = it,
-                                        fontSize = 14.sp,
-                                        lineHeight = 18.sp,
-                                        defaultStyle = primaryTextStyle
-                                    )
-                                }
-                                item.desc?.let {
-                                    PvzRichText(
-                                        text = it,
-                                        fontSize = 11.sp,
-                                        lineHeight = 14.sp,
-                                        defaultStyle = secondaryTextStyle,
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-                                }
-
-                                // 输入框（使用主题色；默认标题=placeholder，默认多行）
-                                PvzInput(
-                                    value = currentValue,
-                                    onValueChange = { newValue ->
-                                        val newState = state.copy(inputValues = state.inputValues + (item.id to newValue))
-                                        onStateChange(newState)
-                                    },
-                                    placeholder = item.placeholder ?: "请输入...",
-                                    modifier = Modifier.fillMaxWidth(),
-                                    theme = section.theme,
-                                    multiline = true
-                                )
-                            }
-
-                            // 输入完成时保存
-                            LaunchedEffect(currentValue) {
-                                onStateChange(state.copy(inputValues = state.inputValues + (item.id to currentValue)))
-                            }
-                        }
-
-                        SectionType.NUMBER -> {
-                            val primaryTextStyle = PvzTextStyle(section.theme.primaryTextColor)
-                            val secondaryTextStyle = PvzTextStyle(section.theme.secondaryTextColor)
-
-                            // min/max/step 复用 SLIDER 的配置字段（yml 里同名配置对 NUMBER 同样生效）
-                            val numberMin = item.minValue.toInt()
-                            val numberMax = item.maxValue.toInt()
-                            val numberStep = item.step.toInt().coerceAtLeast(1)
-                            val numberValue = (
-                                    state.numberValues[item.id]
-                                        ?: item.defaultValue?.toInt()
-                                        ?: numberMin
-                                    ).coerceIn(numberMin, numberMax)
-
-                            val jsExtractor = rememberAssetExtractor(
-                                context = LocalContext.current
-                            )
-                            val uiState by jsExtractor.extractor.uiState
-                            PvzExtractorDialog(
-                                uiState = uiState,
-                                SettingsDialogState.isUseShowNotUpdate,
-                                onDismissRequest = { jsExtractor.extractor.dismiss() }
-                            )
-
-                            val jsScript = item.readJs(section, version)
-                            LaunchedEffect(item.id, version.id, jsScript) {
-                                if (jsScript != null) {
-                                    PvzToolJsEngine.executeScript(
-                                        extractor = jsExtractor,
-                                        script = jsScript,
-                                        section = section,
-                                        item = item,
-                                        version = version,
-                                        sectionStates = sectionStates,
-                                        updateSectionState = updateSectionState
-                                    )
-                                }
-                            }
-
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                item.name?.let {
-                                    PvzRichText(
-                                        text = it,
-                                        fontSize = 14.sp,
-                                        lineHeight = 18.sp,
-                                        defaultStyle = primaryTextStyle
-                                    )
-                                }
-                                item.desc?.let {
-                                    PvzRichText(
-                                        text = it,
-                                        fontSize = 11.sp,
-                                        lineHeight = 14.sp,
-                                        defaultStyle = secondaryTextStyle,
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-                                }
-
-                                // 数量输入：± 按钮单击步进、长按连续步进，min/max 由 yml 配置
-                                // theme 跟随栏目主题（与同栏目 PvzInput 配色一致）
-                                PvzNumberInput(
-                                    value = numberValue,
-                                    onValueChange = { newValue ->
-                                        onStateChange(
-                                            state.copy(numberValues = state.numberValues + (item.id to newValue))
-                                        )
-                                    },
-                                    min = numberMin,
-                                    max = numberMax,
-                                    step = numberStep,
-                                    suffix = item.valueSuffix,
-                                    theme = section.theme
-                                )
-                            }
-                        }
-
-                        SectionType.INFO -> {
-                            val primaryTextStyle = PvzTextStyle(section.theme.primaryTextColor)
-                            val secondaryTextStyle = PvzTextStyle(section.theme.secondaryTextColor)
-                            // 信息框使用浅色背景（sliderActiveColor），与编辑框的深色背景形成对比
-                            val infoBackgroundColor = section.theme.sliderActiveColor
-                            // 根据背景亮度自动选择文字颜色，保证对比度
-                            val infoTextColor = getContrastingTextColor(infoBackgroundColor)
-
-                            // 从 state 中读取 info 值，支持 JS 动态修改
-                            val currentInfoValue = state.infoValues[item.id] ?: item.infoValue ?: "—"
-
-                            val jsExtractor = rememberAssetExtractor(
-                                context = LocalContext.current
-                            )
-
-                            val uiState by jsExtractor.extractor.uiState
-                            PvzExtractorDialog(uiState = uiState, SettingsDialogState.isUseShowNotUpdate, onDismissRequest = { jsExtractor.extractor.dismiss() })
-
-                            // 读取 JS 脚本
-                            val jsScript = item.readJs(section, version)
-
-                            // 首次加载或重新加载时执行 JS
-                            LaunchedEffect(item.id, version.id, jsScript) {
-                                if (jsScript != null) {
-                                    PvzToolJsEngine.executeScript(
-                                        extractor = jsExtractor,
-                                        script = jsScript,
-                                        section = section,
-                                        item = item,
-                                        version = version,
-                                        sectionStates = sectionStates,
-                                        updateSectionState = updateSectionState
-                                    )
-                                }
-                            }
-
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                // 标签
-                                item.name?.let {
-                                    PvzRichText(
-                                        text = it,
-                                        fontSize = 14.sp,
-                                        lineHeight = 18.sp,
-                                        defaultStyle = primaryTextStyle
-                                    )
-                                }
-                                item.desc?.let {
-                                    PvzRichText(
-                                        text = it,
-                                        fontSize = 11.sp,
-                                        lineHeight = 14.sp,
-                                        defaultStyle = secondaryTextStyle,
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-                                }
-
-                                // 信息值（使用浅色背景 sliderActiveColor，与编辑框的深色背景形成对比）
-                                PvzSimpleCardGreen(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    borderColor = infoBackgroundColor,
-                                    backgroundColor = infoBackgroundColor
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(12.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        // INFO 限高：配置了 maxLines 时把高度锁到 maxLines × 行高(18sp)，
-                                        // 超出部分在卡片内上下滚动；未配置则保持旧行为（随内容无限增高）。
-                                        val infoMaxLines = item.maxLines ?: 0
-                                        if (infoMaxLines > 0) {
-                                            val infoScrollState = rememberScrollState()
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .heightIn(max = (18 * infoMaxLines).dp)
-                                                    .verticalScroll(infoScrollState)
-                                            ) {
-                                                PvzRichText(
-                                                    text = currentInfoValue,
-                                                    fontSize = 14.sp,
-                                                    lineHeight = 18.sp,
-                                                    defaultStyle = PvzTextStyle(infoTextColor)
-                                                )
-                                            }
-                                        } else {
-                                            PvzRichText(
-                                                text = currentInfoValue,
-                                                fontSize = 14.sp,
-                                                lineHeight = 18.sp,
-                                                defaultStyle = PvzTextStyle(infoTextColor),
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                        }
-                                        item.icon?.let { rawIconPath ->
-                                            val iconPath = JsFileResolver.resolvePlaceholders(rawIconPath)
-                                            AsyncImageFromAssets(
-                                                if (iconPath.startsWith("/")) iconPath else "images/$iconPath",
-                                                contentDescription = item.name,
-                                                modifier = Modifier
-                                                    .size(20.dp)
-                                                    .padding(start = 8.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    SectionItemContent(
+                        item = item,
+                        section = section,
+                        state = state,
+                        onStateChange = onStateChange,
+                        updateSectionState = updateSectionState,
+                        version = version,
+                        sectionStates = sectionStates
+                    )
                 }
 
                 // item 之间的分隔线（最后一个可见 item 不加分隔线）
@@ -3368,6 +2732,671 @@ fun Pvz2MainScreen(
     widthDp = 900,
     heightDp = 600
 )
+
+/**
+ * 单个栏目条目的内容渲染（原 `when (item.type)` 块原样搬出）。
+ *
+ * 抽成独立函数是为了让**列表**与**网格**两种视图、以及长按拖动容器都能复用同一份渲染逻辑，
+ * 避免「网格里复制一套、列表里一套」后改一处漏一处。
+ */
+@Composable
+private fun SectionItemContent(
+    item: SectionItem,
+    section: DynamicSection,
+    state: DynamicSectionState,
+    onStateChange: (DynamicSectionState) -> Unit,
+    updateSectionState: (String, (DynamicSectionState) -> DynamicSectionState) -> Unit,
+    version: VersionDef,
+    sectionStates: Map<String, DynamicSectionState>,
+) {
+                    when (item.type) {
+                        SectionType.RADIO -> {
+                            val isSelected = state.selectedPresetItemIds[item.groupId] == item.id
+                            val jsExtractor = rememberAssetExtractor(
+                                context = LocalContext.current
+                            )
+
+                            val uiState by jsExtractor.extractor.uiState
+                            PvzExtractorDialog(uiState = uiState,SettingsDialogState.isUseShowNotUpdate, onDismissRequest = { jsExtractor.extractor.dismiss() })
+
+                            RadioButtonItem(
+                                label = item.name,
+                                subLabel = item.desc,
+                                selected = isSelected,
+                                leadingIconPath = item.icon?.let { JsFileResolver.resolvePlaceholders(it) },
+                                theme = section.theme,
+                                onSelect = {
+                                    val newState = state.copy(
+                                        selectedPresetItemIds = state.selectedPresetItemIds + (item.groupId to item.id)
+                                    )
+
+                                    onStateChange(newState)
+
+                                    val jsScript = item.readJs(section,version)
+                                    if (jsScript != null) {
+                                        JsUiManager.runUserScript(key = "js:${section.id}:${item.id}") {
+                                            PvzToolJsEngine.executeScript(
+                                                extractor = jsExtractor,
+                                                script = jsScript,
+                                                section = section,
+                                                item = item,
+                                                version = version,
+                                                sectionStates = sectionStates,
+                                                updateSectionState = updateSectionState
+                                            )
+                                        }
+                                    }
+                                }
+                            )
+                        }
+
+                        SectionType.CHECKBOX -> {
+                            val isChecked = state.checkedItemIds.contains(item.id)
+                            val jsExtractor = rememberAssetExtractor(
+                                context = LocalContext.current
+                            )
+
+                            val uiState by jsExtractor.extractor.uiState
+                            PvzExtractorDialog(uiState = uiState,SettingsDialogState.isUseShowNotUpdate, onDismissRequest = { jsExtractor.extractor.dismiss() })
+
+                            SectionSwitchItem(
+                                item = item,
+                                checked = isChecked,
+                                theme = section.theme,
+                                onCheckedChange = { checked ->
+                                    val newIds = if (checked) state.checkedItemIds + item.id else state.checkedItemIds - item.id
+                                    val newState = state.copy(checkedItemIds = newIds)
+
+                                    onStateChange(newState)
+                                    Log.d("CheckboxSave", "功能[${item.name}]状态变更，立即部分保存")
+
+                                    val jsScript = item.readJs(section,version)
+                                    // 如果有 jsScript 或 jsPath，执行 JS 并传入选中状态
+                                    if (jsScript != null) {
+                                        JsUiManager.runUserScript(key = "js:${section.id}:${item.id}") {
+                                            PvzToolJsEngine.executeScript(
+                                                extractor = jsExtractor,
+                                                script = jsScript,
+                                                section = section,
+                                                item = item,
+                                                version = version,
+                                                sectionStates = sectionStates,
+                                                updateSectionState = updateSectionState
+                                            )
+                                        }
+                                    }
+                                },
+                            )
+                        }
+
+                        SectionType.DESCRIPTION -> {
+                            // 读取 JS 脚本
+                            val jsScript = item.readJs(section, version)
+
+                            val currentDescriptionValue = state.descriptionValues[item.id] ?: item.desc.orEmpty().ifEmpty { item.name }
+
+                            // 创建 extractor
+                            val jsExtractor = rememberAssetExtractor(
+                                context = LocalContext.current
+                            )
+
+                            val uiState by jsExtractor.extractor.uiState
+                            PvzExtractorDialog(uiState = uiState, SettingsDialogState.isUseShowNotUpdate, onDismissRequest = { jsExtractor.extractor.dismiss() })
+
+                            // 首次加载或重新加载时执行 JS
+                            LaunchedEffect(item.id, version.id, jsScript) {
+                                if (jsScript != null) {
+                                    PvzToolJsEngine.executeScript(
+                                        extractor = jsExtractor,
+                                        script = jsScript,
+                                        section = section,
+                                        item = item,
+                                        version = version,
+                                        sectionStates = sectionStates,
+                                        updateSectionState = updateSectionState
+                                    )
+                                }
+                            }
+
+                            if (!currentDescriptionValue.isNullOrBlank()) {
+                                // DESCRIPTION 同样支持 maxLines 限高 + 内部滚动（行高 16sp）
+                                val descMaxLines = item.maxLines ?: 0
+                                if (descMaxLines > 0) {
+                                    val descScrollState = rememberScrollState()
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = (16 * descMaxLines).dp)
+                                            .verticalScroll(descScrollState)
+                                    ) {
+                                        PvzRichText(
+                                            text = currentDescriptionValue,
+                                            fontSize = 12.sp,
+                                            lineHeight = 16.sp,
+                                            defaultStyle = PvzTextStyle(section.theme.secondaryTextColor),
+                                            modifier = Modifier.padding(4.dp)
+                                        )
+                                    }
+                                } else {
+                                    PvzRichText(
+                                        text = currentDescriptionValue,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp,
+                                        defaultStyle = PvzTextStyle(section.theme.secondaryTextColor),
+                                        modifier = Modifier.padding(4.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        SectionType.BUTTON -> {
+                            val buttonScope = rememberCoroutineScope()
+
+                            SectionButtonItem(
+                                item = item,
+                                section = section,
+                                version = version,
+                                sectionStates = sectionStates,
+                                scope = buttonScope,
+                                theme = section.theme,
+                                updateSectionState = updateSectionState
+                            )
+                        }
+
+                        SectionType.SLIDER -> {
+                            val currentValue = state.sliderValues[item.id] ?: item.defaultValue ?: item.minValue
+                            val displayValue = item.valueSuffix?.let { "${"%.2f".format(currentValue)}$it" } ?: currentValue.toString()
+                            val sliderSteps = ((item.maxValue - item.minValue) / item.step).toInt() - 1
+                            // 从主题获取 Slider 颜色和文字颜色
+                            val activeColor = section.theme.sliderActiveColor
+                            val inactiveColor = section.theme.sliderInactiveColor
+                            val primaryTextStyle = PvzTextStyle(section.theme.primaryTextColor)
+                            val secondaryTextStyle = PvzTextStyle(section.theme.secondaryTextColor)
+
+                            // 计算填充色的渐变版本（上亮下暗）
+                            val activeGradientTop = activeColor.copy(
+                                red = (activeColor.red * 1.2f).coerceAtMost(1f),
+                                green = (activeColor.green * 1.2f).coerceAtMost(1f),
+                                blue = (activeColor.blue * 1.2f).coerceAtMost(1f)
+                            )
+                            val activeGradientBottom = activeColor.copy(
+                                red = (activeColor.red * 0.7f),
+                                green = (activeColor.green * 0.7f),
+                                blue = (activeColor.blue * 0.7f)
+                            )
+
+                            // 计算轨道背景的渐变版本（内凹感）
+                            val inactiveGradientTop = inactiveColor.copy(
+                                red = (inactiveColor.red * 1.2f).coerceAtMost(1f),
+                                green = (inactiveColor.green * 1.2f).coerceAtMost(1f),
+                                blue = (inactiveColor.blue * 1.2f).coerceAtMost(1f)
+                            )
+                            val inactiveGradientBottom = inactiveColor.copy(
+                                red = (inactiveColor.red * 0.7f),
+                                green = (inactiveColor.green * 0.7f),
+                                blue = (inactiveColor.blue * 0.7f)
+                            )
+
+                            // 齿轮旋转角度 = 进度 * 360度
+                            val rotationAngle = ((currentValue - item.minValue) / (item.maxValue - item.minValue)) * 360f
+
+                            // 单行布局：标题/说明独占上方，下面一行是「Min − [轨道] + Max」
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                            item.name?.let {
+                                PvzRichText(
+                                    text = "$it ($displayValue)",
+                                    fontSize = 14.sp,
+                                    lineHeight = 18.sp,
+                                    defaultStyle = primaryTextStyle,
+                                )
+                            }
+                            item.desc?.let {
+                                PvzRichText(
+                                    text = "[${"%.2f".format(item.minValue)}~${"%.2f".format(item.maxValue)}${item.valueSuffix ?: ""}] $it",
+                                    fontSize = 11.sp,
+                                    lineHeight = 14.sp,
+                                    defaultStyle = secondaryTextStyle,
+                                )
+                            }
+
+                            val stepColors = pvzStepColors(section.theme)
+                            val stepLo = item.minValue
+                            val stepHi = item.maxValue
+                            val stepSize = if (item.step <= 0f) 1f else item.step
+                            // ⚠️ rememberAssetExtractor 是 @Composable，必须提前取好（局部函数里不能调 Composable）
+                            val stepExtractor = rememberAssetExtractor(context = LocalContext.current)
+
+                            // 步进后立刻写状态并执行该条目脚本；连点由 runUserScript 的 key 取消旧任务
+                            fun applyStep(next: Float) {
+                                val clamped = next.coerceIn(stepLo, stepHi)
+                                onStateChange(state.copy(sliderValues = state.sliderValues + (item.id to clamped)))
+                                val jsScript = item.readJs(section, version) ?: return
+                                JsUiManager.runUserScript(key = "js:${section.id}:${item.id}") {
+                                    PvzToolJsEngine.executeScript(
+                                        extractor = stepExtractor,
+                                        script = jsScript,
+                                        section = section,
+                                        item = item,
+                                        version = version,
+                                        sectionStates = sectionStates,
+                                        updateSectionState = updateSectionState
+                                    )
+                                }
+                            }
+
+                            // 单行：Min − [齿轮轨道] + Max
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .height(40.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (item.showStepButtons) {
+                                    PvzJumpButton(
+                                        label = "Min",
+                                        enabled = currentValue > stepLo,
+                                        colors = stepColors,
+                                        height = 30.dp,
+                                        width = 40.dp,
+                                        onClick = { applyStep(stepLo) }
+                                    )
+                                    PvzStepButton(
+                                        symbol = "−",
+                                        enabled = currentValue > stepLo,
+                                        colors = stepColors,
+                                        width = 36.dp,
+                                        fontSize = 16,
+                                        height = 30.dp,
+                                        onStep = { applyStep(currentValue - stepSize) }
+                                    )
+                                }
+                                val density = LocalDensity.current
+                                BoxWithConstraints(
+                                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                                ) {
+                                    // 轨道高度和齿轮大小
+                                    val trackHeight = 20.dp
+                                    val gearSize = 32.dp
+
+                                    // 进度比例
+                                    val progress = ((currentValue - item.minValue) / (item.maxValue - item.minValue)).coerceIn(0f, 1f)
+
+                                    // 计算齿轮中心位置（齿轮中心正好在填充色/轨道色交界处）
+                                    val trackWidthPx = constraints.maxWidth.toFloat()
+                                    val gearCenterPx = progress * trackWidthPx
+                                    val gearLeftOffset = with(density) { gearCenterPx.toDp() } - gearSize / 2
+
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        // 轨道容器（圆角胶囊形状）
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(trackHeight)
+                                                .clip(RoundedCornerShape(trackHeight / 2))
+                                        ) {
+                                            // 轨道背景（内凹感）
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(
+                                                        Brush.verticalGradient(
+                                                            colors = listOf(
+                                                                inactiveGradientTop,
+                                                                inactiveColor,
+                                                                inactiveGradientBottom
+                                                            )
+                                                        )
+                                                    )
+                                            )
+
+                                            // 选中部分（圆柱立体感）
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth(progress)
+                                                    .fillMaxHeight()
+                                                    .background(
+                                                        Brush.verticalGradient(
+                                                            colors = listOf(
+                                                                activeGradientTop,
+                                                                activeColor,
+                                                                activeGradientBottom
+                                                            )
+                                                        )
+                                                    )
+                                            )
+                                        }
+
+                                        // 齿轮作为滑块（中心对准填充色/轨道色交界处）
+                                        Box(
+                                            modifier = Modifier
+                                                .size(gearSize)
+                                                .align(Alignment.CenterStart)
+                                                .offset(x = gearLeftOffset)
+                                        ) {
+                                            Image(
+                                                painter = rememberVectorPainter(Pvz2Icon.Gear),
+                                                contentDescription = "Slider thumb",
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .graphicsLayer {
+                                                        rotationZ = rotationAngle
+                                                    }
+                                            )
+                                        }
+
+                                        val jsExtractor = rememberAssetExtractor(
+                                            context = LocalContext.current
+                                        )
+
+                                        val uiState by jsExtractor.extractor.uiState
+                                        PvzExtractorDialog(uiState = uiState,SettingsDialogState.isUseShowNotUpdate, onDismissRequest = { jsExtractor.extractor.dismiss() })
+
+                                        // 完全透明的 Slider 用于处理交互
+                                        Slider(
+                                            value = currentValue,
+                                            onValueChange = { newValue ->
+                                                val clampedValue = (newValue / item.step).toInt() * item.step
+                                                val finalValue = clampedValue.coerceIn(item.minValue, item.maxValue)
+                                                val newState = state.copy(sliderValues = state.sliderValues + (item.id to finalValue))
+                                                onStateChange(newState)
+                                            },
+                                            onValueChangeFinished = {
+                                                val finalState = state.copy(sliderValues = state.sliderValues + (item.id to currentValue))
+                                                onStateChange(finalState)
+
+                                                val jsScript = item.readJs(section,version)
+                                                // 如果有 jsScript 或 jsPath，拖动结束后执行
+                                                if (jsScript != null) {
+                                                    JsUiManager.runUserScript(key = "js:${section.id}:${item.id}") {
+                                                        PvzToolJsEngine.executeScript(
+                                                            extractor = jsExtractor,
+                                                            script = jsScript,
+                                                            section = section,
+                                                            item = item,
+                                                            version = version,
+                                                            sectionStates = sectionStates,
+                                                            updateSectionState = updateSectionState
+                                                        )
+                                                    }
+                                                }
+                                            },
+                                            valueRange = item.minValue..item.maxValue,
+                                            steps = sliderSteps.coerceAtLeast(0),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(48.dp),
+                                            colors = SliderDefaults.colors(
+                                                thumbColor = Color.Transparent,
+                                                activeTrackColor = Color.Transparent,
+                                                inactiveTrackColor = Color.Transparent,
+                                                activeTickColor = Color.Transparent,
+                                                inactiveTickColor = Color.Transparent
+                                            )
+                                        )
+                                    }
+                                }
+                                if (item.showStepButtons) {
+                                    PvzStepButton(
+                                        symbol = "+",
+                                        enabled = currentValue < stepHi,
+                                        colors = stepColors,
+                                        width = 36.dp,
+                                        fontSize = 16,
+                                        height = 30.dp,
+                                        onStep = { applyStep(currentValue + stepSize) }
+                                    )
+                                    PvzJumpButton(
+                                        label = "Max",
+                                        enabled = currentValue < stepHi,
+                                        colors = stepColors,
+                                        height = 30.dp,
+                                        width = 40.dp,
+                                        onClick = { applyStep(stepHi) }
+                                    )
+                                }
+                            } // Column（标题/说明 + 单行 Min − 轨道 + Max）
+                            } // Column（上一行「标题 | 滑块」+ 本行步进）
+                        }
+
+                        SectionType.INPUT -> {
+                            val currentValue = state.inputValues[item.id] ?: item.inputDefault ?: ""
+                            val primaryTextStyle = PvzTextStyle(section.theme.primaryTextColor)
+                            val secondaryTextStyle = PvzTextStyle(section.theme.secondaryTextColor)
+
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                // 标签
+                                item.name?.let {
+                                    PvzRichText(
+                                        text = it,
+                                        fontSize = 14.sp,
+                                        lineHeight = 18.sp,
+                                        defaultStyle = primaryTextStyle
+                                    )
+                                }
+                                item.desc?.let {
+                                    PvzRichText(
+                                        text = it,
+                                        fontSize = 11.sp,
+                                        lineHeight = 14.sp,
+                                        defaultStyle = secondaryTextStyle,
+                                        modifier = Modifier.padding(bottom = 4.dp)
+                                    )
+                                }
+
+                                // 输入框（使用主题色；默认标题=placeholder，默认多行）
+                                PvzInput(
+                                    value = currentValue,
+                                    onValueChange = { newValue ->
+                                        val newState = state.copy(inputValues = state.inputValues + (item.id to newValue))
+                                        onStateChange(newState)
+                                    },
+                                    placeholder = item.placeholder ?: "请输入...",
+                                    modifier = Modifier.fillMaxWidth(),
+                                    theme = section.theme,
+                                    multiline = true
+                                )
+                            }
+
+                            // 输入完成时保存
+                            LaunchedEffect(currentValue) {
+                                onStateChange(state.copy(inputValues = state.inputValues + (item.id to currentValue)))
+                            }
+                        }
+
+                        SectionType.NUMBER -> {
+                            val primaryTextStyle = PvzTextStyle(section.theme.primaryTextColor)
+                            val secondaryTextStyle = PvzTextStyle(section.theme.secondaryTextColor)
+
+                            // min/max/step 复用 SLIDER 的配置字段（yml 里同名配置对 NUMBER 同样生效）
+                            val numberMin = item.minValue.toInt()
+                            val numberMax = item.maxValue.toInt()
+                            val numberStep = item.step.toInt().coerceAtLeast(1)
+                            val numberValue = (
+                                    state.numberValues[item.id]
+                                        ?: item.defaultValue?.toInt()
+                                        ?: numberMin
+                                    ).coerceIn(numberMin, numberMax)
+
+                            val jsExtractor = rememberAssetExtractor(
+                                context = LocalContext.current
+                            )
+                            val uiState by jsExtractor.extractor.uiState
+                            PvzExtractorDialog(
+                                uiState = uiState,
+                                SettingsDialogState.isUseShowNotUpdate,
+                                onDismissRequest = { jsExtractor.extractor.dismiss() }
+                            )
+
+                            val jsScript = item.readJs(section, version)
+                            LaunchedEffect(item.id, version.id, jsScript) {
+                                if (jsScript != null) {
+                                    PvzToolJsEngine.executeScript(
+                                        extractor = jsExtractor,
+                                        script = jsScript,
+                                        section = section,
+                                        item = item,
+                                        version = version,
+                                        sectionStates = sectionStates,
+                                        updateSectionState = updateSectionState
+                                    )
+                                }
+                            }
+
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                item.name?.let {
+                                    PvzRichText(
+                                        text = it,
+                                        fontSize = 14.sp,
+                                        lineHeight = 18.sp,
+                                        defaultStyle = primaryTextStyle
+                                    )
+                                }
+                                item.desc?.let {
+                                    PvzRichText(
+                                        text = it,
+                                        fontSize = 11.sp,
+                                        lineHeight = 14.sp,
+                                        defaultStyle = secondaryTextStyle,
+                                        modifier = Modifier.padding(bottom = 4.dp)
+                                    )
+                                }
+
+                                // 数量输入：± 按钮单击步进、长按连续步进，min/max 由 yml 配置
+                                // theme 跟随栏目主题（与同栏目 PvzInput 配色一致）
+                                PvzNumberInput(
+                                    value = numberValue,
+                                    onValueChange = { newValue ->
+                                        onStateChange(
+                                            state.copy(numberValues = state.numberValues + (item.id to newValue))
+                                        )
+                                    },
+                                    min = numberMin,
+                                    max = numberMax,
+                                    step = numberStep,
+                                    suffix = item.valueSuffix,
+                                    theme = section.theme
+                                )
+                            }
+                        }
+
+                        SectionType.INFO -> {
+                            val primaryTextStyle = PvzTextStyle(section.theme.primaryTextColor)
+                            val secondaryTextStyle = PvzTextStyle(section.theme.secondaryTextColor)
+                            // 信息框使用浅色背景（sliderActiveColor），与编辑框的深色背景形成对比
+                            val infoBackgroundColor = section.theme.sliderActiveColor
+                            // 根据背景亮度自动选择文字颜色，保证对比度
+                            val infoTextColor = getContrastingTextColor(infoBackgroundColor)
+
+                            // 从 state 中读取 info 值，支持 JS 动态修改
+                            val currentInfoValue = state.infoValues[item.id] ?: item.infoValue ?: "—"
+
+                            val jsExtractor = rememberAssetExtractor(
+                                context = LocalContext.current
+                            )
+
+                            val uiState by jsExtractor.extractor.uiState
+                            PvzExtractorDialog(uiState = uiState, SettingsDialogState.isUseShowNotUpdate, onDismissRequest = { jsExtractor.extractor.dismiss() })
+
+                            // 读取 JS 脚本
+                            val jsScript = item.readJs(section, version)
+
+                            // 首次加载或重新加载时执行 JS
+                            LaunchedEffect(item.id, version.id, jsScript) {
+                                if (jsScript != null) {
+                                    PvzToolJsEngine.executeScript(
+                                        extractor = jsExtractor,
+                                        script = jsScript,
+                                        section = section,
+                                        item = item,
+                                        version = version,
+                                        sectionStates = sectionStates,
+                                        updateSectionState = updateSectionState
+                                    )
+                                }
+                            }
+
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                // 标签
+                                item.name?.let {
+                                    PvzRichText(
+                                        text = it,
+                                        fontSize = 14.sp,
+                                        lineHeight = 18.sp,
+                                        defaultStyle = primaryTextStyle
+                                    )
+                                }
+                                item.desc?.let {
+                                    PvzRichText(
+                                        text = it,
+                                        fontSize = 11.sp,
+                                        lineHeight = 14.sp,
+                                        defaultStyle = secondaryTextStyle,
+                                        modifier = Modifier.padding(bottom = 4.dp)
+                                    )
+                                }
+
+                                // 信息值（使用浅色背景 sliderActiveColor，与编辑框的深色背景形成对比）
+                                PvzSimpleCardGreen(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    borderColor = infoBackgroundColor,
+                                    backgroundColor = infoBackgroundColor
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // INFO 限高：配置了 maxLines 时把高度锁到 maxLines × 行高(18sp)，
+                                        // 超出部分在卡片内上下滚动；未配置则保持旧行为（随内容无限增高）。
+                                        val infoMaxLines = item.maxLines ?: 0
+                                        if (infoMaxLines > 0) {
+                                            val infoScrollState = rememberScrollState()
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .heightIn(max = (18 * infoMaxLines).dp)
+                                                    .verticalScroll(infoScrollState)
+                                            ) {
+                                                PvzRichText(
+                                                    text = currentInfoValue,
+                                                    fontSize = 14.sp,
+                                                    lineHeight = 18.sp,
+                                                    defaultStyle = PvzTextStyle(infoTextColor)
+                                                )
+                                            }
+                                        } else {
+                                            PvzRichText(
+                                                text = currentInfoValue,
+                                                fontSize = 14.sp,
+                                                lineHeight = 18.sp,
+                                                defaultStyle = PvzTextStyle(infoTextColor),
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
+                                        item.icon?.let { rawIconPath ->
+                                            val iconPath = JsFileResolver.resolvePlaceholders(rawIconPath)
+                                            AsyncImageFromAssets(
+                                                if (iconPath.startsWith("/")) iconPath else "images/$iconPath",
+                                                contentDescription = item.name,
+                                                modifier = Modifier
+                                                    .size(20.dp)
+                                                    .padding(start = 8.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+}
+
+
 @Composable
 private fun Pvz2MainScreenPreview() {
     InitializePvz2.init(LocalContext.current)

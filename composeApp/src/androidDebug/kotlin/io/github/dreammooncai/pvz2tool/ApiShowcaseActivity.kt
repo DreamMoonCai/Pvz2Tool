@@ -38,6 +38,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.dreammooncai.pvz2tool.js.JsLogger
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.platform.LocalContext
+import io.github.dreammooncai.pvz2tool.ui.dialog.rememberAssetExtractor
+import io.github.dreammooncai.pvz2tool.ui.main.DynamicSectionComponent
+import io.github.dreammooncai.pvz2tool.ui.main.DynamicSectionState
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsChoiceItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsDialogsHost
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
@@ -198,7 +203,8 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
             text = "ui.multiSelect('选择功能', items, {selectAll:true, searchable:true, quantity:{min:1,max:99,default:3,suffix:'个'}})\n" +
                     "• 右上角「全选」：对当前**过滤后**的条目一键全选 / 取消全选\n" +
                     "• 右上角「搜索」：按名称过滤条目（勾选状态不受过滤影响）\n" +
-                    "• 数量行：「±」步进、长按连续增减、「«」「»」直达最小 / 最大\n" +
+                    "• 数量行：「±」步进、长按连续增减、「Min」「Max」直达边界\n" +
+                    "• 长按条目可**拖动排序**（网格/列表都生效），返回顺序即拖动后的顺序\n" +
                     "• 确定返回 {values:[...], count:n}",
             color = Color(0xFF8A9199),
             fontSize = 12.sp
@@ -218,6 +224,7 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
                     quantityStep = 1,
                     quantityDefault = 3,
                     quantitySuffix = "个",
+                    reorderable = true,
                     forceMaxForm = true
                 ).await()
             }

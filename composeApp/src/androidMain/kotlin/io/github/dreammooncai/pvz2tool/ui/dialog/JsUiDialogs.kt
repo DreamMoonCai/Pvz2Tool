@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.SolidColor
 import io.github.dreammooncai.pvz2tool.Pvz2ToolConfigUIChoiceActions
 import io.github.dreammooncai.pvz2tool.ui.PvzInput
 import io.github.dreammooncai.pvz2tool.ui.PvzNumberInput
+import io.github.dreammooncai.pvz2tool.ui.ReorderableItemGrid
 import io.github.dreammooncai.pvz2tool.ui.PvzJumpButton
 import io.github.dreammooncai.pvz2tool.ui.PvzStepButton
 import io.github.dreammooncai.pvz2tool.ui.pvzStepColors
@@ -231,6 +232,10 @@ data class JsSelectState(
     val quantityStep: Int = 1,
     val quantityDefault: Int = 1,
     val quantitySuffix: String = "",
+    /** 允许长按拖动调整条目顺序（网格/列表都生效）；返回顺序按拖动后的顺序 */
+    val reorderable: Boolean = false,
+    /** 拖动排序结束后回调（收到按新顺序排列的 value 数组） */
+    val onReorder: (suspend (JsAny?) -> Unit)? = null,
     val onCancel: (suspend (JsAny?) -> Unit)? = null,
     val onSelect: (suspend (JsAny?) -> Unit)? = null, // 单选：选中某项(value)即触发；多选：选中集合(values)变化时触发
     val deferredSingle: CompletableDeferred<String?>? = null,
@@ -1104,6 +1109,9 @@ object JsUiManager {
         quantityStep: Int = 1,
         quantityDefault: Int = 1,
         quantitySuffix: String = "",
+        /** 允许长按拖动调整条目顺序（网格/列表都生效） */
+        reorderable: Boolean = false,
+        onReorder: (suspend (JsAny?) -> Unit)? = null,
         onCancel: (suspend (JsAny?) -> Unit)? = null,
         onSelect: (suspend (JsAny?) -> Unit)? = null,
         onResult: (suspend (JsAny?) -> Unit)? = null
@@ -1136,6 +1144,8 @@ object JsUiManager {
             quantityStep = quantityStep,
             quantityDefault = quantityDefault.coerceIn(quantityMin, quantityMax),
             quantitySuffix = quantitySuffix,
+            reorderable = reorderable,
+            onReorder = onReorder,
             onCancel = onCancel,
             onSelect = onSelect,
             deferredMulti = deferred
@@ -1968,8 +1978,14 @@ fun JsItemChoiceDialog() {
     var searchQuery by remember(choiceKey) { mutableStateOf("") }
     var quantity by remember(choiceKey) { mutableIntStateOf(state.quantityDefault) }
 
-    // 过滤后仍保留**原始下标**：选中态以原始下标为键，搜索期间勾选不会串条目
+    // 拖动排序后的下标顺序（仅多选 + reorderable 时可变；初始 = 配置顺序）
+    var itemOrder by remember(choiceKey) { mutableStateOf(state.items.indices.toList()) }
+
+    // 过滤后仍保留**原始下标**：选中态以原始下标为键，搜索期间勾选不会串条目。
+    // 再按 itemOrder 排序（未拖动时与原始顺序一致）。
+    val orderRank = itemOrder.withIndex().associate { (rank, idx) -> idx to rank }
     val visibleChoices = ChoiceFilter.filterWithIndex(state.items, searchQuery)
+        .sortedBy { (index, _) -> orderRank[index] ?: Int.MAX_VALUE }
     val visibleIndices = visibleChoices.map { it.first }
     val allVisibleSelected = ChoiceFilter.isAllSelected(selectedIndices, visibleIndices)
 
@@ -1977,7 +1993,7 @@ fun JsItemChoiceDialog() {
 
     /** 把当前选中集合推给 onSelect 回调（与逐项点选保持同一套语义） */
     fun notifySelection() {
-        val vals = selectedIndices.sorted().map { state.items[it].value.js }
+        val vals = itemOrder.filter { it in selectedIndices }.map { state.items[it].value.js }
         JsUiManager.uiScope.launch {
             JsUiManager.launchCallback(JsUiManager.frameByState(state)) { state.onSelect?.invoke(vals.js) }
         }
@@ -2066,7 +2082,9 @@ fun JsItemChoiceDialog() {
                                     .weight(1f)
                                     .height(48.dp)
                             ) {
-                                val vals = selectedIndices.sorted().map { state.items[it].value }
+                                // 按拖动后的顺序返回（未拖动时即原始顺序）
+                                val vals = itemOrder.filter { it in selectedIndices }
+                                    .map { state.items[it].value }
                                 // 数量未开启时 count = -1，JS 侧据此仍返回数组（保持旧行为）
                                 val result = MultiSelectResult(
                                     values = vals,
@@ -2128,7 +2146,52 @@ fun JsItemChoiceDialog() {
                     )
                 }
 
-                if (isGrid) {
+                // 多选 + reorderable：网格/列表都用可拖动容器（长按格子拖动换位）
+                if (isMulti && state.reorderable) {
+                    ReorderableItemGrid(
+                        ids = visibleChoices.map { it.first.toString() },
+                        columns = if (isGrid) state.columns.coerceIn(2, 6) else 1,
+                        // 搜索过滤时禁用拖动：避免只对「过滤后的子集」重排，把其余条目顺序也打乱
+                        enabled = searchQuery.isBlank(),
+                        onOrderChange = { newIds ->
+                            val newOrder = newIds.mapNotNull { it.toIntOrNull() }
+                            itemOrder = newOrder
+                            state.onReorder?.let { cb ->
+                                JsUiManager.uiScope.launch {
+                                    JsUiManager.launchCallback(JsUiManager.frameByState(state)) {
+                                        cb(newOrder.map { state.items[it].value.js }.js)
+                                    }
+                                }
+                            }
+                        }
+                    ) { cellId, _ ->
+                        val index = cellId.toInt()
+                        val choice = state.items[index]
+                        if (isGrid) {
+                            GridChoiceCell(
+                                modifier = Modifier.fillMaxWidth(),
+                                item = choice,
+                                index = index,
+                                selected = index in selectedIndices,
+                                isMulti = true,
+                                showIndex = state.showIndex,
+                                showIndexColor = state.showIndexColor,
+                                onSelect = onSelect
+                            )
+                        } else {
+                            ListChoiceRow(
+                                item = choice,
+                                index = index,
+                                hasAnyIcon = hasAnyIcon,
+                                selected = index in selectedIndices,
+                                isMulti = true,
+                                showIndex = state.showIndex,
+                                showIndexColor = state.showIndexColor,
+                                onSelect = onSelect
+                            )
+                        }
+                    }
+                } else if (isGrid) {
                     val columns = state.columns.coerceIn(2, 6)
                     if (state.forceMaxForm) { // 最高形态：选项可能极多，用 LazyVerticalGrid 懒加载（仅组合可见项）
                         LazyVerticalGrid(

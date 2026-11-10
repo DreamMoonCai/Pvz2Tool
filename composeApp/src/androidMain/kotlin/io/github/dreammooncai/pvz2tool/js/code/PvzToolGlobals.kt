@@ -324,6 +324,7 @@ object PvzToolGlobals {
         //           confirmColor?, cancelColor?, forceMaxForm?,
         //           selectAll?（右上角全选）, searchable?（右上角搜索）,
         //           quantity?（数量输入：true 或 {min,max,step,default,suffix}）,
+        //           reorderable?（长按拖动排序，默认 false）,
         //           onCancel?, onSelect?, onResult? }
         //   forceMaxForm: true 时以最高形态展示（内容区固定上限高度，跳过探测重测，适合内容很多的场景）
         listOf("multiSelect".js, "多选".js).func(
@@ -371,6 +372,11 @@ object PvzToolGlobals {
             val quantitySuffix = quantityObject?.get("suffix".js, this)?.orNull?.let { toString(it) }
                 ?: quantityObject?.get("unit".js, this)?.orNull?.let { toString(it) } ?: ""
 
+            // 长按拖动排序：网格/列表都生效，返回顺序 = 拖动后的顺序
+            val reorderable = options?.get("reorderable".js, this)?.orNull?.toBoolean()
+                ?: options?.get("可排序".js, this)?.orNull?.toBoolean()
+                ?: options?.get("拖拽排序".js, this)?.orNull?.toBoolean() ?: false
+            val onReorder = bindJsCallback(options, "onReorder", runtime)
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onSelect = bindJsCallback(options, "onSelect", runtime)
             val onResult = bindJsCallback(options, "onResult", runtime)
@@ -396,6 +402,8 @@ object PvzToolGlobals {
                 quantityStep = quantityStep,
                 quantityDefault = quantityDefault,
                 quantitySuffix = quantitySuffix,
+                reorderable = reorderable,
+                onReorder = onReorder,
                 onCancel = onCancel,
                 onSelect = onSelect,
                 onResult = onResult

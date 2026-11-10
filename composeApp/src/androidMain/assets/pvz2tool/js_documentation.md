@@ -2005,6 +2005,9 @@ var t = ui.select("难度", ["简单", "普通", "困难"]);
 **布局**：与 `ui.select` 一致；纯文字模式每条目前带勾选标记，有图标模式选中后在图标右上角显示勾标。需点击「确定」确认，或「取消」清空。
 
 > 「全选」只作用于**当前过滤结果**：搜索「阳光」时点全选，只会勾选名字含「阳光」的条目，被过滤掉的条目选中状态不变。
+>
+> 开启 `reorderable` 后：**长按**任意条目 → 拖动 → 松手换位（网格/列表同样支持），
+> 返回的 `values` 与 `onReorder` 回调都按新顺序给出；条目顺序不会持久化，需由脚本自己保存。
 
 **示例**：
 ```javascript
@@ -4963,3 +4966,4 @@ console.log(window.__count);
 *新增：schedules 定时任务配置（dream.yml 顶层 schedules 列表，支持 cron 表达式或 "every Xh/Xm/Xd" 间隔描述，远程回调 JS 触发 notification 等）。参见 config_documentation.md*
 *新增：ui.multiSelect/ui.多选 的 options 新增 selectAll（标题栏「全选」胶囊，仅作用于当前过滤结果）、searchable（标题栏「搜索」胶囊，按 name/value 过滤）、quantity（数量行「±/长按/«»」，支持 true 或 {min,max,step,default,suffix}）。开启任意一项后返回 { values: string[], count: number }（count 未开启 quantity 时为 -1），未开启时仍返回 string[] 保持不变；同时修复 options 里 boolean 用 toKotlin as? Boolean 取值在 keight 下静默失效的问题（改用 toBoolean）*
 *新增：ui.slider/ui.滑块 的 options 新增 stepButtons（与滑块同一行的「Min − [轨道] + Max」：± 单击步进 step、长按 400ms 后每 80ms 连续增减、Min/Max 直达边界，按钮高 30dp 与 20dp 轨道同比例，默认 true）与 minMaxButtons（是否显示 Min/Max，默认 true）；配置栏目 SectionItem 的 SLIDER 同步新增 showStepButtons（默认 true）。最值按钮符号由 « » 改为文字 Min/Max，且与 ± 统一为同一套绿色实心胶囊（原轻量描边样式与 ± 并排像四个不同控件）*
+*新增：ui.multiSelect/ui.多选 的 options 新增 reorderable（长按拖动排序，网格/列表都生效，搜索过滤期间自动禁用）与 onReorder 回调；返回的 values 与 onSelect/onReorder 均按拖动后的顺序排列*
