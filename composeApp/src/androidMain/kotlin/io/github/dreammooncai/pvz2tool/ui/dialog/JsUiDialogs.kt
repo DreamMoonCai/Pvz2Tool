@@ -2197,6 +2197,8 @@ fun JsItemChoiceDialog() {
                         }
                     ) { cellId, _, handleModifier ->
                         val index = cellId.toInt()
+                        // 顺序可能在换弹窗的那一帧还是旧的，越界就跳过（不让 UI 崩）
+                        if (index !in state.items.indices) return@ReorderableItemGrid
                         val choice = state.items[index]
                         if (isGrid) {
                             GridChoiceCell(
