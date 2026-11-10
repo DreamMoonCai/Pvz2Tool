@@ -2671,6 +2671,8 @@ private fun FoldedChoicesRow(
                         LazyRow(
                             modifier = Modifier.fillMaxSize(),
                             horizontalArrangement = Arrangement.spacedBy(tailSpacing),
+                            // 末尾留一点内边距：滚到底时最后一项能完全贴边，不会卡在「半个」的位置
+                            contentPadding = PaddingValues(end = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             items(tailIds, key = { it }) { id ->
