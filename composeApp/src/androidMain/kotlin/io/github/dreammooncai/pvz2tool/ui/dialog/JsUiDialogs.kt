@@ -243,9 +243,16 @@ data class JsChoiceItem(
  */
 data class JsMoreOptions(
     val text: String = "",
+    /** 每行直接显示几个 */
     val limit: Int = 5,
-    val visible: Int = 5
-)
+    /** 胶囊里一屏显示几个（超出左右横滚） */
+    val visible: Int = 5,
+    /** 每行最多藏几个（<=0 表示与 limit 相同 = 每行 2×limit 个为一组） */
+    val hidden: Int = -1
+) {
+    /** 每行总槽位数 = 显示数 + 藏起来的上限 */
+    val groupSize: Int get() = limit.coerceAtLeast(1) + (if (hidden > 0) hidden else limit).coerceAtLeast(0)
+}
 
 /** 选择弹窗状态（单项 / 多项通用） */
 data class JsSelectState(
@@ -2537,8 +2544,8 @@ private fun FoldedChoicesRow(
     val scope = rememberCoroutineScope()
     val limit = more.limit.coerceAtLeast(1)
     val visible = more.visible.coerceAtLeast(1)
-    // 一行总槽位 = 折叠后可见数 + 更多里最多展示数；每行末尾挂一个「更多」胶囊
-    val groupSize = limit + visible
+    // 一行总槽位 = 每行显示数 + 每行最多藏几个（默认两者相等）；每行末尾挂一个「更多」胶囊
+    val groupSize = more.groupSize
 
     // 🔴 首屏 / 各行 / 胶囊共用一条顺序：拖动可以跨行、跨「更多」边界（外面的能拖进去、里面的能拖出来），
     //    重排后按 groupSize 重新分组即可，语义和「一行平铺 N 个」完全一致。

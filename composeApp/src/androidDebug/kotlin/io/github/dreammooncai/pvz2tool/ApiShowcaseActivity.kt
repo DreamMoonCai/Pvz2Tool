@@ -283,7 +283,7 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
                     columns = 5,
                     selectAllEnabled = true,
                     searchEnabled = true,
-                    more = JsMoreOptions(text = "更多", limit = 5, visible = 5),
+                    more = JsMoreOptions(text = "更多", limit = 5, visible = 3, hidden = 5),
                     reorderable = true,
                     orderKey = "demo_more",
                     forceMaxForm = true

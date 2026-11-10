@@ -404,12 +404,16 @@ object PvzToolGlobals {
                     val visible = moreObject.get("visible".js, this)?.orNull?.let { toNumber(it).toInt() }
                         ?: moreObject.get("可见".js, this)?.orNull?.let { toNumber(it).toInt() }
                         ?: limit
+                    val hidden = moreObject.get("hidden".js, this)?.orNull?.let { toNumber(it).toInt() }
+                        ?: moreObject.get("藏".js, this)?.orNull?.let { toNumber(it).toInt() }
+                        ?: -1
                     JsMoreOptions(
                         text = moreObject.get("text".js, this)?.orNull?.let { toString(it) }
                             ?: moreObject.get("文字".js, this)?.orNull?.let { toString(it) }
                             ?: "",
                         limit = limit.coerceAtLeast(1),
-                        visible = visible.coerceAtLeast(1)
+                        visible = visible.coerceAtLeast(1),
+                        hidden = hidden
                     )
                 }
                 moreRaw?.toBoolean() == true -> JsMoreOptions()
