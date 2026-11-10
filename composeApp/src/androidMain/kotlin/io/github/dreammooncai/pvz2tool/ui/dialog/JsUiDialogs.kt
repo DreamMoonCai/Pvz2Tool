@@ -2547,6 +2547,17 @@ private fun ChoiceSearchField(
  * 用 `detectDragGesturesAfterLongPress`（Main pass）时，手指往第二行或胶囊里移动会被
  * 外层竖向滚动 / 胶囊横向滚动先抢走，表现为「一移就跟松手了一样」、跨不了行也进不了胶囊。
  */
+/**
+ * 可拖动的格子外壳：长按 → 放大 + **二维跟手平移**（上下也能拖，可以跨行），
+ * 每跨过一个槽位就换位，松手 spring 弹回并提交顺序。
+ *
+ * 🔴 位移用「当前指针位置 - 按下位置」直接算（`change.position - down.position`）：
+ * 这个坐标是**相对格子自身**的，格子换位后坐标系跟着走，自动补偿了位移，不会累积漂移。
+ * 早先用「累加 dx + 换位后扣一个槽位」，槽位宽度在不同行/胶囊里不一致 → 越拖越漂。
+ *
+ * 🔴 手势走 [PointerEventPass.Initial] 并 consume：否则手指往上下（外层竖向滚动）
+ * 或往胶囊里（横滚）移动会被抢走，表现为「一移就跟松手了一样」。
+ */
 @Composable
 private fun DraggableChoiceCell(
     id: Int,
@@ -2558,7 +2569,8 @@ private fun DraggableChoiceCell(
     onDragEnd: () -> Unit,
     content: @Composable () -> Unit
 ) {
-    val offsetX = remember(id) { Animatable(0f) }
+    val offX = remember(id) { Animatable(0f) }
+    val offY = remember(id) { Animatable(0f) }
     var dragging by remember(id) { mutableStateOf(false) }
     val dragScope = rememberCoroutineScope()
     val scale by animateFloatAsState(
@@ -2569,7 +2581,8 @@ private fun DraggableChoiceCell(
     Box(
         modifier = modifier
             .graphicsLayer {
-                translationX = offsetX.value
+                translationX = offX.value
+                translationY = offY.value
                 scaleX = scale
                 scaleY = scale
             }
@@ -2582,33 +2595,25 @@ private fun DraggableChoiceCell(
                         longPress.consume()
                         dragging = true
                         onDragStart()
-                        var acc = 0f
-                        // 🔴 用**绝对坐标差**而不是 positionChange()：
-                        //    长按后的 change 已被 consume，positionChange() 会恒为 0（表现为「原地不动」）
-                        var lastX = longPress.position.x
                         while (true) {
                             val event = awaitPointerEvent(PointerEventPass.Initial)
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             if (!change.pressed) break
-                            // 关键：Initial 通道消费，外层滚动/胶囊横滚都收不到
                             change.consume()
-                            val dx = change.position.x - lastX
-                            lastX = change.position.x
-                            if (dx != 0f) {
-                                acc += dx
-                                dragScope.launch { offsetX.snapTo(offsetX.value + dx) }
-                                val step = (acc / stepPx).toInt()
-                                if (step != 0) {
-                                    if (onStep(step)) {
-                                        dragScope.launch { offsetX.snapTo(offsetX.value - step * stepPx) }
-                                    }
-                                    acc -= step * stepPx
-                                }
+                            // 相对格子的绝对位移（换位后自动补偿，不会漂）
+                            val dx = change.position.x - down.position.x
+                            val dy = change.position.y - down.position.y
+                            dragScope.launch { offX.snapTo(dx) }
+                            dragScope.launch { offY.snapTo(dy) }
+                            val step = (dx / stepPx).toInt()
+                            if (step != 0) {
+                                onStep(step)
                             }
                         }
                         dragging = false
                         dragScope.launch {
-                            offsetX.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 620f))
+                            offX.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 620f))
+                            offY.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 620f))
                         }
                         onDragEnd()
                     }
