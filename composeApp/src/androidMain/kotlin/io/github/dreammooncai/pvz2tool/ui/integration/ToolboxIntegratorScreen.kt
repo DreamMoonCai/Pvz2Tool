@@ -243,6 +243,9 @@ data class TbiItemDraft(
     val pressSound: String = "",
     val releaseSound: String = "",
     val smfList: List<String> = emptyList(),
+    /** 图标宽/高（dp，空 = 跟随顶栏默认尺寸） */
+    val width: String = "",
+    val height: String = "",
 )
 
 // ── 列表排序辅助 ─────────────────────────────────────────
@@ -330,6 +333,8 @@ data class SectionItemDraft(
     val defaultValue: String = "",
     val step: String = "1",
     val valueSuffix: String = "",
+    /** SLIDER：是否显示 ± / Min / Max 步进按钮（对应 yml showStepButtons） */
+    val showStepButtons: Boolean = true,
     // BUTTON
     val buttonText: String = "",
     val buttonColor: String = "blue",
@@ -337,7 +342,9 @@ data class SectionItemDraft(
     val placeholder: String = "",
     val inputDefault: String = "",
     // INFO
-    val infoValue: String = ""
+    val infoValue: String = "",
+    // INFO / DESCRIPTION：限高（空 = 不限，超出在卡片内滚动）
+    val maxLines: String = ""
 )
 
 // ── 从 dream.yml 读取默认值 ───────────────────────────────
@@ -376,7 +383,9 @@ fun loadDefaultsFromDreamYml(raw: String): DreamDefaults {
                         valueSuffix = i.valueSuffix ?: "",
                         buttonText = i.buttonText ?: "", buttonColor = i.buttonColor ?: "blue",
                         placeholder = i.placeholder ?: "", inputDefault = i.inputDefault ?: "",
-                        infoValue = i.infoValue ?: ""
+                        infoValue = i.infoValue ?: "",
+                        maxLines = i.maxLines?.toString() ?: "",
+                        showStepButtons = i.showStepButtons
                     )
                 }
             )
@@ -415,7 +424,8 @@ fun loadDefaultsFromDreamYml(raw: String): DreamDefaults {
         tbiItems = config?.ui?.topBarIcons?.items?.map { tbi ->
             TbiItemDraft(tbi.id, tbi.icon, tbi.iconPress ?: "", tbi.contentDescription ?: "",
                 tbi.jsScript ?: "", tbi.jsPath ?: "", tbi.isShowFromJs ?: "",
-                tbi.isShowFromJsPath ?: "", tbi.pressSound ?: "", tbi.releaseSound ?: "")
+                tbi.isShowFromJsPath ?: "", tbi.pressSound ?: "", tbi.releaseSound ?: "",
+                width = tbi.width?.toString() ?: "", height = tbi.height?.toString() ?: "")
         } ?: emptyList(),
         // UI 高级文本默认值
         uiVersionLabel = config?.ui?.versionLabel ?: "版本号：",
@@ -551,6 +561,12 @@ fun loadDefaultsFromDreamYml(raw: String): DreamDefaults {
         uiSetShowNotUpdate = config?.ui?.settings?.showNotUpdate ?: "",
         uiSetExitConfirm = config?.ui?.settings?.exitConfirm ?: "",
         uiSndSwitchClick = config?.ui?.sounds?.switchClick ?: "ui_switch_click.wav",
+        uiChoiceSelectAll = config?.ui?.choiceActions?.selectAll ?: "全选",
+        uiChoiceUnselectAll = config?.ui?.choiceActions?.unselectAll ?: "取消",
+        uiChoiceSearch = config?.ui?.choiceActions?.search ?: "搜索",
+        uiChoiceSearchClose = config?.ui?.choiceActions?.searchClose ?: "关闭",
+        uiChoiceSearchHint = config?.ui?.choiceActions?.searchHint ?: "搜索…",
+        uiChoiceSearchEmpty = config?.ui?.choiceActions?.searchEmpty ?: "没有匹配的条目",
         cgVideoPath = config?.ui?.assets?.cgVideoPath ?: "opening.mp4",
         cgVideoPoster = config?.ui?.assets?.cgVideoPoster ?: "",
         cgVideoLoadTimeout = config?.ui?.assets?.cgVideoLoadTimeout?.toString() ?: "5000"
@@ -664,6 +680,9 @@ data class DreamDefaults(
     val uiSetChangeProfile: String, val uiSetShowNotUpdate: String, val uiSetExitConfirm: String,
     val uiSndSwitchClick: String,
     val cgVideoPath: String, val cgVideoPoster: String, val cgVideoLoadTimeout: String,
+    // 选择/多选弹窗文案（ui.choiceActions）
+    val uiChoiceSelectAll: String, val uiChoiceUnselectAll: String, val uiChoiceSearch: String,
+    val uiChoiceSearchClose: String, val uiChoiceSearchHint: String, val uiChoiceSearchEmpty: String,
     val schedules: List<ScheduleDraft> = emptyList(),
 )
 
@@ -732,6 +751,23 @@ private fun packScriptAssetPath(raw: String?): String? {
     return raw
 }
 
+/**
+ * 【新增 yml 字段必须同步到这里 —— 硬要求】
+ *
+ * 集成器是工具的**代码**（不是文档）：`Pvz2ToolConfig` 里任何可自定义的 yml 属性，
+ * 都必须能在集成器里编辑并写回，否则用户只能用文本编辑器改 yml。
+ * 新增一个配置字段时，按下面 6 步逐个补齐，缺一处就等于该字段没进集成器：
+ *
+ * 1. `xxxDraft`（本文件顶部数据类）：加同名字段（Boolean/字符串化数值）；
+ * 2. `loadDefaultsFromDreamYml()`：从解析后的 config 回填 draft，`?: 默认值`；
+ * 3. `DreamDefaults`：如果是全新的配置组/段，先加到这里，再在 `applyConfigDefaults()` 回填向导状态；
+ * 4. `buildYamlFromWizard()` 参数 + 本函数内的 `template.xxx.copy(...)`：真正写回 yml 的地方；
+ * 5. 向导 UI（`Step*` / `*SettingsContent` / `ItemSettingsContent`）：加输入控件；
+ * 6. `buildYamlFromWizard()` 的**两个**调用点（`previewYml` 与 `doApply()`）补参数。
+ *
+ * 注意 kaml 序列化是 `encodeDefaults = false`：字段值等于默认值时不会写进 yml（正常），
+ * 但**被丢弃的字段**（copy 时漏掉）会在目标里悄悄变回默认值，属于数据丢失，比不显示更糟。
+ */
 private fun buildYamlFromWizard(
     templateYml: String,
     gameActivity: String, smfDirectory: String, baseAssetPath: String, simplifiedLaunch: Boolean,
@@ -771,6 +807,9 @@ private fun buildYamlFromWizard(
     uiLogCopyDesc: String, uiLogClearDesc: String, uiLogNoLogText: String, uiLogPresetSaveLabel: String, uiLogLocalSaveLabel: String,
     uiDlgDelSave: String, uiDlgEditUser: String, uiDlgShareTitle: String, uiDlgPackFail: String, uiDlgNoShare: String,
     uiWelcomeEditTitle: String, uiWelcomeEditHint: String,
+    // 选择/多选弹窗文案（ui.choiceActions）
+    uiChoiceSelectAll: String, uiChoiceUnselectAll: String, uiChoiceSearch: String,
+    uiChoiceSearchClose: String, uiChoiceSearchHint: String, uiChoiceSearchEmpty: String,
     saveDraft: SaveDraft, gameDisplay: Pvz2ToolConfigGameDisplay,
     uiSetChangeProfile: String, uiSetShowNotUpdate: String, uiSetExitConfirm: String, uiSndSwitchClick: String,
     schedules: List<ScheduleDraft>,
@@ -838,6 +877,8 @@ private fun buildYamlFromWizard(
                 addItems = s.addItems, isExpanded = s.isExpanded,
                 confirmButtonText = s.confirmButtonText.ifBlank { null },
                 items = s.items.map { item ->
+                    // SLIDER 与 NUMBER 共用 min/max/step/default/suffix（NUMBER 是 ± 精确步进版滑块）
+                    val isNumeric = item.type == "SLIDER" || item.type == "NUMBER"
                     SectionItem(item.id, SectionType.valueOf(item.type),
                         name = item.name.ifBlank { null }, desc = item.desc.ifBlank { null },
                         icon = item.icon.ifBlank { null }, assetPath = item.assetPath.ifBlank { null },
@@ -851,16 +892,21 @@ private fun buildYamlFromWizard(
                         isShowFromJsPath = packScriptAssetPath(item.isShowFromJsPath),
                         groupId = item.groupId,
                         smfList = item.smfList.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                        minValue = if (item.type == "SLIDER") item.minValue.toFloatOrNull() ?: 0f else 0f,
-                        maxValue = if (item.type == "SLIDER") item.maxValue.toFloatOrNull() ?: 100f else 100f,
-                        defaultValue = if (item.type == "SLIDER") item.defaultValue.toFloatOrNull() else null,
-                        step = if (item.type == "SLIDER") item.step.toFloatOrNull() ?: 1f else 1f,
-                        valueSuffix = if (item.type == "SLIDER") item.valueSuffix.ifBlank { null } else null,
+                        minValue = if (isNumeric) item.minValue.toFloatOrNull() ?: 0f else 0f,
+                        maxValue = if (isNumeric) item.maxValue.toFloatOrNull() ?: 100f else 100f,
+                        defaultValue = if (isNumeric) item.defaultValue.toFloatOrNull() else null,
+                        step = if (isNumeric) item.step.toFloatOrNull() ?: 1f else 1f,
+                        valueSuffix = if (isNumeric) item.valueSuffix.ifBlank { null } else null,
+                        // SLIDER 的 ±/Min/Max 步进按钮开关（NUMBER 恒为 ± 步进，不受此开关影响）
+                        showStepButtons = if (item.type == "SLIDER") item.showStepButtons else true,
                         buttonText = if (item.type == "BUTTON") item.buttonText.ifBlank { null } else null,
                         buttonColor = if (item.type == "BUTTON") item.buttonColor.ifBlank { null } else null,
                         placeholder = if (item.type == "INPUT") item.placeholder.ifBlank { null } else null,
                         inputDefault = if (item.type == "INPUT") item.inputDefault.ifBlank { null } else null,
-                        infoValue = if (item.type == "INFO") item.infoValue.ifBlank { null } else null
+                        infoValue = if (item.type == "INFO") item.infoValue.ifBlank { null } else null,
+                        // INFO / DESCRIPTION 限高（空 = 不限）
+                        maxLines = if (item.type == "INFO" || item.type == "DESCRIPTION")
+                            item.maxLines.toIntOrNull() else null
                     )
                 },
                 descriptionContent = s.descriptionContent.ifBlank { "" },
@@ -932,7 +978,8 @@ private fun buildYamlFromWizard(
                         it.jsScript.ifBlank { null }, packScriptAssetPath(it.jsPath),
                         it.isShowFromJs.ifBlank { null }, packScriptAssetPath(it.isShowFromJsPath),
                         it.pressSound.ifBlank { null }, it.releaseSound.ifBlank { null },
-                        smfList = it.smfList)
+                        smfList = it.smfList,
+                        width = it.width.toIntOrNull(), height = it.height.toIntOrNull())
                 }
             ),
             versionLabel = uiVersionLabel,
@@ -988,6 +1035,15 @@ private fun buildYamlFromWizard(
             ),
             welcome = template.ui.welcome.copy(
                 greetingTemplate = uiWelcomeGreeting, editUserNameTitle = uiWelcomeEditTitle, editUserNameHint = uiWelcomeEditHint
+            ),
+            // 选择/多选弹窗文案（全选/搜索/占位/空结果）
+            choiceActions = template.ui.choiceActions.copy(
+                selectAll = uiChoiceSelectAll.ifBlank { "全选" },
+                unselectAll = uiChoiceUnselectAll.ifBlank { "取消" },
+                search = uiChoiceSearch.ifBlank { "搜索" },
+                searchClose = uiChoiceSearchClose.ifBlank { "关闭" },
+                searchHint = uiChoiceSearchHint.ifBlank { "搜索…" },
+                searchEmpty = uiChoiceSearchEmpty.ifBlank { "没有匹配的条目" }
             )
         )
     )
@@ -1294,6 +1350,13 @@ fun ToolboxIntegratorScreen(
     var uiWelcomeGreeting by remember { mutableStateOf(defaults.uiWelcomeGreeting) }
     var uiWelcomeEditTitle by remember { mutableStateOf(defaults.uiWelcomeEditTitle) }
     var uiWelcomeEditHint by remember { mutableStateOf(defaults.uiWelcomeEditHint) }
+    // 选择/多选弹窗文案（ui.choiceActions）
+    var uiChoiceSelectAll by remember { mutableStateOf(defaults.uiChoiceSelectAll) }
+    var uiChoiceUnselectAll by remember { mutableStateOf(defaults.uiChoiceUnselectAll) }
+    var uiChoiceSearch by remember { mutableStateOf(defaults.uiChoiceSearch) }
+    var uiChoiceSearchClose by remember { mutableStateOf(defaults.uiChoiceSearchClose) }
+    var uiChoiceSearchHint by remember { mutableStateOf(defaults.uiChoiceSearchHint) }
+    var uiChoiceSearchEmpty by remember { mutableStateOf(defaults.uiChoiceSearchEmpty) }
     // Extractor
     var uiExDialogTitle by remember { mutableStateOf(defaults.uiExDialogTitle) }; var uiExInitLoadTip by remember { mutableStateOf(defaults.uiExInitLoadTip) }
     var uiExInitProgTip by remember { mutableStateOf(defaults.uiExInitProgTip) }; var uiExNoNeedTip by remember { mutableStateOf(defaults.uiExNoNeedTip) }
@@ -1402,6 +1465,9 @@ fun ToolboxIntegratorScreen(
         uiLogNoLogText = d.uiLogNoLogText; uiLogPresetSaveLabel = d.uiLogPresetSaveLabel; uiLogLocalSaveLabel = d.uiLogLocalSaveLabel
         uiDialogConfirm = d.uiDialogConfirm; uiDialogCancel = d.uiDialogCancel
         uiWelcomeGreeting = d.uiWelcomeGreeting; uiWelcomeEditTitle = d.uiWelcomeEditTitle; uiWelcomeEditHint = d.uiWelcomeEditHint
+        uiChoiceSelectAll = d.uiChoiceSelectAll; uiChoiceUnselectAll = d.uiChoiceUnselectAll
+        uiChoiceSearch = d.uiChoiceSearch; uiChoiceSearchClose = d.uiChoiceSearchClose
+        uiChoiceSearchHint = d.uiChoiceSearchHint; uiChoiceSearchEmpty = d.uiChoiceSearchEmpty
         uiExDialogTitle = d.uiExDialogTitle; uiExInitLoadTip = d.uiExInitLoadTip; uiExInitProgTip = d.uiExInitProgTip
         uiExNoNeedTip = d.uiExNoNeedTip; uiExSingleFileTip = d.uiExSingleFileTip; uiExMultiFileTip = d.uiExMultiFileTip
         uiExWaitingTip = d.uiExWaitingTip; uiExCompleteTip = d.uiExCompleteTip
@@ -1507,6 +1573,8 @@ fun ToolboxIntegratorScreen(
                 uiLogCopyDesc, uiLogClearDesc, uiLogNoLogText, uiLogPresetSaveLabel, uiLogLocalSaveLabel,
                 uiDlgDelSave, uiDlgEditUser, uiDlgShareTitle, uiDlgPackFail, uiDlgNoShare,
                 uiWelcomeEditTitle, uiWelcomeEditHint,
+                uiChoiceSelectAll, uiChoiceUnselectAll, uiChoiceSearch,
+                uiChoiceSearchClose, uiChoiceSearchHint, uiChoiceSearchEmpty,
                 saveDraft, gameDisplay, uiSetChangeProfile, uiSetShowNotUpdate, uiSetExitConfirm, uiSndSwitchClick,
                 schedules = schedules,
                 isUpdateMode = sourceMode == "update"
@@ -1947,6 +2015,8 @@ fun ToolboxIntegratorScreen(
                         uiLogCopyDesc, uiLogClearDesc, uiLogNoLogText, uiLogPresetSaveLabel, uiLogLocalSaveLabel,
                         uiDlgDelSave, uiDlgEditUser, uiDlgShareTitle, uiDlgPackFail, uiDlgNoShare,
                         uiWelcomeEditTitle, uiWelcomeEditHint,
+                        uiChoiceSelectAll, uiChoiceUnselectAll, uiChoiceSearch,
+                        uiChoiceSearchClose, uiChoiceSearchHint, uiChoiceSearchEmpty,
                         saveDraft, gameDisplay, uiSetChangeProfile, uiSetShowNotUpdate, uiSetExitConfirm, uiSndSwitchClick,
                         schedules = schedules,
                         isUpdateMode = sourceMode == "update"
@@ -2897,6 +2967,31 @@ fun ToolboxIntegratorScreen(
                                 UiInputCard("通用确认按钮（ui.dialog.confirm）", "") { IntegratorInputField(uiDialogConfirm, "如 确定") { uiDialogConfirm = it } }
                                 UiInputCard("通用取消按钮（ui.dialog.cancel）", "") { IntegratorInputField(uiDialogCancel, "如 取消") { uiDialogCancel = it } }
                                 UiInputCard("欢迎语模板（ui.welcome.greeting）", "") { IntegratorInputField(uiWelcomeGreeting, "如 欢迎您，%s") { uiWelcomeGreeting = it } }
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        // ui.choiceActions：ui.multiSelect / ui.select 弹窗右上角的胶囊与搜索文案
+                        PvzDialogCard(title = null) {
+                            Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                UiSectionHeader("选择弹窗文案")
+                                UiInputCard("全选按钮（ui.choiceActions.selectAll）", "有未选项时显示") {
+                                    IntegratorInputField(uiChoiceSelectAll, "如 全选", fieldKey = "ui.choiceActions.selectAll") { uiChoiceSelectAll = it }
+                                }
+                                UiInputCard("取消全选按钮（ui.choiceActions.unselectAll）", "已全选时同一位置显示") {
+                                    IntegratorInputField(uiChoiceUnselectAll, "如 取消", fieldKey = "ui.choiceActions.unselectAll") { uiChoiceUnselectAll = it }
+                                }
+                                UiInputCard("搜索按钮（ui.choiceActions.search）", "") {
+                                    IntegratorInputField(uiChoiceSearch, "如 搜索", fieldKey = "ui.choiceActions.search") { uiChoiceSearch = it }
+                                }
+                                UiInputCard("关闭搜索按钮（ui.choiceActions.searchClose）", "搜索展开后同一位置显示") {
+                                    IntegratorInputField(uiChoiceSearchClose, "如 关闭", fieldKey = "ui.choiceActions.searchClose") { uiChoiceSearchClose = it }
+                                }
+                                UiInputCard("搜索框占位文字（ui.choiceActions.searchHint）", "") {
+                                    IntegratorInputField(uiChoiceSearchHint, "如 搜索…", fieldKey = "ui.choiceActions.searchHint") { uiChoiceSearchHint = it }
+                                }
+                                UiInputCard("无匹配结果提示（ui.choiceActions.searchEmpty）", "") {
+                                    IntegratorInputField(uiChoiceSearchEmpty, "如 没有匹配的条目", fieldKey = "ui.choiceActions.searchEmpty") { uiChoiceSearchEmpty = it }
+                                }
                             }
                         }
                     }
@@ -5420,6 +5515,13 @@ private fun TbiItemEditor(
                 update { it.copy(smfList = v.split(",", "，").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }) }
             }
         }
+        // 图标尺寸（dp）：null 时跟随顶栏默认尺寸；只在数字时才写回，避免非法值被序列化
+        UiInputCard("图标宽度 dp（可选，空 = 跟随默认）（width）", "") {
+            IntegratorInputField(item.width, "如 28") { v -> update { it.copy(width = v.filter { c -> c.isDigit() }) } }
+        }
+        UiInputCard("图标高度 dp（可选，空 = 跟随默认）（height）", "") {
+            IntegratorInputField(item.height, "如 28") { v -> update { it.copy(height = v.filter { c -> c.isDigit() }) } }
+        }
     }
 }
 
@@ -5705,6 +5807,7 @@ private fun ItemSettingsContent(
                                 "CHECKBOX" to "勾选框",
                                 "RADIO" to "单选项",
                                 "SLIDER" to "滑块",
+                                "NUMBER" to "数量输入（± 步进）",
                                 "INPUT" to "文本输入",
                                 "INFO" to "信息展示"
                             )
@@ -5771,7 +5874,8 @@ private fun ItemSettingsContent(
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(smfList = v) }))
                                     }
                                 }
-                                "SLIDER" -> {
+                                // SLIDER 与 NUMBER 共用同一组数值字段（NUMBER 是 ± 精确步进版滑块）
+                                "SLIDER", "NUMBER" -> {
                                     Spacer(Modifier.height(4.dp))
                                     IntegratorInputField(item.minValue, "最小值", fieldKey = "minValue") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(minValue = v) }))
@@ -5787,6 +5891,12 @@ private fun ItemSettingsContent(
                                     }
                                     IntegratorInputField(item.valueSuffix, "数值后缀", fieldKey = "valueSuffix") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(valueSuffix = v) }))
+                                    }
+                                    if (item.type == "SLIDER") {
+                                        Spacer(Modifier.height(4.dp))
+                                        PvzCheckRow("显示 ± / Min / Max 步进按钮（showStepButtons）", item.showStepButtons) {
+                                            onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(showStepButtons = !item.showStepButtons) }))
+                                        }
                                     }
                                 }
                                 "BUTTON" -> {
@@ -5816,6 +5926,13 @@ private fun ItemSettingsContent(
                                     IntegratorInputField(item.infoValue, "静态显示文本", multiline = true, fieldKey = "infoValue") { v ->
                                         onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(infoValue = v) }))
                                     }
+                                }
+                            }
+                            // INFO / DESCRIPTION 限高：锁定卡片高度，超出部分在卡片内滚动（空 = 不限）
+                            if (item.type == "INFO" || item.type == "DESCRIPTION") {
+                                Spacer(Modifier.height(4.dp))
+                                IntegratorInputField(item.maxLines, "最大行数（空 = 不限，超出滚动）", fieldKey = "maxLines") { v ->
+                                    onUpdate(section.copy(items = items.toMutableList().also { it[i] = it[i].copy(maxLines = v) }))
                                 }
                             }
                             Spacer(Modifier.height(4.dp))
@@ -5848,9 +5965,11 @@ private fun ItemSettingsContent(
                     Text("BUTTON - 按钮，左文右钮或全宽横条", fontSize = 12.sp, color = Color(0xFF5D4E37))
                     Text("CHECKBOX - 勾选框", fontSize = 12.sp, color = Color(0xFF5D4E37))
                     Text("RADIO - 单选项（同 groupId 为一组）", fontSize = 12.sp, color = Color(0xFF5D4E37))
-                    Text("SLIDER - 滑块（min/max/step/valueSuffix）", fontSize = 12.sp, color = Color(0xFF5D4E37))
+                    Text("SLIDER - 滑块（min/max/step/valueSuffix，可用 showStepButtons 关掉 ±/Min/Max 按钮）", fontSize = 12.sp, color = Color(0xFF5D4E37))
+                    Text("NUMBER - 数量输入框（[−] 数值 [+] 长按连续，复用 min/max/step/valueSuffix）", fontSize = 12.sp, color = Color(0xFF5D4E37))
                     Text("INPUT - 文本输入框", fontSize = 12.sp, color = Color(0xFF5D4E37))
                     Text("INFO - 信息展示（infoValue + jsScript 动态值）", fontSize = 12.sp, color = Color(0xFF5D4E37))
+                    Text("INFO / DESCRIPTION - 可用 maxLines 限高，超出在卡片内滚动", fontSize = 12.sp, color = Color(0xFF5D4E37))
                     Spacer(Modifier.height(12.dp))
                     Text("name 和 desc 字段支持 {{red:}} {{green:}} 等复合颜色文本标记。", fontSize = 11.sp, color = PvzBorderBrown)
                 }
