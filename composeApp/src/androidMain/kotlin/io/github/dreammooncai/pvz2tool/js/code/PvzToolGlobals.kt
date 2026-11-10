@@ -324,7 +324,7 @@ object PvzToolGlobals {
         //           confirmColor?, cancelColor?, forceMaxForm?,
         //           selectAll?（右上角全选）, searchable?（右上角搜索）,
         //           quantity?（数量输入：true 或 {min,max,step,default,suffix}）,
-        //           reorderable?（长按拖动排序，默认 false）,
+        //           reorderable?（拖动排序，默认 false）, orderKey?（排序持久化键，默认 = title）,
         //           onCancel?, onSelect?, onResult? }
         //   forceMaxForm: true 时以最高形态展示（内容区固定上限高度，跳过探测重测，适合内容很多的场景）
         listOf("multiSelect".js, "多选".js).func(
@@ -376,6 +376,18 @@ object PvzToolGlobals {
             val reorderable = options?.get("reorderable".js, this)?.orNull?.toBoolean()
                 ?: options?.get("可排序".js, this)?.orNull?.toBoolean()
                 ?: options?.get("拖拽排序".js, this)?.orNull?.toBoolean() ?: false
+            // 排序持久化键：不传默认用 title，这样同一个弹窗下次打开会沿用上次的顺序；
+            // 明确想要「临时排序」时传 orderKey:null / ""。
+            val orderKey = if (reorderable) {
+                val raw = options?.get("orderKey".js, this)?.orNull
+                    ?: options?.get("排序键".js, this)?.orNull
+                when {
+                    raw == null || raw == io.github.alexzhirkevich.keight.js.Undefined -> title
+                    else -> toString(raw).ifBlank { null }
+                }
+            } else {
+                null
+            }
             val onReorder = bindJsCallback(options, "onReorder", runtime)
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onSelect = bindJsCallback(options, "onSelect", runtime)
@@ -404,6 +416,7 @@ object PvzToolGlobals {
                 quantitySuffix = quantitySuffix,
                 reorderable = reorderable,
                 onReorder = onReorder,
+                orderKey = orderKey,
                 onCancel = onCancel,
                 onSelect = onSelect,
                 onResult = onResult

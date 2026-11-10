@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.graphics.SolidColor
 import io.github.dreammooncai.pvz2tool.Pvz2ToolConfigUIChoiceActions
 import io.github.dreammooncai.pvz2tool.ui.PvzInput
+import io.github.dreammooncai.pvz2tool.ui.ItemOrder
 import io.github.dreammooncai.pvz2tool.ui.PvzNumberInput
 import io.github.dreammooncai.pvz2tool.ui.ReorderableItemGrid
 import io.github.dreammooncai.pvz2tool.ui.PvzJumpButton
@@ -240,6 +241,11 @@ data class JsSelectState(
     val reorderable: Boolean = false,
     /** 拖动排序结束后回调（收到按新顺序排列的 value 数组） */
     val onReorder: (suspend (JsAny?) -> Unit)? = null,
+    /**
+     * 排序持久化的 key：同一个 key 再次打开会沿用上次拖动后的顺序。
+     * null = 不持久化（临时排序）。
+     */
+    val orderKey: String? = null,
     val onCancel: (suspend (JsAny?) -> Unit)? = null,
     val onSelect: (suspend (JsAny?) -> Unit)? = null, // 单选：选中某项(value)即触发；多选：选中集合(values)变化时触发
     val deferredSingle: CompletableDeferred<String?>? = null,
@@ -1116,6 +1122,8 @@ object JsUiManager {
         /** 允许长按拖动调整条目顺序（网格/列表都生效） */
         reorderable: Boolean = false,
         onReorder: (suspend (JsAny?) -> Unit)? = null,
+        /** 排序持久化 key（null = 不持久化） */
+        orderKey: String? = null,
         onCancel: (suspend (JsAny?) -> Unit)? = null,
         onSelect: (suspend (JsAny?) -> Unit)? = null,
         onResult: (suspend (JsAny?) -> Unit)? = null
@@ -1150,6 +1158,7 @@ object JsUiManager {
             quantitySuffix = quantitySuffix,
             reorderable = reorderable,
             onReorder = onReorder,
+            orderKey = orderKey,
             onCancel = onCancel,
             onSelect = onSelect,
             deferredMulti = deferred
@@ -1982,8 +1991,22 @@ fun JsItemChoiceDialog() {
     var searchQuery by remember(choiceKey) { mutableStateOf("") }
     var quantity by remember(choiceKey) { mutableIntStateOf(state.quantityDefault) }
 
-    // 拖动排序后的下标顺序（仅多选 + reorderable 时可变；初始 = 配置顺序）
-    var itemOrder by remember(choiceKey) { mutableStateOf(state.items.indices.toList()) }
+    // 拖动排序后的下标顺序（仅多选 + reorderable 时可变）。
+    // 初始值：有持久化顺序（orderKey）则按它重排，否则用配置顺序。
+    // ⚠️ 用 remember(choiceKey) 而不是 remember(ids)：拖动过程中外部重组不应重置顺序。
+    var itemOrder by remember(choiceKey) {
+        val persistKey = state.orderKey
+        mutableStateOf(
+            if (state.reorderable && persistKey != null) {
+                val saved = ChoiceOrderStore.load(persistKey)
+                val values = state.items.map { it.value }
+                ItemOrder.applyOrder(configured = values, saved = saved)
+                    .mapNotNull { v -> state.items.indexOfFirst { it.value == v }.takeIf { it >= 0 } }
+            } else {
+                state.items.indices.toList()
+            }
+        )
+    }
 
     // 过滤后仍保留**原始下标**：选中态以原始下标为键，搜索期间勾选不会串条目。
     // 再按 itemOrder 排序（未拖动时与原始顺序一致）。
@@ -2160,6 +2183,10 @@ fun JsItemChoiceDialog() {
                         onOrderChange = { newIds ->
                             val newOrder = newIds.mapNotNull { it.toIntOrNull() }
                             itemOrder = newOrder
+                            // 持久化：同一个 orderKey 下次打开沿用这次的顺序
+                            state.orderKey?.let { key ->
+                                ChoiceOrderStore.save(key, newOrder.map { state.items[it].value })
+                            }
                             state.onReorder?.let { cb ->
                                 JsUiManager.uiScope.launch {
                                     JsUiManager.launchCallback(JsUiManager.frameByState(state)) {
@@ -2180,7 +2207,8 @@ fun JsItemChoiceDialog() {
                                 isMulti = true,
                                 showIndex = state.showIndex,
                                 showIndexColor = state.showIndexColor,
-                                onSelect = onSelect
+                                onSelect = onSelect,
+                                dragHandleModifier = handleModifier
                             )
                         } else {
                             ListChoiceRow(
@@ -2416,9 +2444,7 @@ private fun GridChoiceCell(
     showIndex: Boolean,
     showIndexColor: String,
     onSelect: (Int) -> Unit,
-    /** 是否在行尾显示「拖动把手」（仅多选 + reorderable 时开启） */
-    showDragHandle: Boolean = false,
-    /** 把手的拖动手势（按住把手可直接拖，不必长按整行） */
+    /** 拖动把手手势：贴到**图标**上（网格里只有长按图标才能拖） */
     dragHandleModifier: Modifier = Modifier,
 ) {
     val interaction = rememberSoundInteractionSource(
@@ -2430,7 +2456,12 @@ private fun GridChoiceCell(
             onSelect(index)
         }, horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(contentAlignment = Alignment.Center) {
+        // 手势贴在图标上：网格里「长按图标」才能拖，点文字/空白不拖。
+        // 容器给到 46dp（比图标 34dp 略大），长按更容易按中。
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = dragHandleModifier.size(46.dp)
+        ) {
             ItemIconOrPlaceholder(
                 item, 48.dp, index, item.showIndex ?: showIndex, item.showIndexColor ?: showIndexColor
             )
@@ -2464,7 +2495,7 @@ private fun ListChoiceRow(
     onSelect: (Int) -> Unit,
     /** 是否在行尾显示「拖动把手」（仅多选 + reorderable 时开启） */
     showDragHandle: Boolean = false,
-    /** 把手的拖动手势（按住把手可直接拖，不必长按整行） */
+    /** 把手的拖动手势（长按「≡」把手后拖动） */
     dragHandleModifier: Modifier = Modifier,
 ) {
     val interaction = rememberSoundInteractionSource(

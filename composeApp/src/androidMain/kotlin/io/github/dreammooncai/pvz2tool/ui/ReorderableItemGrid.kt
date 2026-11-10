@@ -1,6 +1,5 @@
 package io.github.dreammooncai.pvz2tool.ui
 
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +16,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,9 +36,11 @@ import kotlinx.coroutines.launch
 /**
  * 可**长按拖动排序**的条目容器，同时支持列表（[columns] = 1）与网格（[columns] > 1）。
  *
- * ## 交互
- * - 长按某格 → 抬起即可拖动；拖到别的格子上方 → 两者**换位**（实时预览）；
- * - 松手 → 通过 [onOrderChange] 回调把新顺序交给调用方持久化。
+ * ## 交互（按需求：只有「把手/图标」能拖，且都要长按）
+ * - 列表：长按行尾的「≡」把手后拖动；
+ * - 网格：长按格子里的**图标**后拖动；
+ * - 拖到别的格子上方 → 两者换位（带弹簧动画）；松手 → [onOrderChange] 回调新顺序。
+ * - 行体/格子空白处**不接管**拖动，避免和列表滚动、点击选择打架。
  *
  * ## 实现要点（都是踩过的坑）
  * 1. **用 `boundsInParent` 命中的不是手指位置，而是被拖格子的当前中心**。
@@ -86,6 +88,10 @@ fun ReorderableItemGrid(
                 horizontalArrangement = Arrangement.spacedBy(itemSpacing)
             ) {
                 rowIds.forEach { id ->
+                    // 🔴 必须 key(id)：换位后若按位置匹配，格子会被复用成「另一个条目」，
+                    // 手势协程随节点重建而中断 → onDragEnd 不触发、dragOffset 残留，
+                    // 表现为「拖到一半格子直接消失」。key 让节点跟着条目 id 走。
+                    key(id) {
                     CellScope(
                         id = id,
                         dragging = draggingId == id,
@@ -130,6 +136,7 @@ fun ReorderableItemGrid(
                     ) { dragging, handleModifier ->
                         content(id, dragging, handleModifier)
                     }
+                    }
                 }
                 // 末行不足 columns 时补空位，保证每格宽度一致
                 repeat(cols - rowIds.size) {
@@ -154,11 +161,11 @@ private fun RowScope.CellScope(
     onDragCancel: () -> Unit,
     content: @Composable (dragging: Boolean, handleModifier: Modifier) -> Unit,
 ) {
-    // 把手手势：**按下即拖**（`detectDragGestures` 不做长按等待，超过 touch slop 就开始），
-    // 与「长按整格拖动」共用同一套回调——两种入口都能拖。
+    // 把手/图标手势：**长按后**才能拖（与滚动、点击选择不打架）。
+    // 只有贴了这个 Modifier 的元素能起拖：列表 = 行尾「≡」把手，网格 = 图标本身。
     val handleModifier = if (enabled) {
         Modifier.pointerInput(id) {
-            detectDragGestures(
+            detectDragGesturesAfterLongPress(
                 onDragStart = { onDragStart() },
                 onDrag = { change, amount ->
                     change.consume()
@@ -217,18 +224,6 @@ private fun RowScope.CellScope(
                 alpha = if (dragging) 0.92f else 1f
             }
             .zIndex(if (dragging) 1f else 0f)
-            .pointerInput(id, enabled) {
-                if (!enabled) return@pointerInput
-                detectDragGesturesAfterLongPress(
-                    onDragStart = { onDragStart() },
-                    onDrag = { change, amount ->
-                        change.consume()
-                        onDrag(amount)
-                    },
-                    onDragEnd = { onDragEnd() },
-                    onDragCancel = { onDragCancel() }
-                )
-            }
     ) {
         content(dragging, handleModifier)
     }

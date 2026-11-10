@@ -65,6 +65,7 @@ class UiShowcaseTest {
                         quantityDefault = 3,
                         quantitySuffix = "个",
                         reorderable = true,
+                        orderKey = "demo_list",
                         forceMaxForm = true
                     ).await()
                 }
@@ -90,6 +91,7 @@ class UiShowcaseTest {
                         selectAllEnabled = true,
                         searchEnabled = true,
                         reorderable = true,
+                        orderKey = "demo_grid",
                         forceMaxForm = true
                     ).await()
                 }

@@ -204,7 +204,7 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
                     "• 右上角「全选」：对当前**过滤后**的条目一键全选 / 取消全选\n" +
                     "• 右上角「搜索」：按名称过滤条目（勾选状态不受过滤影响）\n" +
                     "• 数量行：「±」步进、长按连续增减、「Min」「Max」直达边界\n" +
-                    "• 长按条目可**拖动排序**（网格/列表都生效），返回顺序即拖动后的顺序\n" +
+                    "• 拖动排序会**持久化**（同 orderKey 下次打开沿用）；列表行尾「≡」把手按住即拖\n" +
                     "• 确定返回 {values:[...], count:n}",
             color = Color(0xFF8A9199),
             fontSize = 12.sp
@@ -225,6 +225,7 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
                     quantityDefault = 3,
                     quantitySuffix = "个",
                     reorderable = true,
+                    orderKey = "demo_list",
                     forceMaxForm = true
                 ).await()
             }
@@ -251,6 +252,7 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
                     selectAllEnabled = true,
                     searchEnabled = true,
                     reorderable = true,
+                    orderKey = "demo_grid",
                     forceMaxForm = true
                 ).await()
             }

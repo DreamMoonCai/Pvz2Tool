@@ -2006,8 +2006,10 @@ var t = ui.select("难度", ["简单", "普通", "困难"]);
 
 > 「全选」只作用于**当前过滤结果**：搜索「阳光」时点全选，只会勾选名字含「阳光」的条目，被过滤掉的条目选中状态不变。
 >
-> 开启 `reorderable` 后：列表行右侧出现「≡」把手，**按住把手直接拖动**（或长按整行）→ 松手换位；网格里长按图标拖动。
-> 返回的 `values` 与 `onReorder` 回调都按新顺序给出；条目顺序不会持久化，需由脚本自己保存。
+> 开启 `reorderable` 后：列表长按行尾「≡」把手拖动、网格长按图标拖动 → 松手换位（带弹簧动画）。
+> 返回的 `values` 与 `onReorder` 回调都按新顺序给出。
+> 顺序默认按 `orderKey`（缺省=标题）**持久化**，下次打开沿用；配置增删条目时自动合并。
+> 想每次都用配置顺序：`orderKey: ""`。
 
 **示例**：
 ```javascript
@@ -4968,3 +4970,4 @@ console.log(window.__count);
 *新增：ui.slider/ui.滑块 的 options 新增 stepButtons（与滑块同一行的「Min − [轨道] + Max」：± 单击步进 step、长按 400ms 后每 80ms 连续增减、Min/Max 直达边界，按钮高 30dp 与 20dp 轨道同比例，默认 true）与 minMaxButtons（是否显示 Min/Max，默认 true）；配置栏目 SectionItem 的 SLIDER 同步新增 showStepButtons（默认 true）。最值按钮符号由 « » 改为文字 Min/Max，且与 ± 统一为同一套绿色实心胶囊（原轻量描边样式与 ± 并排像四个不同控件）*
 *新增：ui.multiSelect/ui.多选 的 options 新增 reorderable（长按拖动排序，网格/列表都生效，搜索过滤期间自动禁用）与 onReorder 回调；返回的 values 与 onSelect/onReorder 均按拖动后的顺序排列*
 *优化：ui.multiSelect 拖动排序体验——列表行右侧的「≡」把手可**按下即拖**（30×36dp 触摸区，不必长按整行；网格仍为长按图标拖动）；换位改用弹簧位移动画（记录上一帧位置 → 以旧位移作起始偏移收敛到 0），不再瞬移生硬*
+*优化：ui.multiSelect 拖动排序改为「长按把手/图标」起拖（行体与空白处不再响应，避免误拖）；新增 orderKey（排序持久化键，默认=标题，传 "" 关闭）——拖动结果写入 SharedPreferences，下次打开按 ItemOrder 合并后还原；修复换位后单元格未 key 导致 dragging 状态错位、格子拖到一半消失的问题*
