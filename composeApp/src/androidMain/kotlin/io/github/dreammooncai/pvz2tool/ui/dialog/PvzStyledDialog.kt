@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -25,8 +26,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +51,7 @@ import io.github.dreammooncai.pvz2tool.view.PvzRedButton
 import io.github.dreammooncai.pvz2tool.view.PvzRichText
 import io.github.dreammooncai.pvz2tool.view.PvzTextWhiteStyle
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * PVZ 风格弹窗卡片外壳：奶黄渐变底 + 三层绿框 + 绿色标题栏。
@@ -76,12 +85,27 @@ fun PvzDialogCard(
             modifier = Modifier.padding(vertical = if (title != null) 10.dp else 8.dp)
         ) {
             if (title != null) {
-                // 标题栏（标题居中；右侧浮层放操作按钮，避免挤占/换行）
+                // 标题栏：标题**优先居中**；只有居中会压到右侧按钮时，才向左让出「差的那部分」。
+                // 用 onSizeChanged 量三个宽度来算位移（不能用 BoxWithConstraints：
+                // 它是 SubcomposeLayout，在本弹窗的 intrinsic 测量探测下会崩）。
+                var barWidthPx by remember { mutableIntStateOf(0) }
+                var titleWidthPx by remember { mutableIntStateOf(0) }
+                var trailingWidthPx by remember { mutableIntStateOf(0) }
+                val density = LocalDensity.current
+                val gapPx = with(density) { 8.dp.toPx() }
+
+                val centeredLeft = (barWidthPx - titleWidthPx) / 2f
+                val rightLimit = barWidthPx - trailingWidthPx - gapPx
+                // 居中时标题右缘超出按钮左缘多少 → 需要左移多少（且不超过「贴左」）
+                val overflow = centeredLeft + titleWidthPx - rightLimit
+                val shiftPx = overflow.coerceIn(0f, centeredLeft.coerceAtLeast(0f))
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Brush.verticalGradient(colors = listOf(Color(0xFF88CD23), Color(0xFF97DC02))))
-                        .padding(vertical = 15.dp),
+                        .padding(vertical = 15.dp)
+                        .onSizeChanged { barWidthPx = it.width },
                     contentAlignment = Alignment.Center
                 ) {
                     PvzRichText(
@@ -89,13 +113,15 @@ fun PvzDialogCard(
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         defaultStyle = PvzTextWhiteStyle.copy(shadowColor = null),
-                        // 左右留出胶囊按钮的空间，标题过长时在中间区域换行而不是与按钮重叠
-                        modifier = Modifier.padding(horizontal = 112.dp)
+                        modifier = Modifier
+                            .onSizeChanged { titleWidthPx = it.width }
+                            .offset { IntOffset(-shiftPx.roundToInt(), 0) }
                     )
                     Row(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .padding(end = 10.dp),
+                            .padding(end = 10.dp)
+                            .onSizeChanged { trailingWidthPx = it.width },
                         verticalAlignment = Alignment.CenterVertically,
                         content = headerTrailingContent
                     )

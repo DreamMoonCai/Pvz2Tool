@@ -232,6 +232,32 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
 
         Spacer(Modifier.height(6.dp))
 
+        // ========== ①-b 网格布局（带图标，长按图标拖动） ==========
+        ShowcaseLabel("①-b 多选弹窗 · 网格布局（长按图标拖动排序）")
+        Text(
+            text = "条目 ≥ 8 且带 icon 时自动切网格；长按任一格子拖动即可换位（网格没有把手）。\n" +
+                    "配合 selectAll / searchable 使用：先搜索再全选，只作用于过滤结果。",
+            color = Color(0xFF8A9199),
+            fontSize = 12.sp
+        )
+        ShowcaseActionButton("弹出多选弹窗（网格布局）") {
+            scope.launch {
+                JsUiManager.showMultiSelect(
+                    ownerContext = null,
+                    title = "选择要启用的功能（网格）",
+                    items = DEMO_GRID_CHOICES,
+                    defaultValues = listOf("sun"),
+                    columns = 3,
+                    selectAllEnabled = true,
+                    searchEnabled = true,
+                    reorderable = true,
+                    forceMaxForm = true
+                ).await()
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
         // ========== ② 滑块弹窗（同样带 ±/«» 步进） ==========
         ShowcaseLabel("② 滑块弹窗：ui.slider(title, options)")
         Text(
@@ -292,6 +318,19 @@ private val DEMO_CHOICES = listOf(
     JsChoiceItem(name = "免内购", value = "iap"),
     JsChoiceItem(name = "关卡解锁", value = "level"),
     JsChoiceItem(name = "植物全解锁", value = "plants")
+)
+
+/** 网格布局演示数据：9 条带图标（≥8 且带 icon 才会进网格），循环复用已有图标资源 */
+private val DEMO_GRID_CHOICES = listOf(
+    JsChoiceItem(name = "阳光无限", value = "sun", icon = "auto_collect.png"),
+    JsChoiceItem(name = "冷却无CD", value = "cool", icon = "save_icon.png"),
+    JsChoiceItem(name = "自动收集", value = "auto", icon = "auto_collect.png"),
+    JsChoiceItem(name = "自动种植", value = "plant", icon = "save_icon.png"),
+    JsChoiceItem(name = "加速战斗", value = "speed", icon = "new_version_icon.png"),
+    JsChoiceItem(name = "无限金币", value = "gold", icon = "old_version_icon.png"),
+    JsChoiceItem(name = "无限钻石", value = "diamond", icon = "new_version_icon.png"),
+    JsChoiceItem(name = "关卡解锁", value = "level", icon = "old_version_icon.png"),
+    JsChoiceItem(name = "植物全解锁", value = "plants", icon = "ic_floating_dave.png")
 )
 
 /** 演示用按钮 */

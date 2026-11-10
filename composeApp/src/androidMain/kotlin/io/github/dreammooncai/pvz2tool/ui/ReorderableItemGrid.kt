@@ -1,5 +1,6 @@
 package io.github.dreammooncai.pvz2tool.ui
 
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,6 +11,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -26,6 +31,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.launch
 
 /**
  * 可**长按拖动排序**的条目容器，同时支持列表（[columns] = 1）与网格（[columns] > 1）。
@@ -45,7 +51,10 @@ import androidx.compose.ui.zIndex
  * @param ids 当前要展示的条目 id（顺序 = 初始顺序）
  * @param columns 每行列数；1 = 列表
  * @param onOrderChange 拖动结束后回调新顺序（仅本次展示的 id 子集）
- * @param content 单格内容；`dragging` 为 true 时表示该格正在被拖动
+ * @param content 单格内容：
+ *   - `dragging` 为 true 表示该格正在被拖动；
+ *   - [handleModifier] 是「拖动把手」手势：贴到某个图标上即可**按住把手直接拖**（无需长按），
+ *     列表布局靠它给出可拖动提示（不然用户不知道能拖）。
  */
 @Composable
 fun ReorderableItemGrid(
@@ -55,7 +64,7 @@ fun ReorderableItemGrid(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     itemSpacing: Dp = 8.dp,
-    content: @Composable (id: String, dragging: Boolean) -> Unit,
+    content: @Composable (id: String, dragging: Boolean, handleModifier: Modifier) -> Unit,
 ) {
     // 本地顺序：拖动过程只改它，松手才回调（见实现要点 3）
     var order by remember(ids) { mutableStateOf(ids) }
@@ -118,8 +127,8 @@ fun ReorderableItemGrid(
                             dragOffset = Offset.Zero
                             order = ids
                         }
-                    ) { dragging ->
-                        content(id, dragging)
+                    ) { dragging, handleModifier ->
+                        content(id, dragging, handleModifier)
                     }
                 }
                 // 末行不足 columns 时补空位，保证每格宽度一致
@@ -143,16 +152,65 @@ private fun RowScope.CellScope(
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
     onDragCancel: () -> Unit,
-    content: @Composable (dragging: Boolean) -> Unit,
+    content: @Composable (dragging: Boolean, handleModifier: Modifier) -> Unit,
 ) {
+    // 把手手势：**按下即拖**（`detectDragGestures` 不做长按等待，超过 touch slop 就开始），
+    // 与「长按整格拖动」共用同一套回调——两种入口都能拖。
+    val handleModifier = if (enabled) {
+        Modifier.pointerInput(id) {
+            detectDragGestures(
+                onDragStart = { onDragStart() },
+                onDrag = { change, amount ->
+                    change.consume()
+                    onDrag(amount)
+                },
+                onDragEnd = { onDragEnd() },
+                onDragCancel = { onDragCancel() }
+            )
+        }
+    } else {
+        Modifier
+    }
+
+    // ===== 换位动画 =====
+    // 布局是「即时」的：换位后格子瞬间出现在新位置。这里记住上一帧位置，
+    // 一旦检测到位置变化就把「旧位置 - 新位置」作为起始偏移，弹簧动画收敛到 0，
+    // 视觉上就是从原位置滑到新位置（而不是瞬移）。
+    val animOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    var lastTopLeft by remember { mutableStateOf<Offset?>(null) }
+    var wasDragging by remember { mutableStateOf(false) }
+    val animScope = rememberCoroutineScope()
+
     Box(
         modifier = Modifier
             .weight(1f)
-            .onGloballyPositioned { onBoundsChanged(it.boundsInParent()) }
+            .onGloballyPositioned { coords ->
+                val rect = coords.boundsInParent()
+                onBoundsChanged(rect)
+                val prev = lastTopLeft
+                // 刚结束拖动的格子直接落在新位置，不要再从旧位置滑一次
+                if (wasDragging && !dragging) {
+                    lastTopLeft = rect.topLeft
+                    wasDragging = dragging
+                    return@onGloballyPositioned
+                }
+                wasDragging = dragging
+                if (prev != null && !dragging && prev != rect.topLeft) {
+                    animScope.launch {
+                        animOffset.snapTo(prev - rect.topLeft)
+                        animOffset.animateTo(
+                            targetValue = Offset.Zero,
+                            animationSpec = spring(dampingRatio = 0.78f, stiffness = 620f)
+                        )
+                    }
+                }
+                lastTopLeft = rect.topLeft
+            }
             .graphicsLayer {
-                val offset = dragOffsetProvider()
-                translationX = offset.x
-                translationY = offset.y
+                val drag = dragOffsetProvider()
+                val anim = animOffset.value
+                translationX = drag.x + anim.x
+                translationY = drag.y + anim.y
                 // 拖动中的格子放大一点并浮到最上层，明确「正在拖它」
                 scaleX = if (dragging) 1.06f else 1f
                 scaleY = if (dragging) 1.06f else 1f
@@ -172,6 +230,6 @@ private fun RowScope.CellScope(
                 )
             }
     ) {
-        content(dragging)
+        content(dragging, handleModifier)
     }
 }

@@ -16,8 +16,8 @@ import org.junit.runner.RunWith
  * **新增 API 弹窗的效果演示（只跑这一条，不涉及视频/音频）**
  *
  * 启动 [ApiShowcaseActivity] 后依次展示两个弹窗：
- * 1. **多选弹窗增强**：标题栏右上角「全选 / 搜索」+ 数量行「± / « / »」，
- *    停留期间可以**手动点按**体验（搜索「阳光」看过滤，全选看批量勾选）；
+ * 1. **多选弹窗 · 列表布局**：标题栏「全选 / 搜索」+ 数量行 + 每行「≡」拖动把手（按下即拖）；
+ * 1-b. **多选弹窗 · 网格布局**：带图标（≥8 条）自动切网格，**长按图标拖动**换位；
  * 2. **数量弹窗**：`ui.number` 独立用法。
  *
  * 运行（约 25 秒）：
@@ -74,6 +74,30 @@ class UiShowcaseTest {
             JsUiManager.hideSelect()
             delay(600)
             multiJob.cancel()
+
+            // ================= ①-b 多选弹窗（网格布局，长按图标拖动） =================
+            instrumentation.runOnMainSync {
+                ApiShowcaseState.step = "①-b 网格布局：长按图标拖动换位（3 列）"
+            }
+            val gridJob = launch(Dispatchers.Main) {
+                runCatching {
+                    JsUiManager.showMultiSelect(
+                        ownerContext = null,
+                        title = "选择要启用的功能（网格）",
+                        items = GRID_CHOICES,
+                        defaultValues = listOf("sun"),
+                        columns = 3,
+                        selectAllEnabled = true,
+                        searchEnabled = true,
+                        reorderable = true,
+                        forceMaxForm = true
+                    ).await()
+                }
+            }
+            delay(10_000)
+            JsUiManager.hideSelect()
+            delay(600)
+            gridJob.cancel()
 
             // ================= ② 滑块弹窗（带 ± / « » 步进） =================
             instrumentation.runOnMainSync {
@@ -138,6 +162,19 @@ class UiShowcaseTest {
             JsChoiceItem(name = "免内购", value = "iap"),
             JsChoiceItem(name = "关卡解锁", value = "level"),
             JsChoiceItem(name = "植物全解锁", value = "plants")
+        )
+
+        /** 网格布局演示：9 条带图标（≥8 且带 icon 才会进网格） */
+        val GRID_CHOICES = listOf(
+            JsChoiceItem(name = "阳光无限", value = "sun", icon = "auto_collect.png"),
+            JsChoiceItem(name = "冷却无CD", value = "cool", icon = "save_icon.png"),
+            JsChoiceItem(name = "自动收集", value = "auto", icon = "auto_collect.png"),
+            JsChoiceItem(name = "自动种植", value = "plant", icon = "save_icon.png"),
+            JsChoiceItem(name = "加速战斗", value = "speed", icon = "new_version_icon.png"),
+            JsChoiceItem(name = "无限金币", value = "gold", icon = "old_version_icon.png"),
+            JsChoiceItem(name = "无限钻石", value = "diamond", icon = "new_version_icon.png"),
+            JsChoiceItem(name = "关卡解锁", value = "level", icon = "old_version_icon.png"),
+            JsChoiceItem(name = "植物全解锁", value = "plants", icon = "ic_floating_dave.png")
         )
     }
 }

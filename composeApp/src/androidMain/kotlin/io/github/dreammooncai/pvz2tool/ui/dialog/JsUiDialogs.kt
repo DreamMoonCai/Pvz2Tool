@@ -1,5 +1,6 @@
 package io.github.dreammooncai.pvz2tool.ui.dialog
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,6 +34,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
@@ -2164,7 +2168,7 @@ fun JsItemChoiceDialog() {
                                 }
                             }
                         }
-                    ) { cellId, _ ->
+                    ) { cellId, _, handleModifier ->
                         val index = cellId.toInt()
                         val choice = state.items[index]
                         if (isGrid) {
@@ -2187,7 +2191,9 @@ fun JsItemChoiceDialog() {
                                 isMulti = true,
                                 showIndex = state.showIndex,
                                 showIndexColor = state.showIndexColor,
-                                onSelect = onSelect
+                                onSelect = onSelect,
+                                showDragHandle = true,
+                                dragHandleModifier = handleModifier
                             )
                         }
                     }
@@ -2317,8 +2323,8 @@ private fun ChoiceHeaderChip(
 
     Box(
         modifier = Modifier
-            .padding(start = 6.dp)
-            .height(24.dp)
+            .padding(start = 5.dp)
+            .height(22.dp)
             .clip(shape)
             .background(background)
             .border(1.5.dp, Color(0xFF344702), shape)
@@ -2328,13 +2334,13 @@ private fun ChoiceHeaderChip(
                 }
                 onClick()
             }
-            .padding(horizontal = 9.dp),
+            .padding(horizontal = 7.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
             color = textColor,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1
         )
@@ -2409,7 +2415,11 @@ private fun GridChoiceCell(
     isMulti: Boolean,
     showIndex: Boolean,
     showIndexColor: String,
-    onSelect: (Int) -> Unit
+    onSelect: (Int) -> Unit,
+    /** 是否在行尾显示「拖动把手」（仅多选 + reorderable 时开启） */
+    showDragHandle: Boolean = false,
+    /** 把手的拖动手势（按住把手可直接拖，不必长按整行） */
+    dragHandleModifier: Modifier = Modifier,
 ) {
     val interaction = rememberSoundInteractionSource(
         InitializePvz2.config.ui.sounds.switchClickPress, InitializePvz2.config.ui.sounds.switchClickRelease
@@ -2451,7 +2461,11 @@ private fun ListChoiceRow(
     isMulti: Boolean,
     showIndex: Boolean,
     showIndexColor: String,
-    onSelect: (Int) -> Unit
+    onSelect: (Int) -> Unit,
+    /** 是否在行尾显示「拖动把手」（仅多选 + reorderable 时开启） */
+    showDragHandle: Boolean = false,
+    /** 把手的拖动手势（按住把手可直接拖，不必长按整行） */
+    dragHandleModifier: Modifier = Modifier,
 ) {
     val interaction = rememberSoundInteractionSource(
         InitializePvz2.config.ui.sounds.switchClickPress, InitializePvz2.config.ui.sounds.switchClickRelease
@@ -2487,6 +2501,51 @@ private fun ListChoiceRow(
                 imageVector = if (selected) Pvz2Icon.HookSelect else Pvz2Icon.Hook,
                 contentDescription = if (selected) "已选中" else "未选中",
                 modifier = Modifier.size(20.dp)
+            )
+        }
+
+        if (showDragHandle) {
+            Spacer(modifier = Modifier.width(4.dp))
+            // 🔴 手势挂在外层 30×36dp 的盒子上（而不是画图标的 14×16dp）：
+            // 之前把 size 写在 padding 前，实际可点区域被内缩成 14×18dp，
+            // 手指很难按中 → 表现为「拖不动，只能长按整行」。
+            Box(
+                modifier = dragHandleModifier
+                    .size(width = 30.dp, height = 36.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0x146B7A2E)),
+                contentAlignment = Alignment.Center
+            ) {
+                DragHandleIcon(
+                    modifier = Modifier.size(width = 14.dp, height = 16.dp),
+                    color = Color(0xFF6B7A2E)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 「拖动把手」图标：三根横条（≡）。
+ *
+ * 用 Canvas 画而不是用 Material 的 `DragHandle` 图标：核心图标包里没有它，
+ * 而且自绘更贴合 PVZ 的粗描边观感（线与线的间距、粗细可按 dp 精确控制）。
+ */
+@Composable
+private fun DragHandleIcon(
+    modifier: Modifier = Modifier,
+    color: Color = Color(0xFF6B7A2E),
+) {
+    Canvas(modifier = modifier) {
+        val barHeight = size.height / 7f
+        val gap = (size.height - barHeight * 3) / 2f
+        repeat(3) { i ->
+            val top = i * (barHeight + gap)
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(0f, top),
+                size = Size(size.width, barHeight),
+                cornerRadius = CornerRadius(barHeight / 2f)
             )
         }
     }
