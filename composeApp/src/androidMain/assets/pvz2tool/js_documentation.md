@@ -2601,6 +2601,19 @@ let t = timer.set(() => {
 }, 500);
 ```
 
+### 想直接看到调用效果？
+
+项目内置了一个**演示用仪器化测试**：运行后模拟器屏幕会依次展示真实效果
+（日志面板逐条刷新 → 视频全屏播放 / 暂停 / 继续 / 跳转 / 关闭 → 音效播放），
+并有断言校验（含「视频确实在播放而非降级成海报」）。
+
+```bash
+./gradlew :composeApp:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=io.github.dreammooncai.pvz2tool.ApiShowcaseTest
+```
+
+> 演示界面代码位于 `src/androidDebug` 变体源集，**不会打进 release 正式包**。
+
 ---
 
 ## 8.8. log - 日志读写

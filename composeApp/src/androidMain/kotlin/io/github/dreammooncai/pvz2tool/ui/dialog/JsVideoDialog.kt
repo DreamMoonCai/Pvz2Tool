@@ -1,15 +1,16 @@
 package io.github.dreammooncai.pvz2tool.ui.dialog
 
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.view.CgVideoPlayer
@@ -191,22 +192,32 @@ object JsVideoManager {
 /**
  * JS 视频弹窗宿主。挂在 `JsDialogsHost()` 上，与其它 JS 弹窗共用同一套弹窗机制，
  * 内部直接复用 [CgVideoPlayer]，播放行为与游戏内 CG 完全一致。
+ *
+ * 🔴 这里刻意**不用** M3 的 `BasicAlertDialog`（其它 JS 弹窗用的那个）：
+ * 它内部会给内容套上 `DialogMinWidth=280dp` / `DialogMaxWidth=560dp` 的尺寸约束，
+ * 即便 `usePlatformDefaultWidth = false`，视频也只会显示在中间一小块里（「视频没有全屏」）。
+ * 改用无该约束的 [Dialog]，配合 `usePlatformDefaultWidth = false` +
+ * `decorFitsSystemWindows = false`（窗口延伸进状态栏/导航栏后面），才是真正的全屏。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JsVideoDialog() {
     val state by JsVideoManager.state.collectAsState()
     val path = state.path
     if (!state.isVisible || path == null) return
 
-    BasicAlertDialog(
+    Dialog(
         onDismissRequest = { JsVideoManager.stop() },
         properties = DialogProperties(
             dismissOnClickOutside = false,
-            usePlatformDefaultWidth = false
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
         )
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
             // 按 session 重建：同一地址再次播放时也要从头开始
             key(state.session) {
                 CgVideoPlayer(

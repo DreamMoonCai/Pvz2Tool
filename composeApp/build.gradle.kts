@@ -161,6 +161,12 @@ kotlin {
             implementation(libs.androidx.testExt.junit)
             implementation(libs.androidx.espresso.core)
             implementation("androidx.test:runner:1.7.0")
+            // 演示 Activity 需要 Compose（承载 JsDialogsHost 以便视频弹窗真正显示在屏幕上）
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material3)
+            implementation(libs.compose.ui)
+            implementation(libs.androidx.activity.compose)
         }
         all {
             languageSettings.enableLanguageFeature("ContextParameters")
@@ -215,6 +221,14 @@ android {
         unitTests.isReturnDefaultValues = true
     }
 }
+
+// ──────────────────────────────────────────────────────────────
+// 「一键看到 API 调用效果」的运行方式（演示用 Activity 在 src/androidDebug，不进 release 包）：
+//   ./gradlew :composeApp:connectedDebugAndroidTest \
+//     -Pandroid.testInstrumentationRunnerArguments.class=io.github.dreammooncai.pvz2tool.ApiShowcaseTest
+// 运行后模拟器屏幕会依次展示：日志面板刷新 → 视频全屏播放/暂停/继续/跳转/关闭 → 音效播放。
+// 想跑全部仪器化测试时去掉 -Pandroid.testInstrumentationRunnerArguments.class=... 即可。
+// ──────────────────────────────────────────────────────────────
 
 // ============================================================
 // 删除所有 dimen 变体（兼容 configuration cache）
