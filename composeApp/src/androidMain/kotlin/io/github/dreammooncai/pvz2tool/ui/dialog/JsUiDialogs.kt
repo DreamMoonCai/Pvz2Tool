@@ -13,6 +13,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -2217,7 +2219,8 @@ fun JsItemChoiceDialog() {
                 }
 
                 // 多选 + reorderable：网格/列表都用可拖动容器（长按格子拖动换位）
-                if (isMulti && state.reorderable) {
+                // 例外：开了「更多」折叠时交给 FoldedChoicesRow（它自己支持跨区拖动）
+                if (isMulti && state.reorderable && !foldEnabled) {
                     ReorderableItemGrid(
                         ids = headChoices.map { it.first.toString() },
                         columns = if (isGrid) state.columns.coerceIn(2, 6) else 1,
@@ -2283,7 +2286,21 @@ fun JsItemChoiceDialog() {
                             state = state,
                             selectedIndices = selectedIndices,
                             selectedIndex = selectedIndex,
-                            onSelect = onSelect
+                            onSelect = onSelect,
+                            onOrderChange = { newOrder ->
+                                // 拖动（含跨「更多」边界）后同步全局顺序 + 持久化 + 回调
+                                itemOrder = newOrder + visibleIndices.filter { it !in newOrder }
+                                state.orderKey?.let { key ->
+                                    ChoiceOrderStore.save(key, newOrder.map { state.items[it].value })
+                                }
+                                state.onReorder?.let { cb ->
+                                    JsUiManager.uiScope.launch {
+                                        JsUiManager.launchCallback(JsUiManager.frameByState(state)) {
+                                            cb(newOrder.map { state.items[it].value.js }.js)
+                                        }
+                                    }
+                                }
+                            }
                         )
                     } else if (state.forceMaxForm) { // 最高形态：选项可能极多，用 LazyVerticalGrid 懒加载（仅组合可见项）
                         LazyVerticalGrid(
@@ -2509,84 +2526,138 @@ private fun FoldedChoicesRow(
     state: JsSelectState,
     selectedIndices: Set<Int>,
     selectedIndex: Int,
-    onSelect: (Int) -> Unit
+    onSelect: (Int) -> Unit,
+    onOrderChange: (List<Int>) -> Unit
 ) {
     val density = LocalDensity.current
     var expanded by remember(state) { mutableStateOf(false) }
+    val limit = more.limit.coerceAtLeast(1)
+
+    // 🔴 折叠区和首屏共用**一条**顺序：拖动可跨越「更多」边界（外面的能拖进去、里面的能拖出来）。
+    val allItems = remember(head, tail) { (head + tail).associateBy { it.first } }
+    var order by remember(state) { mutableStateOf((head + tail).map { it.first }) }
+    val orderedHead = order.take(limit).mapNotNull { allItems[it] }
+    val orderedTail = order.drop(limit).mapNotNull { allItems[it] }
+
     val visible = more.visible.coerceAtLeast(1)
     var cellPx by remember { mutableIntStateOf(0) }
     var contentPx by remember { mutableIntStateOf(0) }
-    val cellWidth = with(density) { cellPx.toDp() }
-    // 胶囊内容区里正好排下 visible 个格子
     val tailCellWidth = with(density) {
         (if (contentPx > 0) contentPx.toFloat() / visible else cellPx.toFloat()).toDp()
     }
+    val stepPx = cellPx.toFloat().coerceAtLeast(1f)
+    val columns = state.columns.coerceIn(2, 6)
 
-    // 🔴 宽度一律用 weight 分配（弹窗里取不到可靠的父宽）：
-    //    收起 = [格子 × N 均分剩余] + [折叠胶囊（文字宽 + 按钮宽，自然宽度）]
-    //    展开 = [格子 × N 均分] + [折叠胶囊占 (可见数 + 1) 个槽位，内部三段]
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        head.forEach { entry ->
-            val (i, item) = entry
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .onSizeChanged { if (it.width > 0) cellPx = it.width }
-            ) {
-                GridChoiceCell(
-                    modifier = Modifier.fillMaxWidth(),
-                    item = item,
-                    index = i,
-                    selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
-                    isMulti = state.mode == "multi",
-                    showIndex = state.showIndex,
-                    showIndexColor = state.showIndexColor,
-                    onSelect = onSelect,
-                    // 展开时前面的格子也一起缩小，别让文字被截断
-                    contentScale = if (expanded) 0.75f else 1f
+    /** 长按图标拖动换位（首屏与胶囊内通用；跨越 limit 自动在两边换人） */
+    val dragModifier: (Int) -> Modifier = { id ->
+        if (!state.reorderable) {
+            Modifier
+        } else {
+            Modifier.pointerInput(id, stepPx) {
+                var acc = 0f
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { acc = 0f },
+                    onDragEnd = { onOrderChange(order) },
+                    onDragCancel = { onOrderChange(order) },
+                    onDrag = { change, drag ->
+                        change.consume()
+                        acc += drag.x
+                        val step = (acc / stepPx).toInt()
+                        if (step != 0) {
+                            val cur = order.indexOf(id)
+                            if (cur >= 0) {
+                                val target = (cur + step).coerceIn(0, order.lastIndex)
+                                if (target != cur) {
+                                    order = ItemOrder.move(
+                                        order.map { it.toString() },
+                                        id.toString(),
+                                        order[target].toString()
+                                    ).mapNotNull { it.toIntOrNull() }
+                                }
+                            }
+                            acc -= step * stepPx
+                        }
+                    }
                 )
             }
         }
+    }
 
-        // 三段式：文字常驻，只有中间内容段受开关控制。
-        // 🔴 宽度用 **weight 动画**：每帧重新分配，视觉上就是「中间慢慢打开、前面格子同步缩小」。
-        val foldWeight by animateFloatAsState(
-            targetValue = if (expanded) (visible + 1).toFloat() else 1.3f,
-            animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
-            label = "fold_row_weight"
-        )
-        RowFoldSegment(
-            text = more.text.ifBlank { null },
-            expanded = expanded,
-            modifier = Modifier.weight(foldWeight.coerceAtLeast(0.05f)),
-            buttonWidth = 40.dp,
-            barHeight = 74.dp,
-            onClick = { expanded = !expanded },
-            onContentWidthChange = { contentPx = it }
-        ) {
-            LazyRow(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+    val foldWeight by animateFloatAsState(
+        targetValue = if (expanded) (visible + 1).toFloat() else 1.6f,
+        animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+        label = "fold_row_weight"
+    )
+
+    // 首屏按 columns 分行；「更多」胶囊接在**最后一行末尾**
+    Column(modifier = Modifier.fillMaxWidth()) {
+        orderedHead.chunked(columns).forEachIndexed { rowIdx, row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                items(tail, key = { it.first }) { entry ->
+                row.forEach { entry ->
                     val (i, item) = entry
-                    Box(modifier = Modifier.width(tailCellWidth.coerceAtLeast(36.dp))) {
-                        GridChoiceCell(
-                            modifier = Modifier.fillMaxWidth(),
-                            item = item,
-                            index = i,
-                            selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
-                            isMulti = state.mode == "multi",
-                            showIndex = state.showIndex,
-                            showIndexColor = state.showIndexColor,
-                            onSelect = onSelect,
-                            // 展开态的内容区格子同样缩小，保证文字完整
-                            contentScale = 0.75f
-                        )
+                    key(i) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .onSizeChanged { if (it.width > 0 && rowIdx == 0) cellPx = it.width }
+                        ) {
+                            GridChoiceCell(
+                                modifier = Modifier.fillMaxWidth(),
+                                item = item,
+                                index = i,
+                                selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
+                                isMulti = state.mode == "multi",
+                                showIndex = state.showIndex,
+                                showIndexColor = state.showIndexColor,
+                                onSelect = onSelect,
+                                dragHandleModifier = dragModifier(i),
+                                contentScale = if (expanded) 0.75f else 1f
+                            )
+                        }
+                    }
+                }
+
+                // 只有最后一行接折叠胶囊
+                if (rowIdx == orderedHead.chunked(columns).lastIndex) {
+                    RowFoldSegment(
+                        text = more.text.ifBlank { null },
+                        expanded = expanded,
+                        modifier = Modifier.weight(foldWeight.coerceAtLeast(0.05f)),
+                        buttonWidth = 40.dp,
+                        barHeight = 74.dp,
+                        onClick = { expanded = !expanded },
+                        onContentWidthChange = { contentPx = it }
+                    ) {
+                        LazyRow(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            items(orderedTail, key = { it.first }) { entry ->
+                                val (i, item) = entry
+                                Box(
+                                    modifier = Modifier
+                                        .width(tailCellWidth.coerceAtLeast(36.dp))
+                                        .animateItem()
+                                ) {
+                                    GridChoiceCell(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        item = item,
+                                        index = i,
+                                        selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
+                                        isMulti = state.mode == "multi",
+                                        showIndex = state.showIndex,
+                                        showIndexColor = state.showIndexColor,
+                                        onSelect = onSelect,
+                                        contentScale = 0.75f,
+                                        dragHandleModifier = dragModifier(i)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
