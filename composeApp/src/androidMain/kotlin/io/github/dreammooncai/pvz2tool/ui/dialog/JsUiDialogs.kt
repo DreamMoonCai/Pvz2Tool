@@ -12,7 +12,12 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.Image
@@ -52,6 +57,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -2280,8 +2286,7 @@ fun JsItemChoiceDialog() {
                         // 「更多」折叠：首行 head 个格子 + 折叠段 + 按钮，全部排在同一行，
                         // 展开后格子整体缩小（一行 = head + visible + 1 个槽位）
                         FoldedChoicesRow(
-                            head = headChoices,
-                            tail = tailChoices,
+                            all = visibleChoices,
                             more = moreOptions!!,
                             state = state,
                             selectedIndices = selectedIndices,
@@ -2520,8 +2525,7 @@ private fun ChoiceSearchField(
  */
 @Composable
 private fun FoldedChoicesRow(
-    head: List<Pair<Int, JsChoiceItem>>,
-    tail: List<Pair<Int, JsChoiceItem>>,
+    all: List<Pair<Int, JsChoiceItem>>,
     more: JsMoreOptions,
     state: JsSelectState,
     selectedIndices: Set<Int>,
@@ -2530,25 +2534,27 @@ private fun FoldedChoicesRow(
     onOrderChange: (List<Int>) -> Unit
 ) {
     val density = LocalDensity.current
-    var expanded by remember(state) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val limit = more.limit.coerceAtLeast(1)
-
-    // 🔴 折叠区和首屏共用**一条**顺序：拖动可跨越「更多」边界（外面的能拖进去、里面的能拖出来）。
-    val allItems = remember(head, tail) { (head + tail).associateBy { it.first } }
-    var order by remember(state) { mutableStateOf((head + tail).map { it.first }) }
-    val orderedHead = order.take(limit).mapNotNull { allItems[it] }
-    val orderedTail = order.drop(limit).mapNotNull { allItems[it] }
-
     val visible = more.visible.coerceAtLeast(1)
+    // 一行总槽位 = 折叠后可见数 + 更多里最多展示数；每行末尾挂一个「更多」胶囊
+    val groupSize = limit + visible
+
+    // 🔴 首屏 / 各行 / 胶囊共用一条顺序：拖动可以跨行、跨「更多」边界（外面的能拖进去、里面的能拖出来），
+    //    重排后按 groupSize 重新分组即可，语义和「一行平铺 N 个」完全一致。
+    val byId = remember(all) { all.associate { it.first to it.second } }
+    var order by remember(state) { mutableStateOf(all.map { it.first }) }
+    // 同时只展开一行的「更多」（多行各展开一个会互相挤）
+    var expandedGroup by remember(state) { mutableStateOf(-1) }
+
     var cellPx by remember { mutableIntStateOf(0) }
     var contentPx by remember { mutableIntStateOf(0) }
     val tailCellWidth = with(density) {
         (if (contentPx > 0) contentPx.toFloat() / visible else cellPx.toFloat()).toDp()
     }
     val stepPx = cellPx.toFloat().coerceAtLeast(1f)
-    val columns = state.columns.coerceIn(2, 6)
 
-    /** 长按图标拖动换位（首屏与胶囊内通用；跨越 limit 自动在两边换人） */
+    /** 长按图标拖动换位（跨行 / 跨更多都走同一条 order） */
     val dragModifier: (Int) -> Modifier = { id ->
         if (!state.reorderable) {
             Modifier
@@ -2583,52 +2589,77 @@ private fun FoldedChoicesRow(
         }
     }
 
-    val foldWeight by animateFloatAsState(
-        targetValue = if (expanded) (visible + 1).toFloat() else 1.6f,
-        animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
-        label = "fold_row_weight"
-    )
+    /** 换位后从旧位置滑到新位置（普通 Row 没有 animateItem，自己补一段 spring 位移） */
+    val placementModifier: @Composable (Int) -> Modifier = { id ->
+        var lastX by remember(id) { mutableFloatStateOf(Float.NaN) }
+        val shift = remember(id) { Animatable(0f) }
+        Modifier
+            .onGloballyPositioned { coords ->
+                val x = coords.positionInParent().x
+                if (!lastX.isNaN() && kotlin.math.abs(x - lastX) > 1f) {
+                    scope.launch {
+                        shift.snapTo(lastX - x)
+                        shift.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 620f))
+                    }
+                }
+                lastX = x
+            }
+            .offset { IntOffset(shift.value.roundToInt(), 0) }
+    }
 
-    // 首屏按 columns 分行；「更多」胶囊接在**最后一行末尾**
     Column(modifier = Modifier.fillMaxWidth()) {
-        orderedHead.chunked(columns).forEachIndexed { rowIdx, row ->
+        order.chunked(groupSize).forEachIndexed { groupIdx, groupIds ->
+            val headIds = groupIds.take(limit)
+            val tailIds = groupIds.drop(limit)
+            val expanded = expandedGroup == groupIdx
+            val foldWeight by animateFloatAsState(
+                targetValue = if (expanded) (visible + 1).toFloat() else 1f,
+                animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+                label = "fold_row_weight_$groupIdx"
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                row.forEach { entry ->
-                    val (i, item) = entry
-                    key(i) {
+                headIds.forEach { id ->
+                    val item = byId[id] ?: return@forEach
+                    key("g${groupIdx}_h$id") {
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .onSizeChanged { if (it.width > 0 && rowIdx == 0) cellPx = it.width }
+                                .then(placementModifier(id))
+                                .onSizeChanged { if (it.width > 0 && groupIdx == 0) cellPx = it.width }
                         ) {
                             GridChoiceCell(
                                 modifier = Modifier.fillMaxWidth(),
                                 item = item,
-                                index = i,
-                                selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
+                                index = id,
+                                selected = if (state.mode == "multi") id in selectedIndices else selectedIndex == id,
                                 isMulti = state.mode == "multi",
                                 showIndex = state.showIndex,
                                 showIndexColor = state.showIndexColor,
                                 onSelect = onSelect,
-                                dragHandleModifier = dragModifier(i),
+                                dragHandleModifier = dragModifier(id),
                                 contentScale = if (expanded) 0.75f else 1f
                             )
                         }
                     }
                 }
 
-                // 只有最后一行接折叠胶囊
-                if (rowIdx == orderedHead.chunked(columns).lastIndex) {
+                // 不足一行的组补空位，保证每行的格子宽度一致（不会因为只剩 2 个就变宽）
+                repeat((limit - headIds.size).coerceAtLeast(0)) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+
+                if (tailIds.isNotEmpty()) {
                     RowFoldSegment(
                         text = more.text.ifBlank { null },
                         expanded = expanded,
                         modifier = Modifier.weight(foldWeight.coerceAtLeast(0.05f)),
                         buttonWidth = 40.dp,
                         barHeight = 74.dp,
-                        onClick = { expanded = !expanded },
+                        onClick = { expandedGroup = if (expanded) -1 else groupIdx },
                         onContentWidthChange = { contentPx = it }
                     ) {
                         LazyRow(
@@ -2636,25 +2667,27 @@ private fun FoldedChoicesRow(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            items(orderedTail, key = { it.first }) { entry ->
-                                val (i, item) = entry
-                                Box(
-                                    modifier = Modifier
-                                        .width(tailCellWidth.coerceAtLeast(36.dp))
-                                        .animateItem()
-                                ) {
-                                    GridChoiceCell(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        item = item,
-                                        index = i,
-                                        selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
-                                        isMulti = state.mode == "multi",
-                                        showIndex = state.showIndex,
-                                        showIndexColor = state.showIndexColor,
-                                        onSelect = onSelect,
-                                        contentScale = 0.75f,
-                                        dragHandleModifier = dragModifier(i)
-                                    )
+                            items(tailIds, key = { it }) { id ->
+                                val item = byId[id]
+                                if (item != null) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(tailCellWidth.coerceAtLeast(36.dp))
+                                            .animateItem()
+                                    ) {
+                                        GridChoiceCell(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            item = item,
+                                            index = id,
+                                            selected = if (state.mode == "multi") id in selectedIndices else selectedIndex == id,
+                                            isMulti = state.mode == "multi",
+                                            showIndex = state.showIndex,
+                                            showIndexColor = state.showIndexColor,
+                                            onSelect = onSelect,
+                                            contentScale = 0.75f,
+                                            dragHandleModifier = dragModifier(id)
+                                        )
+                                    }
                                 }
                             }
                         }
