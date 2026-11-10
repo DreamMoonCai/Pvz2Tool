@@ -35,6 +35,8 @@ fun PvzPopupHost(
     ) -> Unit
 ) {
     // 1. 弹窗栈状态
+    // 注意：不能用 remember(startDestination) —— startDestination 每次组合都是新创建的 MainPopup 实例，
+    // 会导致 key 每次都变、backStack 在每次重组时重置，破坏子页面导航。这里只在首次组合时固化一次。
     val backStack = remember { mutableStateListOf<PvzPopupRoute>().apply { add(startDestination) } }
     val currentRoute = backStack.last()
 

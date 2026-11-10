@@ -42,23 +42,43 @@ class PvzToolContexts(
         listOf("run".js,"运行".js,"call".js,"执行".js).func(FunctionParam("expr")) { args ->
             val expr = toString(args[0])
             try {
-                val result = if (expr.endsWith(".js")) {
-                    val jsFile = if (expr.startsWith("/")) {
-                        File(expr).inputStream()
-                    } else AssetExtractorHolder.openInputStream("js/${expr.removePrefix("js/")}")
-                    jsFile?.use { jsFile ->
-                        val jsCode = jsFile.bufferedReader().readText()
-                        PvzToolJsEngine.getJSEngine().compile(jsCode).invoke(this)
-                    } ?: access.resolveInput(expr, InitializePvz2.context)?.file?.readText()?.let { PvzToolJsEngine.getJSEngine().compile(it).invoke(this) } ?: PvzToolJsEngine.getJSEngine().compile(expr).invoke(this)
+                // 只有「取不到脚本源码」时才回退为内联表达式；
+                // 绝不能因为 invoke() 返回 null（脚本无返回值，属正常结果）就回退，
+                // 否则会把 expr 这个路径字符串当 JS 源码编译，抛出误导性的 SyntaxError。
+                val jsCode = readJsSource(expr)
+                if (jsCode != null) {
+                    PvzToolJsEngine.getJSEngine().compile(jsCode).invoke(this)
                 } else {
                     PvzToolJsEngine.getJSEngine().compile(expr).invoke(this)
                 }
-                result
             } catch (e: Exception) {
                 JsConsole.error("错误:",e)
                 throw e
             }
         }
+    }
+
+    /**
+     * 读取 .js 脚本源码，查找顺序：绝对路径文件 → 资源层（assets/pvz2tool 等）→ 路径解析器（工作目录/SAF）。
+     *
+     * 返回 null 表示「没找到脚本文件」，此时调用方才可将 expr 本身作为内联表达式编译；
+     * 一旦读到了源码就必须执行它，即便执行结果为 null 也不得再回退。
+     */
+    private fun readJsSource(expr: String): String? {
+        if (!expr.endsWith(".js", ignoreCase = true)) return null
+
+        val stream = if (expr.startsWith("/")) {
+            runCatching { File(expr).inputStream() }.getOrNull()
+        } else {
+            runCatching { AssetExtractorHolder.openInputStream("js/${expr.removePrefix("js/")}") }.getOrNull()
+        }
+
+        val fromStream = runCatching { stream?.use { s -> s.bufferedReader().readText() } }.getOrNull()
+        if (fromStream != null) return fromStream
+
+        return runCatching {
+            access.resolveInput(expr, InitializePvz2.context)?.file?.readText()
+        }.getOrNull()
     }
 
     val path = Object("path") {

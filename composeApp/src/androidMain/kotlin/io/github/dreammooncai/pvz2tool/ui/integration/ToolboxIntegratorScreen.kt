@@ -1528,7 +1528,7 @@ fun ToolboxIntegratorScreen(
             if (uri == null) { toast("未选择文件"); return@launch }
             val name = doc?.name ?: "target.apk"
             scope.launch {
-                JsUiManager.showLoading("正在读取 APK", "请稍候，正在复制所选 APK 到工作目录…")
+                JsUiManager.showLoading(null,"正在读取 APK", "请稍候，正在复制所选 APK 到工作目录…")
                 val res = withContext(Dispatchers.IO) {
                     runCatching {
                         val cacheDir = context.cacheDir ?: context.filesDir ?: throw IllegalStateException("无可用缓存目录")
@@ -1876,7 +1876,7 @@ fun ToolboxIntegratorScreen(
         val t = targetApk ?: return
         scope.launch {
             loading = true; errorMsg = null
-            JsUiManager.showLoading("正在计算差异", "请稍候，正在分析 APK 差异…")
+            JsUiManager.showLoading(null,"正在计算差异", "请稍候，正在分析 APK 差异…")
             val res = withContext(Dispatchers.IO) {
                 val (extraAssets, extraRes) = computeExtraResources()
                 val isUpdateMode = sourceMode == "update"
@@ -1910,7 +1910,7 @@ fun ToolboxIntegratorScreen(
         val t = targetApk ?: return
         scope.launch {
             loading = true; errorMsg = null
-            JsUiManager.showLoading("正在打包", "请稍候，正在合并 APK…")
+            JsUiManager.showLoading(null,"正在打包", "请稍候，正在合并 APK…")
             val res = withContext(Dispatchers.IO) {
                 runCatching {
                     val outName = t.name.removeSuffix(".apk") + "_pvz2tool.apk"

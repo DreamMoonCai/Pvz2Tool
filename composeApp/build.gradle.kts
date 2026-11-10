@@ -125,6 +125,8 @@ kotlin {
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.ktor.client.logging)
+            // Ktor 本地服务器（server 对象：基于 CIO 引擎在应用内启动本地 HTTP 服务器）
+            implementation(libs.ktor.server.cio)
             implementation(libs.hiddenapibypass)
 
         }
@@ -151,6 +153,15 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kaml)
         }
+        // 仪器化单元测试（跑在真机/模拟器上）：./gradlew :composeApp:connectedDebugAndroidTest
+        // 源集目录：composeApp/src/androidInstrumentedTest/kotlin
+        androidInstrumentedTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.junit)
+            implementation(libs.androidx.testExt.junit)
+            implementation(libs.androidx.espresso.core)
+            implementation("androidx.test:runner:1.7.0")
+        }
         all {
             languageSettings.enableLanguageFeature("ContextParameters")
             compilerOptions.freeCompilerArgs.add("-Xexpect-actual-classes")
@@ -171,6 +182,9 @@ android {
         // 版本号 = 当前月.日.迭代次数（如 8 月 6 日第 0 次迭代 → 8.6.0），构建时按系统日期动态生成
         versionCode = dynamicVersionCode
         versionName = dynamicVersionName
+        // 仪器化（on-device / 模拟器）单元测试入口：
+        //   ./gradlew :composeApp:connectedDebugAndroidTest
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     packaging {
         resources {
@@ -193,6 +207,12 @@ android {
     buildFeatures {
         viewBinding = true
         compose = true
+    }
+    // 本地 JVM 单元测试（src/androidUnitTest）：让 android.util.Log 等未实现方法返回默认值，
+    // 这样「不依赖 Android 行为的纯逻辑」也能脱离设备快速验证。
+    //   ./gradlew :composeApp:testDebugUnitTest
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 }
 

@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -101,7 +100,6 @@ fun PvzDialogCard(
  * @param content 中间可滚动内容区域
  * @param bottomContent 底部固定内容（按钮区域）
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PvzStyledDialog(
     isVisible: Boolean,
@@ -211,14 +209,18 @@ fun PvzLoadingDialog(
     cancelText: String = "取消",
     cancelColor: Color? = null,
     onDismiss: (suspend () -> Unit)? = null,
-    onClose: () -> Unit,
+    onClose: suspend () -> Unit,
 ) {
     if (!isVisible) return
-    val scope = rememberCoroutineScope()
     val handleDismiss: () -> Unit = {
         if (dismissible) {
-            scope.launch { onDismiss?.invoke() }
-            onClose()
+            // 🔴 用与弹窗生命周期解耦的稳定作用域（JsUiManager.uiScope）：
+            // onDismiss 是 JS 注册的 onCancel（用户 JS），若其执行期间弹窗被关（scope 被 forget），
+            // 仍在挂起（keight jsFn.call）的协程 resume 即抛 ForgottenCoroutineScopeException；统一走 uiScope 规避。
+            JsUiManager.uiScope.launch {
+                onDismiss?.invoke()
+                onClose()
+            }
         }
     }
     Dialog(
@@ -307,7 +309,6 @@ fun PvzProgressDialog(
     onCancel: (suspend () -> Unit)? = null,
 ) {
     if (!isVisible) return
-    val scope = rememberCoroutineScope()
     val handleDismiss: () -> Unit = {
         if (dismissible) {
             onComplete()
@@ -380,7 +381,12 @@ fun PvzProgressDialog(
                         if (progress >= 1f) {
                             onComplete()
                         } else if (showCancel) {
-                            scope.launch { onCancel?.invoke() }
+                            // 🔴 用与弹窗生命周期解耦的稳定作用域（JsUiManager.uiScope）：
+                            // onCancel 最终走到 JsUiManager.cancelProgress()，它会先 isVisible=false 关弹窗、
+                            // 再 runCatching { progressCancelHandler?.invoke() } 跑 JS 注册的 options.onCancel（用户 JS）。
+                            // 用户 JS 在 scope.launch（进度弹窗的 rememberCoroutineScope）上挂起时弹窗已离场、scope 被 forget，
+                            // resume 即抛 ForgottenCoroutineScopeException。改用 uiScope 彻底规避。
+                            JsUiManager.uiScope.launch { onCancel?.invoke() }
                         }
                     }
                 )

@@ -37,7 +37,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,21 +46,19 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import io.github.dreammooncai.manager.FilePickerManager
 import io.github.dreammooncai.pvz2tool.controller.GameDisplayFloatingController
 import io.github.dreammooncai.pvz2tool.controller.FloatingBallController
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
 import io.github.dreammooncai.pvz2tool.js.JsSmfDataManager
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.code.JsDex
 import io.github.dreammooncai.pvz2tool.js.code.JsNative
 import io.github.dreammooncai.pvz2tool.js.code.JsPvz
-import io.github.dreammooncai.pvz2tool.js.code.PvzToolGlobals
 import io.github.dreammooncai.pvz2tool.ui.main.*
-import io.github.dreammooncai.pvz2tool.ui.music.rememberBackgroundMusicState
+import io.github.dreammooncai.pvz2tool.controller.PvzMusicController
 import io.github.dreammooncai.pvz2tool.view.CgVideoPlayer
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzExtractorDialog
@@ -207,25 +204,22 @@ class Pvz2InitializeActivity : ComponentActivity() {
                     return@Pvz2ToolTheme
                 }
 
+                // 背景音乐：地址 / 用户开关 / 前后台 三个输入统一交给 PvzMusicController 收敛。
+                // 播放器由控制器以进程内单例持有，Activity 重建、组合重组、从后台返回都不会再创建新实例，
+                // 因此不可能出现「两段背景音乐同时播放」。
                 val audioPath = InitializePvz2.config.ui.assets.resolvedBackgroundMusic
-                val audioUrl = if (audioPath.startsWith("http://") || audioPath.startsWith("https://")) {
-                    audioPath
-                } else {
-                    "file:///android_asset/${Pvz2ToolConfig.PATH_NAME}/$audioPath".toUri().toString()
-                }
-                val bgMusicState = rememberBackgroundMusicState(audioUrl, initialVolume = InitializePvz2.initialBgMusicVolume)
+                val audioUrl = if (audioPath.isBlank()) null
+                else if (audioPath.startsWith("http://") || audioPath.startsWith("https://")) audioPath
+                else "file:///android_asset/${Pvz2ToolConfig.PATH_NAME}/$audioPath".toUri().toString()
 
-                // 将 bgMusicState 注入 PvzToolGlobals，供 JS audio API 访问
-                LaunchedEffect(bgMusicState) {
-                    PvzToolGlobals.bgMusicState = bgMusicState
+                LaunchedEffect(audioUrl) {
+                    PvzMusicController.setBgmVolume(InitializePvz2.initialBgMusicVolume, persist = false)
+                    PvzMusicController.bindBgmUrl(audioUrl)
                 }
 
                 LaunchedEffect(InitializePvz2.isBgMusicOn, InitializePvz2.isAppForeground) {
-                    if (InitializePvz2.isBgMusicOn && InitializePvz2.isAppForeground) {
-                        bgMusicState.resumeWithFadeIn(fadeDuration = 1500)
-                    } else {
-                        bgMusicState.pauseWithFadeOut(fadeDuration = 1500)
-                    }
+                    PvzMusicController.setBgmEnabled(InitializePvz2.isBgMusicOn)
+                    PvzMusicController.setForeground(InitializePvz2.isAppForeground)
                 }
 
                 PvzSaveInfoDialog(importSaveInfoDialogState)
@@ -675,8 +669,7 @@ private fun SimplifiedLaunchScreen(
     private fun handleNotificationAction(intent: Intent?) {
         val action = intent?.getStringExtra("notification_action") ?: return
         if (action.isBlank()) return
-        val scope = CoroutineScope(Dispatchers.IO)
-        scope.launch {
+        JsUiManager.runUserScript {
             try {
                 PvzToolJsEngine.executeScript(action, source = "通知点击")
             } catch (_: Exception) {}

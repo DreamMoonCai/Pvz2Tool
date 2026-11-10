@@ -101,6 +101,7 @@ versionsTheme: "BROWN"
 # 【核心】动态栏目配置
 # ------------------------------
 sections:
+
   # ==========================================
   # 栏目: 音频设置
   # 控制背景音乐和音效音量
@@ -135,6 +136,7 @@ sections:
         valueSuffix: ""
         jsScript: |-
           audio.setSfxVolume(this.value);
+
   # ==========================================
   # 栏目 1: 存档管理
   # 类型: 单选 (RADIO)
@@ -577,6 +579,600 @@ sections:
               result = "HTTP 连接异常\n状态码：" + res.status;
           }
           result;
+
+  # ==========================================
+  # 栏目: 本地服务器测试
+  # 测试 server(服务器/本地服务器) 对象 API。脚本较短且无复合文本语法，直接内联在 jsScript 里。
+  # 要点：
+  #   - 所有方法（GET/POST/PUT/...）与所有路径（含非根路径）都会交给同一个 handler，
+  #     由 JS 自行按 req.method / req.path 分发
+  #   - handler 返回 字符串 → text/plain；返回 普通对象 → 自动 JSON 序列化（application/json）
+  #   - 需要精细控制时返回 { status, headers, contentType, body }
+  #   - 同一 host:port 重复 start 不会崩溃、不会叠加，会复用已运行的实例（句柄 error 为空字符串）
+  # ==========================================
+  - id: "example_server_demo"
+    title: "本地服务器测试"
+    theme: "GREEN"
+
+    items:
+      # ----- 测试1：启动服务器 -----
+      - id: "server_start"
+        name: "启动服务器"
+        desc: "在 8080 端口启动，handler 按 method/path 自行分发"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: |-
+          var srv = server.start({
+              port: 8080,
+              handler: function (req) {
+                  if (req.path == "/") {
+                      return "<h1>Pvz2Tool 本地服务器</h1><p>试试 /api/echo?name=pvz 或 POST /api/json</p>";
+                  }
+                  if (req.path == "/api/echo") {
+                      return { ok: true, method: req.method, path: req.path, query: req.queryParams };
+                  }
+                  if (req.path == "/api/json") {
+                      if (req.method == "POST") {
+                          return { status: 201, body: { received: req.json() } };
+                      }
+                  }
+                  return { status: 404, contentType: "text/plain; charset=utf-8", body: "没有这个接口：" + req.path };
+              }
+          });
+          var result;
+          if (srv.error == "") {
+              result = "已启动：" + srv.url + "\nid = " + srv.id;
+          } else {
+              result = "启动失败：" + srv.error;
+          }
+          ui.alert("启动结果", result);
+          this.all.example_server_demo.server_list_info.call();
+          result;
+      # ----- 测试2：非根路径（验证不是只能处理根目录）-----
+      - id: "server_get_path"
+        name: "GET 非根路径"
+        desc: "请求 /api/echo?name=pvz&lv=10，验证任意路径都能命中 handler"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: |-
+          var list = server.list();
+          var result;
+          if (list.length == 0) {
+              result = "当前没有运行中的服务器，请先点「启动服务器」";
+          } else {
+              var res = http.get("http://127.0.0.1:" + list[0].port + "/api/echo?name=pvz&lv=10");
+              result = "状态码：" + res.status + "\n响应体：" + res.body;
+          }
+          ui.alert("GET /api/echo", result);
+          result;
+      # ----- 测试3：POST 提交 JSON -----
+      - id: "server_post_json"
+        name: "POST 提交 JSON"
+        desc: "向 /api/json 提交 JSON，handler 用 req.json() 解析后回 201"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: |-
+          var list = server.list();
+          var result;
+          if (list.length == 0) {
+              result = "当前没有运行中的服务器，请先点「启动服务器」";
+          } else {
+              var body = JSON.stringify({ hello: "world", n: 1 });
+              var res = http.post("http://127.0.0.1:" + list[0].port + "/api/json", body, {
+                  contentType: "application/json"
+              });
+              result = "状态码：" + res.status + "\n响应体：" + res.body;
+          }
+          ui.alert("POST /api/json", result);
+          result;
+      # ----- 测试4：未知路径自定义 404 -----
+      - id: "server_404"
+        name: "未知路径返回 404"
+        desc: "请求 /not-exist，验证 handler 自定义 404 生效"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: |-
+          var list = server.list();
+          var result;
+          if (list.length == 0) {
+              result = "当前没有运行中的服务器，请先点「启动服务器」";
+          } else {
+              var res = http.get("http://127.0.0.1:" + list[0].port + "/not-exist");
+              result = "状态码：" + res.status + "\n响应体：" + res.body;
+          }
+          ui.alert("GET /not-exist", result);
+          result;
+      # ----- 测试5：端口重复启动（验证不崩溃、不叠加）-----
+      - id: "server_duplicate_port"
+        name: "端口重复启动测试"
+        desc: "连续两次启动 8099，验证复用同一实例且不抛异常"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: |-
+          var a = server.start({ port: 8099, handler: function (req) { return "A"; } });
+          var b = server.start({ port: 8099, handler: function (req) { return "B"; } });
+          var result = "第一次：id=" + a.id + "，error='" + a.error + "'\n第二次：id=" + b.id + "，error='" + b.error + "'\n";
+          if (a.id == b.id) {
+              result = result + "结果：复用了同一个实例，没有崩溃也没有叠加";
+          } else {
+              result = result + "结果：异常，两次启动得到了不同实例";
+          }
+          server.stop(a.id);
+          ui.alert("端口重复测试", result);
+          this.all.example_server_demo.server_list_info.call();
+          result;
+      # ----- 测试6：服务器列表 -----
+      - id: "server_list_info"
+        name: "服务器列表"
+        desc: "server.list() 查看运行中的服务器"
+        type: "INFO"
+        infoValue: "点击刷新"
+        jsScript: |-
+          var list = server.list();
+          var result;
+          if (list.length == 0) {
+              result = "没有运行中的服务器";
+          } else {
+              result = "运行中 " + list.length + " 个：";
+              for (var i = 0; i < list.length; i++) {
+                  result = result + "\n" + list[i].id + " → " + list[i].url;
+              }
+          }
+          result;
+      # ----- 测试7：停止全部 -----
+      - id: "server_stop_all"
+        name: "停止全部服务器"
+        desc: "server.stopAll() / 服务器.停止全部()"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: |-
+          服务器.停止全部();
+          var left = 服务器.列表();
+          var result = "已停止全部服务器，剩余 " + left.length + " 个";
+          ui.alert("停止结果", result);
+          this.all.example_server_demo.server_list_info.call();
+          result;
+      # ----- 测试8：POST 表单（application/x-www-form-urlencoded）-----
+      - id: "server_post_form"
+        name: "POST 表单数据"
+        desc: "handler 手动解析 req.body 的 form-urlencoded，回显各字段"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: |-
+          var a = server.start({ port: 8081, handler: function (req) {
+              if (req.path == "/form" && req.method == "POST") {
+                  var body = req.body || "";
+                  var map = {};
+                  body.split("&").forEach(function (kv) {
+                      var p = kv.split("=");
+                      if (p.length == 2) {
+                          map[decodeURIComponent(p[0])] = decodeURIComponent(p[1]);
+                      }
+                  });
+                  return { received: map, raw: body };
+              }
+              return { status: 404, body: "只接受 POST /form" };
+          } });
+          if (a.error != "") {
+              ui.alert("启动失败", a.error);
+              a.error;
+          } else {
+              var res = http.post(a.url + "/form",
+                  "name=pvz&level=10", { contentType: "application/x-www-form-urlencoded" });
+              var txt = "状态码：" + res.status + "\n响应体：" + res.body;
+              server.stop(a.id);
+              this.all.example_server_demo.server_list_info.call();
+              txt;
+          }
+      # ----- 测试9：自定义响应头 + 回显请求头 -----
+      - id: "server_custom_header"
+        name: "自定义响应头"
+        desc: "handler 返回自定义响应头，并回显收到的 User-Agent；客户端读取 res.headers"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: |-
+          var a = server.start({ port: 8082, handler: function (req) {
+              return {
+                  status: 200,
+                  headers: {
+                      "X-Pvz2-Tool": "demo",
+                      "X-Echo-Ua": (req.headers["user-agent"] || req.headers["User-Agent"] || "none")
+                  },
+                  body: "看响应头里的 X-Pvz2-Tool"
+              };
+          } });
+          if (a.error != "") {
+              ui.alert("启动失败", a.error);
+              a.error;
+          } else {
+              var res = http.get(a.url + "/");
+              var h = res.headers["X-Pvz2-Tool"] || res.headers["x-pvz2-tool"] || "(无)";
+              var txt = "状态码：" + res.status + "\nX-Pvz2-Tool 响应头：" + h + "\n响应体：" + res.body;
+              server.stop(a.id);
+              this.all.example_server_demo.server_list_info.call();
+              txt;
+          }
+      # ----- 测试10：路径参数路由（/api/user/<id>）-----
+      - id: "server_path_param"
+        name: "路径参数路由"
+        desc: "handler 用正则解析 /api/user/<id> 形式路径，返回对应用户"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: |-
+          var users = { "1": "豌豆射手", "2": "向日葵", "3": "坚果墙" };
+          var a = server.start({ port: 8083, handler: function (req) {
+              // 注意：req.path.match 实际走 Java 正则引擎，正斜杠无需也不可转义，
+              // 因此这里用字符串分割手动解析路径参数 /api/user/<id>，绕开正则转义坑。
+              var parts = req.path.split("/");   // ["", "api", "user", "<id>"]
+              if (parts.length == 4 && parts[1] == "api" && parts[2] == "user") {
+                  var id = parts[3];
+                  var name = users[id] || "未知用户";
+                  return { id: id, name: name };
+              }
+              return { status: 404, body: "用法：GET /api/user/<id>" };
+          } });
+          if (a.error != "") {
+              ui.alert("启动失败", a.error);
+              a.error;
+          } else {
+              var res = http.get(a.url + "/api/user/2");
+              var txt = "状态码：" + res.status + "\n响应体：" + res.body;
+              server.stop(a.id);
+              this.all.example_server_demo.server_list_info.call();
+              txt;
+          }
+      # ----- 测试11：中文 JSON + UTF-8 校验 -----
+      - id: "server_json_utf8"
+        name: "中文 JSON 响应"
+        desc: "handler 返回含中文的对象，验证 UTF-8 不被乱码"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: |-
+          var a = server.start({ port: 8084, handler: function (req) {
+              return { 状态: "成功", 消息: "植物大战僵尸2 工具箱", 数字: 42 };
+          } });
+          if (a.error != "") {
+              ui.alert("启动失败", a.error);
+              a.error;
+          } else {
+              var res = http.get(a.url + "/");
+              var txt = "状态码：" + res.status + "\n响应体：" + res.body;
+              server.stop(a.id);
+              this.all.example_server_demo.server_list_info.call();
+              txt;
+          }
+      # ----- 测试12：多端口 + 按 id 停止单个 -----
+      - id: "server_multi_stop_one"
+        name: "多端口并停止单个"
+        desc: "在 8090/8091 各起一个服务器，停止其中一个，验证只停一个"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: |-
+          var a = server.start({ port: 8090, handler: function (req) { return "A"; } });
+          var b = server.start({ port: 8091, handler: function (req) { return "B"; } });
+          server.stop(a.id);   // 只停 8090，8091 继续存活
+          var list = server.list();
+          var has8090 = list.some(function (s) { return s.port == 8090; });
+          var has8091 = list.some(function (s) { return s.port == 8091; });
+          var txt = "8090 已停止：" + (!has8090) + "\n8091 仍存活：" + has8091
+              + "\n结果：" + ((!has8090 && has8091) ? "仅停止了指定端口 ✔" : "异常 ✘");
+          this.all.example_server_demo.server_list_info.call();
+          txt;
+
+  # ==========================================
+  # 栏目: 音频 API 测试
+  # 测试 audio(音频) 对象：背景音乐 / API 音乐 / 音效。脚本较短且无复合文本语法，直接内联在 jsScript 里。
+  # 要点：
+  #   - audio.playMusic 全局唯一：重复调用会先结束上一段，不会叠加出多段声音
+  #   - 播放期间背景音乐让位（渐隐暂停），播完 / stopMusic / 被新的 playMusic 取代后自动恢复
+  #   - 让位期间即使手动打开背景音乐、或从后台返回界面，也不会出现「音乐 + 背景音乐」双重播放
+  #   - 音效（playSound）与背景音乐相互独立，不受影响
+  # ==========================================
+  - id: "example_audio_demo"
+    title: "音频 API 测试"
+    theme: "TEAL"
+
+    items:
+      # ----- 测试1：播放一段音乐（背景音乐自动让位）-----
+      - id: "audio_play_once"
+        name: "播放音乐（不循环）"
+        desc: "播放 sound/bg_music.wav，期间背景音乐暂停，播完自动恢复"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: |-
+          audio.playMusic("bg_music.wav", { volume: 0.8, loop: false, fade: 800 });
+          this.all.example_audio_demo.audio_state_info.call();
+          "已开始播放音乐；此时打开背景音乐开关也不会双重播放";
+      # ----- 测试2：循环播放 -----
+      - id: "audio_play_loop"
+        name: "播放音乐（循环）"
+        desc: "loop 为 true 时一直循环，需要手动停止"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: |-
+          audio.playMusic("bg_music.wav", { volume: 0.6, loop: true });
+          this.all.example_audio_demo.audio_state_info.call();
+          "已开始循环播放，点「停止音乐」结束";
+      # ----- 测试3：连播两次验证不叠加 -----
+      - id: "audio_play_twice"
+        name: "连播两次（验证不叠加）"
+        desc: "连续调用两次，后一次会先结束前一次，始终只有一段音乐"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: |-
+          audio.playMusic("bg_music.wav", { volume: 0.5 });
+          audio.playMusic("bg_music.wav", { volume: 0.9 });
+          this.all.example_audio_demo.audio_state_info.call();
+          "已连播两次，实际只会听到一段（音量 0.9）";
+      # ----- 测试4：停止音乐 -----
+      - id: "audio_stop"
+        name: "停止音乐"
+        desc: "audio.stopMusic()，背景音乐随之恢复"
+        type: "BUTTON"
+        buttonColor: "red"
+        jsScript: |-
+          audio.stopMusic();
+          this.all.example_audio_demo.audio_state_info.call();
+          "已停止音乐，背景音乐已恢复";
+      # ----- 测试5：播放音效（与背景音乐独立）-----
+      - id: "audio_play_sound"
+        name: "播放音效"
+        desc: "audio.playSound() 不受背景音乐影响，可与音乐同时播放"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: |-
+          audio.playSound("ui_button_click_release.wav", 1.0);
+          this.all.example_audio_demo.audio_state_info.call();
+          "已播放音效";
+      # ----- 测试6：背景音乐音量（拖动即时生效）-----
+      - id: "audio_bgm_volume"
+        name: "背景音乐音量"
+        desc: "拖动即时生效：audio.setBgmVolume(this.value)"
+        type: "SLIDER"
+        minValue: 0.0
+        maxValue: 1.0
+        step: 0.01
+        defaultValue: 0.8
+        valueSuffix: ""
+        jsScript: |-
+          audio.setBgmVolume(this.value);
+          this.all.example_audio_demo.audio_state_info.call();
+      # ----- 测试7：音效音量（拖动即时生效）-----
+      - id: "audio_sfx_volume"
+        name: "音效音量"
+        desc: "拖动即时生效：audio.setSfxVolume(this.value)"
+        type: "SLIDER"
+        minValue: 0.0
+        maxValue: 1.0
+        step: 0.01
+        defaultValue: 1.0
+        valueSuffix: ""
+        jsScript: |-
+          audio.setSfxVolume(this.value);
+          this.all.example_audio_demo.audio_state_info.call();
+
+      # ----- 测试8：INFO 实时状态 -----
+      - id: "audio_state_info"
+        name: "音频状态"
+        desc: "音乐是否播放中 / 背景音乐音量 / 音效音量"
+        type: "INFO"
+        infoValue: "点击刷新"
+        jsScript: |-
+          "音乐播放中：" + audio.isMusicPlaying()
+              + "\n背景音乐音量：" + audio.getBgmVolume()
+              + "\n音效音量：" + audio.getSfxVolume();
+
+  # ==========================================
+  # 栏目: 嵌套弹窗 backUI 测试
+  # 测试跨弹窗调用栈：当前.backUI(data) / 当前.返回上一层UI(data)
+  # 注意：只有内含复合文本 {{link|...}} 的示例才保留为 .js 文件（避免内联时复合文本语法
+  # 把脚本里的 {{ }} 误当成富文本标签解析）；其余纯 JS 示例直接内联在 jsScript 里。
+  # 脚本见 assets/pvz2tool/example/backui/ 下仍有需要的文件。
+  # 要点：
+  #   - 当前.backUI 在「复合文本链接（{{link|...}}）」与「弹窗回调（onConfirm / onCancel /
+  #     onSelect / onClick 等）」两种位置都可用，语义完全一致
+  #   - 🔴 核心心智模型：backUI = 「本帧带 data 离场，并把 data 交给**本帧自己**注册的 onResult」。
+  #     onResult 虽然写在父脚本里（作为打开子弹窗时的 options），但归属的是**子弹窗那一帧**。
+  #     所以「第二层调 backUI」触发的是第二层的 onResult，不是第一层的——
+  #     想让数据继续往上走，就在收到数据的 onResult 里再调一次 当前.backUI（逐层接力）。
+  #   - 调用后子弹窗关闭、父弹窗恢复可见
+  #   - 子弹窗若未调用 backUI 就直接关闭，只触发子弹窗自己的 onClose，
+  #     任何 onResult **都不会**触发（onResult = 带回数据，不是关闭通知）
+  # ==========================================
+  - id: "example_backui_demo"
+    title: "嵌套弹窗 backUI 测试"
+    theme: "PURPLE"
+
+    items:
+      # ----- 测试1：popup → confirm，backUI 带回数据（含 {{link}}，保留为 .js 文件）-----
+      - id: "backui_return_data"
+        name: "两层弹窗 + 带回数据"
+        desc: "第二层点链接调用 当前.backUI(data)，第一层注册的 onResult 收到数据"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsPath: "example/backui/return_data.js"
+      # ----- 测试2：子弹窗不调用 backUI 直接关闭（纯 JS，内联）-----
+      - id: "backui_no_call"
+        name: "子弹窗不调用 backUI"
+        desc: "直接关掉第二层：只触发 onClose，父弹窗的 onResult 不再触发"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: |-
+          ui.popup("第一层（popup）", [
+              "点箭头打开第二层，然后直接关掉第二层：",
+              "预期：只弹出「第二层已关闭」，不会弹出「第一层收到」。",
+              {
+                  type: "arrow",
+                  title: "打开第二层（popup）",
+                  onClick: function (nav) {
+                      ui.popup("第二层（popup）", ["点右上角关闭，全程不调用 backUI"], {
+                          onClose: function () { ui.alert("第二层已关闭", "onClose 触发；onResult 不会触发"); }
+                      });
+                  }
+              }
+          ], {
+              onResult: function (d) { ui.alert("第一层收到", "第二层未调用 backUI，data = " + d); }
+          });
+          "已打开第一层弹窗";
+      # ----- 测试3：同类型三层嵌套（含 {{link}}，保留为 .js 文件）-----
+      - id: "backui_three_level"
+        name: "同类型三层嵌套"
+        desc: "验证同类型弹窗也能多层嵌套，返回后上一层完整恢复"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsPath: "example/backui/three_level.js"
+      # ----- 测试4：全局属性映射（self / window / global，纯 JS 内联）-----
+      - id: "backui_global_alias"
+        name: "全局属性映射测试"
+        desc: "验证 self / window / global 与 globalThis 等价（否则会 ReferenceError）"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: |-
+          globalThis.__aliasTest = "ok";
+          var result = "globalThis.__aliasTest = " + globalThis.__aliasTest;
+          result = result + "\nself.__aliasTest = " + self.__aliasTest;
+          result = result + "\nwindow.__aliasTest = " + window.__aliasTest;
+          result = result + "\nglobal.__aliasTest = " + global.__aliasTest;
+          ui.alert("全局属性映射", result);
+          result;
+
+      # ----- 测试5：popup → prompt，backUI 带回输入文本 -----
+      - id: "backui_prompt"
+        name: "两层弹窗 + 带回输入"
+        desc: "第二层是 prompt 输入，确认后 当前.backUI(输入文本) 交回第一层"
+        type: "BUTTON"
+        buttonColor: "blue"
+        jsScript: |-
+          ui.popup("第一层（popup）", [
+              "点箭头打开第二层，输入内容并返回：",
+              {
+                  type: "arrow",
+                  title: "打开第二层（prompt）",
+                  onClick: function (nav) {
+                      ui.prompt("第二层（prompt）", "请输入要带回第一层的内容：", "默认值", "在此输入", {
+                          onConfirm: function (text) {
+                              // 在弹窗回调里直接调用 backUI（不是 {{link}}），无需顾虑冒号约束
+                              当前.backUI(text);
+                          },
+                          onCancel: function () {
+                              当前.backUI(null);
+                          },
+                          // 🔴 backUI 触发的是**本帧（第二层）自己**的 onResult，必须注册在这里。
+                          // 注册到下面 ui.popup 的 options 里就变成了「第一层的 onResult」，
+                          // 只有第一层自己调用 backUI 才会触发，会表现为「点确定什么也没提示」。
+                          onResult: function (d) {
+                              ui.alert("第一层收到", "第二层带回的数据 = " + (d == null ? "null" : d));
+                          }
+                      });
+                  }
+              }
+          ]);
+          "已打开第一层弹窗";
+      # ----- 测试6：popup → actionSheet，backUI 带回选中项 -----
+      - id: "backui_action_sheet"
+        name: "两层弹窗 + actionSheet"
+        desc: "第二层是 actionSheet，选中某项后 当前.backUI(选中值) 交回第一层"
+        type: "BUTTON"
+        buttonColor: "orange"
+        jsScript: |-
+          ui.popup("第一层（popup）", [
+              "点箭头打开操作菜单并带回选择：",
+              {
+                  type: "arrow",
+                  title: "打开第二层（actionSheet）",
+                  onClick: function (nav) {
+                      ui.actionSheet("第二层（actionSheet）", [
+                          { name: "选项 A", value: "a" },
+                          { name: "选项 B", value: "b", danger: true },
+                          "纯文本项"
+                      ], {
+                          onSelect: function (sel) {
+                              当前.backUI(sel);
+                          },
+                          onCancel: function () {
+                              当前.backUI(null);
+                          },
+                          // 注册在**第二层**自己身上：backUI 由第二层调用，数据回到这里
+                          onResult: function (d) {
+                              ui.alert("第一层收到", "第二层带回的选择 = " + (d == null ? "null" : d));
+                          }
+                      });
+                  }
+              }
+          ]);
+          "已打开第一层弹窗";
+      # ----- 测试7：popup → select（单项选择），backUI 带回选中对象 -----
+      - id: "backui_select"
+        name: "两层弹窗 + 单项选择"
+        desc: "第二层是 select 列表，选中后 当前.backUI(选中项对象) 交回第一层"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsScript: |-
+          ui.popup("第一层（popup）", [
+              "点箭头打开列表并带回选中项：",
+              {
+                  type: "arrow",
+                  title: "打开第二层（select）",
+                  onClick: function (nav) {
+                      ui.select("第二层（select）", [
+                          { name: "存档 1", value: "s1", icon: "save_icon.png" },
+                          { name: "存档 2", value: "s2", icon: "save_icon.png" },
+                          { name: "存档 3", value: "s3" }
+                      ], {
+                          onSelect: function (item) {
+                              // 选中的是字符串 value；包成对象再带回，验证对象数据正确回传
+                              当前.backUI({ name: "选中项", value: item });
+                          },
+                          onCancel: function () {
+                              当前.backUI(null);
+                          },
+                          // 注册在**第二层**自己身上：backUI 由第二层调用，数据回到这里
+                          onResult: function (d) {
+                              var txt = (d == null) ? "null" : JSON.stringify(d);
+                              ui.alert("第一层收到", "第二层带回的数据 = " + txt);
+                          }
+                      });
+                  }
+              }
+          ]);
+          "已打开第一层弹窗";
+      # ----- 测试8：popup → confirm，backUI 带回对象（验证对象数据不再 [object Object]）-----
+      - id: "backui_object"
+        name: "两层弹窗 + 带回对象"
+        desc: "第二层 confirm 确认后 当前.backUI({result, ok, ts})，验证对象数据正确回传"
+        type: "BUTTON"
+        buttonColor: "purple"
+        jsScript: |-
+          ui.popup("第一层（popup）", [
+              "点箭头打开第二层，确认后带回一个对象：",
+              {
+                  type: "arrow",
+                  title: "打开第二层（confirm）",
+                  onClick: function (nav) {
+                      ui.confirm("第二层（confirm）", "点确认会把一个对象带回第一层", {
+                          onConfirm: function () {
+                              当前.backUI({ result: "ok", ok: true, ts: Date.now() });
+                          },
+                          onCancel: function () {
+                              当前.backUI(null);
+                          },
+                          // 注册在**第二层**自己身上：backUI 由第二层调用，数据回到这里
+                          onResult: function (d) {
+                              var txt = (d == null) ? "null" : JSON.stringify(d);
+                              ui.alert("第一层收到", "第二层带回的数据 = " + txt);
+                          }
+                      });
+                  }
+              }
+          ]);
+          "已打开第一层弹窗";
+      # ----- 测试9：四层同/异类型嵌套（含 {{link}}，保留为 .js 文件）-----
+      - id: "backui_deep_four"
+        name: "四层嵌套弹窗"
+        desc: "popup→confirm→popup→confirm，验证四层也能逐层 backUI 返回"
+        type: "BUTTON"
+        buttonColor: "green"
+        jsPath: "example/backui/four_level.js"
 
   # ==========================================
   # 栏目 4: JS 工具

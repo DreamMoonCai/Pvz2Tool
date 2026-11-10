@@ -64,7 +64,30 @@ private enum class DecoderScheme {
 }
 
 /**
+ * CG / JS 视频播放器的统一控制接口。
+ *
+ * [CgVideoPlayer] 内部会按 `ExoPlayer → MediaPlayer → 海报` 逐级降级，两种解码方案各自实现本接口，
+ * 准备好后通过 `onControlChanged` 回调交出去。目的是让 JS 的 `video.*` API 在**完全复用 CG 播放链路**
+ * （同样的加载动画、超时降级、后台自动暂停、跳过按钮）的前提下，仍能暂停 / 继续 / 跳转 / 调音量。
+ *
+ * 所有方法都必须在主线程调用。
+ */
+interface VideoPlaybackControl {
+    fun pause()
+    fun resume()
+    fun seekTo(positionMs: Long)
+    fun setVolume(volume: Float)
+    fun setLoop(loop: Boolean)
+    fun isPlaying(): Boolean
+    fun durationMs(): Long
+    fun positionMs(): Long
+}
+
+/**
  * CG 视频播放器（修复版：包含完整超时逻辑）
+ *
+ * @param onControlChanged 播放器就绪时回调可控制句柄（主线程）；方案切换/离场时回调 `null`。
+ *                         JS 视频 API 依赖它做暂停/跳转等控制，CG 场景传 null 即可。
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -74,7 +97,8 @@ fun CgVideoPlayer(
     modifier: Modifier = Modifier,
     onVideoEnd: (() -> Unit)? = null,
     posterImagePath: String? = null,
-    loadTimeoutMillis: Long = 5000L
+    loadTimeoutMillis: Long = 5000L,
+    onControlChanged: ((VideoPlaybackControl?) -> Unit)? = null
 ) {
     // 核心状态管理
     var currentScheme by remember { mutableStateOf(DecoderScheme.EXO_PLAYER) }
@@ -152,6 +176,7 @@ fun CgVideoPlayer(
                 onError = { if (!isManuallyStopped) currentScheme = DecoderScheme.MEDIA_PLAYER },
                 onEnd = { if (!isManuallyStopped) onVideoEnd?.invoke() ?: onSkip() },
                 onSkip = { isManuallyStopped = true; onVideoEnd?.invoke() ?: onSkip() },
+                onControlChanged = onControlChanged,
                 modifier = Modifier.matchParentSize()
             )
         }
@@ -164,6 +189,7 @@ fun CgVideoPlayer(
                 onError = { if (!isManuallyStopped) currentScheme = DecoderScheme.POSTER },
                 onEnd = { if (!isManuallyStopped) onVideoEnd?.invoke() ?: onSkip() },
                 onSkip = { isManuallyStopped = true; onVideoEnd?.invoke() ?: onSkip() },
+                onControlChanged = onControlChanged,
                 modifier = Modifier.matchParentSize()
             )
         }
@@ -181,6 +207,7 @@ private fun ExoPlayerDelegate(
     onError: () -> Unit,
     onEnd: () -> Unit,
     onSkip: () -> Unit,
+    onControlChanged: ((VideoPlaybackControl?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -194,6 +221,24 @@ private fun ExoPlayerDelegate(
             playWhenReady = true
             repeatMode = Player.REPEAT_MODE_OFF
         }
+    }
+
+    // 向调用方暴露控制句柄（JS 视频 API 用）；方案切换/离场时注销
+    DisposableEffect(exoPlayer) {
+        val control = object : VideoPlaybackControl {
+            override fun pause() { exoPlayer.playWhenReady = false }
+            override fun resume() { exoPlayer.playWhenReady = true }
+            override fun seekTo(positionMs: Long) { exoPlayer.seekTo(positionMs.coerceAtLeast(0L)) }
+            override fun setVolume(volume: Float) { exoPlayer.volume = volume.coerceIn(0f, 1f) }
+            override fun setLoop(loop: Boolean) {
+                exoPlayer.repeatMode = if (loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+            }
+            override fun isPlaying(): Boolean = exoPlayer.isPlaying
+            override fun durationMs(): Long = exoPlayer.duration.coerceAtLeast(0L)
+            override fun positionMs(): Long = exoPlayer.currentPosition.coerceAtLeast(0L)
+        }
+        onControlChanged?.invoke(control)
+        onDispose { onControlChanged?.invoke(null) }
     }
 
     // 进入后台（onPause）时暂停播放，回到前台（onResume）时继续，避免后台继续播放 CG 音视频
@@ -280,6 +325,7 @@ private fun MediaPlayerDelegate(
     onError: () -> Unit,
     onEnd: () -> Unit,
     onSkip: () -> Unit,
+    onControlChanged: ((VideoPlaybackControl?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -287,6 +333,29 @@ private fun MediaPlayerDelegate(
     var showSkipButton by remember { mutableStateOf(false) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var mpWasPlaying by remember { mutableStateOf(false) }
+
+    // 向调用方暴露控制句柄（MediaPlayer 降级方案）；离场时注销
+    DisposableEffect(Unit) {
+        val control = object : VideoPlaybackControl {
+            override fun pause() { mediaPlayer?.pause() }
+            override fun resume() { runCatching { mediaPlayer?.start() } }
+            override fun seekTo(positionMs: Long) {
+                runCatching { mediaPlayer?.seekTo(positionMs.coerceAtLeast(0L).toInt()) }
+            }
+            override fun setVolume(volume: Float) {
+                val v = volume.coerceIn(0f, 1f)
+                runCatching { mediaPlayer?.setVolume(v, v) }
+            }
+            override fun setLoop(loop: Boolean) { runCatching { mediaPlayer?.isLooping = loop } }
+            override fun isPlaying(): Boolean = runCatching { mediaPlayer?.isPlaying == true }.getOrDefault(false)
+            override fun durationMs(): Long =
+                runCatching { (mediaPlayer?.duration?.toLong() ?: 0L).coerceAtLeast(0L) }.getOrDefault(0L)
+            override fun positionMs(): Long =
+                runCatching { (mediaPlayer?.currentPosition?.toLong() ?: 0L).coerceAtLeast(0L) }.getOrDefault(0L)
+        }
+        onControlChanged?.invoke(control)
+        onDispose { onControlChanged?.invoke(null) }
+    }
 
     // 进入后台（onPause）时暂停播放，回到前台（onResume）时继续，避免后台继续播放 CG 音视频
     val lifecycle = LocalLifecycleOwner.current

@@ -17,3 +17,16 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# ── 本地临时产物 / 工作笔记（不入库） ──
+# 项目记忆目录（WorkBuddy 本地工作记忆，非代码资产）
+.workbuddy/
+# 排查过程笔记
+backui_fix_overview.md
+backui_verification_matrix.md
+overview.md
+# 本地运行/测试产生的大文件产物
+composeApp/data/
+composeApp/release/
+composeApp/rsb_unpacked_original/
+composeApp/rsb_unpacked_repacked/

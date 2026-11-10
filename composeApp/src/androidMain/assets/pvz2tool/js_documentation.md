@@ -184,6 +184,33 @@
 | `audio.setBgmVolume(v)` | `audio.设置背景音乐音量()` | 设置背景音乐音量（0.0~1.0） |
 | `audio.getSfxVolume()` | `audio.获取音效音量()` | 获取音效音量（0.0~1.0） |
 | `audio.setSfxVolume(v)` | `audio.设置音效音量()` | 设置音效音量（0.0~1.0） |
+| `audio.playMusic(url, options?)` | `audio.播放音乐(url, options?)` | 播放音乐（播放期间暂停背景音乐，结束后恢复；未指定音量则跟随 setBgmVolume） |
+| `audio.stopMusic()` | `audio.停止音乐()` | 停止当前音乐（随之恢复背景音乐） |
+| `audio.isMusicPlaying()` | `audio.是否正在播放音乐()` | 查询音乐是否正在播放（bool） |
+| `audio.playSound(url, volume?)` | `audio.播放音效(url, volume?)` | 播放音效（不受背景音乐影响） |
+
+#### video 对象
+| 英文 | 中文别名 | 说明 |
+|------|----------|------|
+| `video.play(url, options?)` | `video.播放(url, options?)` | 播放视频（Compose 全屏弹窗，链路同游戏内 CG，可跳过） |
+| `video.pause()` | `video.暂停()` | 暂停播放（画面保留） |
+| `video.resume()` | `video.继续()` | 继续播放 |
+| `video.stop()` | `video.停止()` | 停止播放并关闭弹窗 |
+| `video.seekTo(ms)` | `video.跳转(ms)` | 跳转到指定位置（毫秒） |
+| `video.setVolume(v)` | `video.设置音量(v)` | 设置音量（0.0~1.0） |
+| `video.isPlaying()` | `video.是否播放中()` | 是否正在播放（bool） |
+| `video.isVisible()` | `video.是否显示中()` | 视频弹窗是否正在显示（bool） |
+| `video.getDuration()` | `video.获取时长()` | 总时长（毫秒，未知为 0） |
+| `video.getPosition()` | `video.获取位置()` | 当前播放位置（毫秒） |
+
+#### log 对象
+| 英文 | 中文别名 | 说明 |
+|------|----------|------|
+| `log.get(options?)` | `log.获取(options?)` | 获取日志数组 `[{level, message, time}]` |
+| `log.text(options?)` | `log.文本(options?)` | 获取日志纯文本（每行一条） |
+| `log.add(message, level?)` | `log.添加(message, level?)` | 追加一条日志 |
+| `log.clear()` | `log.清空()` | 清空日志 |
+| `log.count()` | `log.数量()` | 当前日志条数 |
 
 #### assets 对象
 | 英文 | 中文别名 |
@@ -214,6 +241,28 @@
 | `response.headers` | | 响应头对象 |
 | `response.json()` | `response.解析JSON()` | 将 body 直接解析为 JS 对象（已自动 JSON.parse，无需再调用 JSON.parse；解析失败返回 null） |
 
+#### server 对象
+| 英文 | 中文别名 | 说明 |
+|------|----------|------|
+| `server.start(options)` | `本地服务器.启动()` / `服务器.开始()` | 启动本地 HTTP 服务器，返回 server 句柄（options 可含 host/port/handler；也支持 `server.start(handler)` / `server.start(port, handler)` / `server.start(port, host, handler)` 等简写） |
+| `server.stop(id?)` | `本地服务器.关闭()` / `本地服务器.停止()` | 关闭指定 id 的服务器；无参则关闭全部 |
+| `server.stopAll()` | `本地服务器.关闭全部()` | 关闭所有运行中的服务器 |
+| `server.list()` | `本地服务器.列表()` / `本地服务器.运行中()` | 返回运行中服务器信息数组（每项含 id/host/port/url/isRunning） |
+| `serverHandle.id` | | 服务器唯一 id |
+| `serverHandle.host` | | 监听地址 |
+| `serverHandle.port` | | 监听端口 |
+| `serverHandle.url` | | 监听地址完整 URL（如 `http://0.0.0.0:8080`） |
+| `serverHandle.isRunning()` | `serverHandle.是否在运行()` | 服务器是否仍在运行 |
+| `serverHandle.stop()` | `serverHandle.关闭()` / `serverHandle.停止()` | 关闭该服务器 |
+| `serverHandle.error` | | 启动失败时的错误信息（成功为 null） |
+| `request.method` | | 请求方法（GET/POST/...） |
+| `request.path` | | 请求路径（不含 query） |
+| `request.url` | | 完整请求路径（含 query） |
+| `request.query` | | 查询字符串（不含 `?`） |
+| `request.headers` | | 请求头对象 |
+| `request.body` | | 请求体文本 |
+| `request.json()` | `request.解析JSON()` | 将 body 解析为 JS 对象（解析失败返回 null） |
+
 #### this 对象
 | 英文 | 中文别名 | 说明 |
 |------|----------|------|
@@ -227,6 +276,85 @@
 | `this.setValue()` | `this.设置值()` | 设置栏目项值 |
 | `this.call()` | `this.调用()` | 主动触发指定项目ID的JS |
 | `this.refresh()` | `this.刷新()` | 刷新整个界面（触发 UI 重组，使 this 中对 state 的修改立即生效） |
+| `this.text` | `this.文本` | 当前复合文本源串（可读写，**仅当脚本由复合文本 `{{js:...}}` / `{{link:...}}` 触发时可用**；设为新串会立即重渲染该复合文本本身） |
+
+**`this.text` 示例**（需在复合文本内、由 `{{js:...}}` 或 `{{link:...}}` 触发）：
+
+```javascript
+// 复合文本："当前点击数：{{js: counter}}"
+// 点击 link 后修改自身文本：
+this.text = "已点击 " + (parseInt(this.text.replace(/\D/g,'')) + 1) + " 次";
+// 或直接在 {{js:...}} 内联片段里：
+// {{js: this.text = "时间：" + new Date().toLocaleTimeString() }}
+```
+
+> 注意：`this.text` 仅在脚本由**复合文本**（如卡片内 `{{js:...}}`、`{{link:...}}` 链接点击）触发时存在；由按钮、复选框、滑块等组件触发的脚本不含此属性。写入 `this.text` 会直接重渲染该复合文本，不会刷新整个界面，也不会与「`{{js:...}}` 刷新机制」形成死循环。
+
+---
+
+#### 复合文本语法（`{{...}}`）
+
+栏目文案、`ui.popup` / `ui.alert` / `ui.confirm` 等的正文与标题、`ui.select` 的项名……凡是**文本**字段都支持下面这套标记。
+解析实现见 `view/PvzText.kt`，以下规则与源码逐条对应。
+
+##### 通用规则
+
+- 结束符是**第一个** `}}` → 🔴 **`{{...}}` 不支持嵌套**：`{{red:外层 {{js:x}} 外层}}` 会在第一个 `}}` 处提前收尾，其余当普通文本。
+- 未识别的标签（既不是 `js` / `link` / `icon`，也不是颜色）会**原样输出** `{{...}}`，不会报错。
+- 形如 `{{内容}}`（既无 `|` 也无 `:`）**不解析**，原样输出。
+
+##### `{{js:表达式}}` — 嵌入 JS 结果
+
+```javascript
+"金币：{{js: pvz.getCoin()}}"
+```
+
+- 表达式结果作为文本插入，且**结果会再递归解析一次**（所以结果里可以返回 `{{red:...}}` 等标记）。
+- 🔴 递归时不再执行结果里的 `{{js:...}}`（防无限递归），但**图标会被识别**——`{{js:}}` 里的图标标签会在渲染前预先收集，可正常显示。
+- 触发时机：界面组合 / `ui.refreshAll()` 广播 / 通过 `this.text` 写入。
+
+##### `{{link|JS代码:显示文字}}` — 可点击链接
+
+```javascript
+"点这里：{{link|当前.backUI('ok'):确认并返回}}"
+```
+
+- 点击即执行 `JS代码`，不跳转浏览器（带协议的普通 URL 链接走浏览器）。
+- 🔴 **按最后一个 `:` 切分**：`JS代码` 里**可以**有冒号，**显示文字里不能有冒号**。
+  ```javascript
+  // ✅ JS 里带半角冒号没问题：切分点是最后一个半角冒号
+  "{{link|当前.backUI({ selected: \"A\" }):选 A 并返回}}"
+  // ✅ 显示文字里用全角「：」也没问题：全角冒号不参与切分
+  "{{link|当前.backUI('ok'):确认：立即返回}}"
+  // ❌ 错误：显示文字里出现半角冒号会被当成切分点，
+  //    JS 被切成 "当前.backUI('ok'):确认"、显示文字变成 " 立即返回"
+  "{{link|当前.backUI('ok'):确认: 立即返回}}"
+  ```
+- 可加样式后缀 `{{link-red|JS:文字}}`、`{{link-gold-shadow|JS:文字}}`，后缀名取自下面的命名色表；
+  未注册的后缀（含不写后缀）统一回退为蓝色带下划线。
+- 🔴 链接里的 `JS代码` 若需要传对象字面量以外的复杂结构，先挂 `globalThis.xxx` 再引用（见第 26 节「全局属性映射」；跨脚本共享数据也走 globalThis）。
+
+##### `{{icon:路径}}` / `{{icon|参数:路径}}` — 内嵌图标
+
+```javascript
+"自动收集 {{icon:auto_collect.png}} 已开启"
+"{{icon|width=24|height=24|x=0|y=-4|z=2:auto_collect.png}} 行内浮层图标"
+```
+
+- 参数可选：`width` / `height`（单位 sp）、`x` / `y`（dp，相对文本起点的偏移）、`z`（层级，用于叠放）。
+- 判定是否为带参格式：最后一个 `:` 之前是否含 `=`。因此**路径里不要出现 `=` 与 `|`**。
+- 路径解析走统一的资源层叠（本地工作目录 → APK assets），见 `path` 相关章节。
+
+##### 颜色
+
+```javascript
+"{{red:危险操作}} {{#FF0000:自定义红}} {{gold-shadow:带描边的金色}}"
+```
+
+- 十六进制：`#RGB` / `#RRGGBB` / `#AARRGGBB`（前两者补 `FF` 不透明）。
+- 命名色（14 个）：`green` `purple` `red` `gold` `gray` `white` `olive` `black` `grey` `blue` `yellow` `orange` `cyan` `pink`
+- 描边（`-shadow` 后缀，仅前 7 个原色支持）：`green-shadow` `purple-shadow` `red-shadow` `gold-shadow` `gray-shadow` `white-shadow` `olive-shadow`
+- 颜色标签可以只作用于一段文字：`"普通{{red:变红}}恢复普通"`。
 
 #### this.version
 | 英文 | 中文别名 |
@@ -309,6 +437,7 @@
 | `vpn` | 虚拟专网 | VPN 断网/恢复网络控制（disconnect/restore/isActive/isPrepared） | 全局 |
 | `notifications` | 通知 | 系统通知发送/取消（show/cancel），支持图标、渠道、点击回调 | 全局 |
 | `timer` | 定时器 | 定时任务管理（schedule/list/cancel/cancelAll/nextTrigger，底层 AlarmManager） | 全局 |
+| `server` | 本地服务器 | 本地 HTTP 服务器（基于 Ktor/CIO，start/stop/stopAll/list；handler 处理请求，支持 async；可对外暴露接口/网页） | 全局 |
 | `this` | - | 工具上下文（含版本、栏目状态等） | 局部 |
 
 > **作用域说明**：
@@ -1527,8 +1656,78 @@ file.resolve("$WORK_DIR/old.txt").renameTo("$WORK_DIR/new.txt");
 | `onSelect(value)` | 选中某项 | select 收到选中项 `value`；multiSelect 收到选中 `value` 数组；actionSheet 收到选中项 `value` |
 | `onChange(value)` | slider 拖动过程中 | 当前数值（实时） |
 | `onDismiss()` | loading 被关闭 | 无参数 |
+| `onResult(data)` | 嵌套弹窗**显式调用** `当前.backUI(data)` 返回时触发（仅当本弹窗是另一个弹窗的「上一层」时） | 子弹窗通过 `backUI` 带回的数据 `data`；子弹窗若未调用 `backUI` 就直接关闭，则**不会**触发本回调 |
 
 > 示例：`ui.confirm("标题", "内容", { confirmText: "好的", onConfirm: function(){ console.log("已确认") } })`
+
+**跨弹窗返回回调 `onResult`（嵌套弹窗专用）**
+- `onResult(data)` (function): **注册在哪一帧，就由哪一帧的 `当前.backUI(data)` 触发**。
+  🔴 常见误解：「子弹窗 backUI → 父弹窗的 onResult 收到」。实际上 `backUI` 触发的是
+  **调用它的那一帧自己**的 `onResult`；它只是写在父脚本里（作为打开子弹窗时的 options）而已。
+  想让数据继续往上传递，就在 `onResult` 里**再调一次** `当前.backUI(data)`，逐层接力。
+- **只有显式调用 `当前.backUI(data)` 才会触发 `onResult`**。若某弹窗**从未调用 `backUI`** 就直接关闭
+  （点按钮 / 点外部 / `nav.close` 等），则只触发它自己的 `onClose`，**任何** `onResult` 都不会被触发；
+  父弹窗照常恢复可见并等待后续交互，不会连带关闭。
+  （即：`onResult` = 「带回数据」，不是「关闭通知」；要监听关闭请用 `onClose`。）
+- 根弹窗（没有上一层弹窗）同样可以注册 `onResult`：由根弹窗**自己**调用 `当前.backUI(data)` 触发，
+  效果是把 `data` 交回打开它的那段脚本，然后关闭整条弹窗链，根 JS 的 `await()` 随之返回并继续执行。
+
+### 跨弹窗调用栈：当前.backUI / 当前.返回上一层UI
+
+当弹窗内的复合文本（`{{js:...}}` / `{{link:...}}`）再次触发弹窗，就会形成**嵌套弹窗**。例如：根弹窗 `ui.confirm` 的按钮点击后执行 JS 打开 `ui.popup`，popup 内按钮又打开 `ui.confirm`……此时这些弹窗按调用顺序进入一个**全局跨弹窗调用栈**，只有栈顶弹窗可见，其余被临时隐藏；关闭栈顶后，上一层弹窗自动恢复可见。
+
+> 注：`ui.popup` 内部的 `nav.push / nav.pop / nav.close` 是「同一个弹窗内的子页面栈」，与这里的「跨弹窗调用栈」是两层独立概念，互不冲突。
+
+**`当前.backUI(data?)` / `当前.返回上一层UI(data?)`**
+
+可用位置（两种都支持，语义完全一致）：
+- 弹窗内的**复合文本**：`{{link|当前.backUI(data):文字}}`、`{{js:当前.backUI(data)}}`；
+- 弹窗的**回调**里：`onConfirm` / `onCancel` / `onSelect` / `onClick` / `onClose` 等函数体内直接写 `当前.backUI(data)`。
+
+调用后：弹出**本弹窗**这一帧，触发**本弹窗自己注册的 `onResult(data)`** 回调，上一层（父）弹窗恢复可见并等待后续交互。可携带任意数据 `data`（字符串 / 数字 / 对象均可）一并交回。
+
+- 在 `onConfirm` / `onSelect` 这类回调里调用时，本弹窗其实已经先离场了，此时 `backUI` 只负责**把数据交回本帧注册的 `onResult`**（不会重复弹栈、更不会误关父弹窗）。
+- 若当前弹窗已是根（无上一层），`当前.backUI(data)` = 先把 `data` 交给本帧的 `onResult`（若注册了），再关闭整条弹窗链：根 JS 的 `await()` 返回结果并继续执行。
+
+**关闭语义（未调用 backUI 时）**
+- 若嵌套弹窗**完全没有调用 `backUI`** 就直接关闭（点按钮 / 点弹窗外部 / `nav.close`）：
+  - 只弹出当前这一层弹窗；
+  - 触发本弹窗自己的 `onClose`；
+  - **不会**触发任何 `onResult`（既不是本弹窗的，也不是父弹窗的）；
+  - **父弹窗保持打开**，不会连带被关掉。
+- 若被关闭的弹窗本身就是根弹窗（栈底），关闭后根 JS 的 `await()` 以默认结果返回，并继续执行剩余逻辑。
+
+**典型用法**
+
+```javascript
+// 打开一个子弹窗（confirm），并把 onResult 注册在**它自己**身上：
+// 只要这个 confirm 内部调用 当前.backUI(data)，这里的 onResult 就会收到 data。
+ui.popup("选择操作", [
+  { type: "arrow", title: "进入子确认", onClick: function() {
+      ui.confirm("确认?", "确定执行吗 {{link|当前.backUI({ selected: \"A\" }):选 A 并返回}}", {
+          onResult: function(data) {
+              // data = { selected: "A" }，即本 confirm 通过 当前.backUI(data) 交回的数据
+              console.log("子确认返回: " + JSON.stringify(data));
+              // 想把数据继续交给上一层，就在这里再接力一次：
+              // 当前.backUI(data);
+          }
+      }).then(function(ok) {
+          // ok 是该 confirm 自身的结果（true/false），与 onResult 的 data 独立
+      });
+  }}
+]);
+```
+
+> 反过来，把 `onResult` 写到外层 `ui.popup(...)` 的 options 里，就变成了**外层弹窗自己**的回调，
+> 需要外层弹窗调用 `当前.backUI(...)` 才会触发——这也是最常见的坑（表现为「点了确定什么也没提示」）。
+
+**嵌套行为说明**
+- 任意类型（含同类型）多层嵌套均受支持：confirm 之上再叠 confirm、prompt 之上再叠 prompt 都可以。
+- 同屏只渲染**全局栈顶**那一帧，下层帧被临时隐藏；栈顶关闭或 `backUI` 返回后，上一层弹窗自动恢复可见，
+  并**完整保留**其在隐藏前的交互状态（输入框已输入的文本、滑块已拖动的位置、多选已勾选的条目都不会丢失）。
+- 关闭语义按「帧」精确定位，而不是「全局栈顶」：即使在 `onConfirm` 等回调里同步打开了子弹窗，
+  按钮的关闭动作也只会关闭它所属的那一个弹窗，不会误关刚打开的子弹窗。
+- 唯一残留限制：由于同屏只渲染栈顶，下层弹窗在隐藏期间**不可见也不可交互**（这是弹窗栈的固有表现，非 bug）。
 
 ### 方法
 
@@ -2179,6 +2378,8 @@ var result = js.run(code);  // 20
 
 `audio` 对象提供背景音乐（BGM）与音效（SFX）音量控制，取值均为 `0.0`（静音）~ `1.0`（最大）。
 
+**音量联动规则**：`playMusic` 未显式指定 `volume` 时跟随 `audio.setBgmVolume()` 的当前值，`playSound` 未显式指定 `volume` 时跟随 `audio.setSfxVolume()` 的当前值；且**实时联动**——播放期间调用 `setBgmVolume` / `setSfxVolume` 会立即作用于正在播放的（未指定音量的）音乐 / 音效。显式指定了音量的调用则固定为该音量，不受全局音量变化影响。
+
 > **中文别名说明**：`audio` 下的所有方法均支持中文别名。
 
 ### 方法
@@ -2195,7 +2396,7 @@ var v = audio.getBgmVolume();   // 或 audio.获取背景音乐音量()
 
 #### audio.setBgmVolume / audio.设置背景音乐音量
 
-设置背景音乐音量，会立即同步更新正在播放的音乐。
+设置背景音乐音量，**实时生效**：立即更新正在播放的背景音乐，以及处于「跟随模式」的 API 音乐（`playMusic` 未显式指定 `volume` 时，播放期间改动本音量会实时作用于该段音乐）；显式指定过音量的音乐不受影响。
 
 **参数**：`volume` (number) - 音量值（0.0~1.0，超出范围会被钳制）
 
@@ -2217,7 +2418,7 @@ var sv = audio.getSfxVolume();  // 或 audio.获取音效音量()
 
 #### audio.setSfxVolume / audio.设置音效音量
 
-设置音效音量，会同步更新所有已存在的音效播放器。
+设置音效音量，**实时生效**：同步更新所有已存在的音效播放器（含正在播放的）；`playSound` 未显式指定 `volume` 时默认跟随本值。
 
 **参数**：`volume` (number) - 音量值（0.0~1.0，超出范围会被钳制）
 
@@ -2226,6 +2427,246 @@ var sv = audio.getSfxVolume();  // 或 audio.获取音效音量()
 ```javascript
 audio.setSfxVolume(0.8);        // 或 audio.设置音效音量(0.8)
 ```
+
+#### audio.playMusic / audio.播放音乐
+
+播放一段音乐。路径解析规则同 `assets` 资源：支持 `http(s)` URL、绝对路径（`/` 开头）、占位符（`$WORK_DIR` 等）、相对路径（本地工作目录 `sound/` 优先，`assets/pvz2tool/sound/` 兜底）。
+
+**背景音乐交互规则**（核心需求）：
+- 若当前**背景音乐正在播放**（处于工具箱主界面，未进入游戏），播放音乐期间会**暂时暂停背景音乐**，音乐播放完成（或被 `stopMusic` / 新的 `playMusic` 取代）后再**恢复背景音乐**。
+- **全局唯一**：任何时刻只存在一段 `playMusic` 音乐。重复调用会先结束并释放上一段，绝不会叠加出多段音乐同时发声。
+- **让位期间不会被"抢回来"**：音乐播放期间，即使用户在设置里手动打开背景音乐、或应用从后台返回前台，背景音乐也会保持静默，
+  直到本段音乐结束 / 被 `stopMusic` / 被新的 `playMusic` 取代后统一恢复 —— 不会出现"音乐 + 背景音乐"双重播放。
+- **音效不受影响**：本方法只针对「音乐」，与音效系统互不干扰。
+- 若**已进入游戏**（承载背景音乐的主界面已销毁，背景音乐不存在/未播放），则**直接播放音乐**，不做任何干预。
+
+**参数**：
+- `url` (string) - 音频路径
+- `options` (object, 可选)：
+  - `volume` (number, 0~1, 可选) - 音乐音量，**默认跟随 `audio.setBgmVolume()` 的当前值（实时联动，播放期间改动 BGM 音量会实时作用于本段音乐）**；显式传值则该段音乐固定为该音量
+  - `loop` (bool) - 是否循环播放，默认 `false`
+  - `fade` (number, ms) - 背景音乐暂停/恢复的渐变时长，默认 `1000`
+
+**返回**：void
+
+```javascript
+audio.playMusic("bgm.mp3");                                  // 或 audio.播放音乐("bgm.mp3")（音量跟随 setBgmVolume）
+audio.playMusic("sound/win.mp3", { volume: 0.8, loop: false });   // 显式音量 0.8，不随全局变化
+audio.playMusic("/sdcard/music.mp3", { fade: 500 });          // 进入游戏后此调用不影响背景音乐
+```
+
+#### audio.stopMusic / audio.停止音乐
+
+停止当前正在播放的音乐。若在播放期间曾暂停背景音乐，则停止后会**恢复背景音乐**（前提是应用仍开启背景音乐且在前后台）。
+
+**返回**：void
+
+```javascript
+audio.stopMusic();            // 或 audio.停止音乐()
+```
+
+#### audio.isMusicPlaying / audio.是否正在播放音乐
+
+查询是否有音乐正在播放。
+
+**返回**：bool
+
+```javascript
+if (audio.isMusicPlaying()) {  // 或 audio.是否正在播放音乐()
+    audio.stopMusic();
+}
+```
+
+#### audio.playSound / audio.播放音效
+
+播放一个音效，**完全不受背景音乐影响**（与背景音乐相互独立）。路径解析规则同 `playMusic`。
+
+**参数**：
+- `url` (string) - 音效路径
+- `volume` (number, 0~1, 可选) - 音效音量，默认跟随全局音效音量（`audio.getSfxVolume()`，实时联动：播放期间改动 SFX 音量会实时作用于正在播放的音效）
+
+**返回**：void
+
+```javascript
+audio.playSound("sound/click.mp3");                          // 或 audio.播放音效("sound/click.mp3")
+audio.playSound("sound/alert.mp3", 0.9);
+```
+
+---
+
+## 8.7. video - 视频播放
+
+播放视频。画面承载在**全屏弹窗**上（与 `ui.alert` / `ui.popup` 同一套弹窗栈，不新起 Activity），
+主界面与悬浮窗里执行脚本都能弹出。播放链路直接复用游戏内 CG 播放器：
+
+- 解码方案自动降级：`ExoPlayer → MediaPlayer → 海报`（5 秒未就绪即降级，保证不卡死）；
+- 加载中显示 loading 动画，右上角有「跳过」按钮（同 CG）；
+- 应用切后台自动暂停、回前台自动恢复；
+- 全屏黑底，画面按比例适配。
+
+> **全局唯一**：任意时刻只有一个视频，新的 `video.play` 会替换上一段。
+> **播完即关闭**：非循环播放结束后弹窗自动关闭；`loop: true` 时自动从头重播。
+
+### 路径规则
+
+与 `assets` / `audio` 一致：
+
+- **相对路径**（如 `video/intro.mp4`）：资源层解析 —— 本地工作目录覆盖 > 目标 APK 底包 > APK assets；
+  若直接写 `intro.mp4` 而资源层找不到，会自动再试 `video/intro.mp4`。
+- **绝对路径**（`/storage/.../intro.mp4`）：直接读本地文件。
+- **URL**（`http(s)://`）：流式播放。
+- **占位符**（`$WORK_DIR`、`$ANDROID_FILES` 等）：先展开再按上面规则解析。
+
+### 方法
+
+#### video.play / video.播放
+
+**参数**：
+- `url` (string) - 视频路径
+- `options` (object, 可选)：
+  - `loop` (bool) - 是否循环播放，默认 `false`
+  - `volume` (number, 0~1) - 音量，默认 `1.0`
+  - `poster` (string) - 海报兜底图（所有解码方案都失败时显示）
+  - `start` (number, ms) - 起始播放位置，默认 `0`
+
+**返回**：void
+
+```javascript
+video.play("video/intro.mp4");                              // 或 video.播放("video/intro.mp4")
+video.play("video/intro.mp4", { loop: true, volume: 0.8 });
+video.play("/storage/emulated/0/DCIM/demo.mp4", { poster: "images/cover.png" });
+video.play("https://example.com/a.mp4");
+```
+
+#### video.pause / video.暂停
+
+暂停播放，**弹窗与画面保留**（可再 `video.resume()` 继续）。
+
+**返回**：void
+
+#### video.resume / video.继续
+
+继续播放。
+
+**返回**：void
+
+#### video.stop / video.停止
+
+停止播放并关闭弹窗。
+
+**返回**：void
+
+#### video.seekTo / video.跳转
+
+**参数**：
+- `position` (number) - 目标位置（毫秒，会钳制为非负）
+
+**返回**：void
+
+#### video.setVolume / video.设置音量
+
+**参数**：
+- `volume` (number) - 音量（0.0~1.0，超出范围会被钳制）
+
+**返回**：void
+
+#### video.isPlaying / video.是否播放中
+
+**返回**：boolean - 是否正在播放
+
+#### video.isVisible / video.是否显示中
+
+**返回**：boolean - 视频弹窗是否正在显示（播放器可能仍在准备中）
+
+#### video.getDuration / video.获取时长
+
+**返回**：number - 总时长（毫秒）；未知时返回 `0`
+
+#### video.getPosition / video.获取位置
+
+**返回**：number - 当前播放位置（毫秒）
+
+### 完整示例
+
+```javascript
+// 播一段开场视频，播放结束（弹窗自动关闭）后再执行后续逻辑
+video.play("video/opening.mp4", { volume: 0.9 });
+
+let t = timer.set(() => {
+  if (!video.isVisible()) {
+    timer.cancel(t);
+    console.log("开场播放结束");
+    // ... 后续逻辑
+  }
+}, 500);
+```
+
+---
+
+## 8.8. log - 日志读写
+
+读写工具箱界面「日志」面板里的内容（最多保留最近 200 条）。可用于脚本自检、
+把关键信息写进日志面板、或把日志导出排查问题。
+
+> 与 `console.*` 的区别：`console.log` 等只能**写**日志（等价于 `log.add` 的 info 级别），
+> `log` 对象额外支持**读取**已有日志、按级别过滤与清空。
+
+### 方法
+
+#### log.get / log.获取
+
+**参数**：
+- `options` (object, 可选)：
+  - `limit` (number) - 只取最近 N 条
+  - `level` (string) - 按级别过滤：`'info'` / `'warn'` / `'error'` / `'success'`
+
+**返回**：Array\<object\> - 每项形如 `{ level, message, time }`
+
+```javascript
+let all = log.get();                          // 或 log.获取()
+let errs = log.get({ level: "error" });        // 只看错误
+let last = log.get({ limit: 20 });             // 最近 20 条
+last.forEach(e => console.log(e.time, e.level, e.message));
+```
+
+#### log.text / log.文本
+
+把日志拼成纯文本，每行格式 `[时间] 级别 内容`，便于写盘或上报。
+
+**参数**：同 `log.get`（`limit` 与 `level` 均生效）
+
+**返回**：string
+
+```javascript
+let dump = log.text();            // 全部日志文本
+let recent = log.text({ limit: 50 });
+```
+
+#### log.add / log.添加
+
+追加一条日志到日志面板。
+
+**参数**：
+- `message` (string) - 内容
+- `level` (string, 可选) - `'info'`（默认）/ `'warn'` / `'error'` / `'success'`
+
+**返回**：void
+
+```javascript
+log.add("脚本开始执行");
+log.add("资源缺失", "warn");
+log.add("保存成功", "success");
+```
+
+#### log.clear / log.清空
+
+清空所有日志。
+
+**返回**：void
+
+#### log.count / log.数量
+
+**返回**：number - 当前日志条数
 
 ---
 
@@ -4183,6 +4624,169 @@ console.log("已加载:", lib.name, lib.loaded);     // 已加载: libfoo.so tru
 let loader = dex.load("/sdcard/plugins/my.dex");  // DEX 内 external fun 可调用 libfoo.so 的符号
 let Cls = loader.findClass("com.example.Plugin");
 Cls.newInstance().call("nativeMethod");
+```
+
+---
+
+## 25. server - 本地 HTTP 服务器
+
+基于 Ktor（CIO 引擎）在应用内启动一个**本地 HTTP 服务器**，把每一个到达的请求交给 JS 编写的 `handler` 处理。可以用它对外暴露接口、提供本地网页、或与游戏 / 外部程序互相调用（例如让游戏通过 `http://127.0.0.1:8080` 拉取数据，或让脚本在后台监听某个地址）。
+
+> 说明：handler 的调用会被调度回 JS 引擎线程执行，保证线程安全；支持 `async` 函数（返回 Promise），引擎会自动等待其完成后再响应。所有服务器在应用退出 / 引擎销毁时由调用方负责关闭（也可 `server.stopAll()` 一键关闭全部）。
+
+> **路由**：所有方法（GET / POST / PUT / DELETE / PATCH / HEAD …）与**所有路径**（含 `/` 与任意深层路径）
+> 都会交给同一个 `handler`，由 JS 自行按 `req.method` / `req.path` 分发。不存在「只能处理根目录」的限制。
+
+> **端口冲突**：同一 `host:port` 重复 `start` **不会崩溃、也不会叠加实例**——会复用已运行的服务器并返回
+> 它的句柄（两个句柄 `id` 相同、`error` 均为 `""`）。端口被其它进程占用时返回 `error` 非空的句柄，不抛异常。
+
+### 方法
+
+| 方法 | 中文别名 | 说明 |
+|------|----------|------|
+| `server.start(options)` | `本地服务器.启动()` / `本地服务器.开始()` / `服务器.创建()` | 启动本地 HTTP 服务器，返回 server 句柄。也支持简写：`server.start(handler)` / `server.start(port, handler)` / `server.start(port, host, handler)` |
+| `server.stop(id?)` | `本地服务器.关闭()` / `本地服务器.停止()` | 关闭指定 id 的服务器；无参则关闭全部 |
+| `server.stopAll()` | `本地服务器.关闭全部()` / `本地服务器.停止全部()` | 关闭所有运行中的服务器 |
+| `server.list()` | `本地服务器.列表()` / `本地服务器.运行中()` | 返回运行中服务器信息数组（每项含 id/host/port/url/isRunning） |
+
+### server.start(options)
+
+`options` 为对象，字段：
+
+| 字段 | 中文别名 | 类型 | 默认值 | 说明 |
+|------|----------|------|--------|------|
+| `host` | `主机` | string | `"0.0.0.0"` | 监听地址。`"0.0.0.0"` 监听所有网卡；`"127.0.0.1"` 仅本机可访问 |
+| `port` | `端口` | number | `8080` | 监听端口（1~65535）。被本应用其它服务器占用 → 复用其句柄；被其它进程占用 → 句柄 `error` 非空 |
+| `handler` | `处理器` | function | 必填 | 请求处理器，签名 `function(req) -> response`，详见下方「handler 约定」 |
+
+若省略 `options`、直接传 `handler` 函数，则使用默认 `host`/`port`。
+
+### server 句柄（serverHandle）
+
+`server.start` 返回的句柄对象：
+
+| 属性 / 方法 | 中文别名 | 说明 |
+|------|----------|------|
+| `id` | | 服务器唯一 id（如 `srv_1`） |
+| `host` | | 监听地址 |
+| `port` | | 监听端口 |
+| `url` | | 监听地址完整 URL（如 `http://0.0.0.0:8080`） |
+| `isRunning()` | `是否在运行()` | 是否仍在运行 |
+| `stop()` | `关闭()` / `停止()` | 关闭该服务器 |
+| `error` | | 启动失败时的错误信息（**成功为空字符串 `""`**，不是 `null`） |
+
+### handler 约定
+
+```js
+function handler(req) {
+  // req: { method, path, url, query, queryParams, headers, body, json() }
+  return response;  // 见下方「返回值」
+}
+```
+
+**请求对象 `req`**：
+
+| 字段 | 说明 |
+|------|------|
+| `req.method` | 请求方法（GET / POST / PUT / DELETE / PATCH / HEAD …） |
+| `req.path` | 路径（不含 query），如 `/api/foo`。**任意路径都会进 handler**，不限于 `/` |
+| `req.url` | 完整路径（含 query） |
+| `req.query` | 查询字符串（不含 `?`），如 `a=1&b=2` |
+| `req.queryParams` | 已解析的查询参数对象，如 `{ a: "1", b: "2" }` |
+| `req.headers` | 请求头对象（key → value） |
+| `req.body` | 请求体文本（GET/HEAD 等无体则为空串） |
+| `req.json()` | 将 `body` 解析为 JS 对象（解析失败返回 `null`） |
+
+**返回值 `response`** 支持四种形式：
+
+1. **字符串 / 数字 / 布尔**：按 JS 的字符串转换规则作为 `200 text/plain` 响应体；
+2. **普通对象**（不含任何响应规格字段）：整体 JSON 序列化，按 `application/json` 返回；
+3. **响应规格对象** —— 只要出现 `status` / `headers` / `contentType` / `body` 中**任意一个**字段即按规格解释：
+   - `status`（或 `状态码`，number，默认 200；越界会被兜底为 500）
+   - `headers`（或 `响应头`，对象）
+   - `contentType`（或 `内容类型`，string，如 `"application/json; charset=utf-8"`）
+   - `body`（或 `响应体`）：字符串直接作为响应体；对象自动 JSON 序列化
+4. **null / undefined**：返回 `204 No Content`。
+
+handler 也支持 `async function` 形式（返回 Promise），引擎会等待其完成。
+
+> handler 抛出的异常会被捕获并返回 `500 Internal Server Error`，不会导致服务器或应用崩溃。
+
+### 示例
+
+```javascript
+// 1) 最简：启动一个返回 JSON 的本地接口
+let srv = server.start({
+  host: "127.0.0.1",
+  port: 8080,
+  handler: function (req) {
+    return {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      body: { ok: true, method: req.method, path: req.path }
+    };
+  }
+});
+console.log(srv.url);   // "http://127.0.0.1:8080"
+// 浏览器/游戏访问 http://127.0.0.1:8080/anything 即可拿到 JSON
+
+// 2) 直接传 handler（使用默认 host/port）
+let srv2 = server.start(function (req) {
+  if (req.path === "/ping") return "pong";
+  return { status: 404, body: "not found" };
+});
+
+// 3) 读取 POST 的 JSON 请求体并回显
+let srv3 = server.start(9090, function (req) {
+  let data = req.json();   // 解析失败返回 null
+  return { status: 200, body: { echo: data, raw: req.body } };
+});
+
+// 4) async handler：先读资源再响应
+let srv4 = server.start(async function (req) {
+  let text = await assets.read("some_file.txt");
+  return text;   // 字符串 → 200 text/plain
+});
+
+// 5) 管理：查看运行中的服务器、按需关闭
+console.log(server.list());
+srv.stop();          // 关闭单个
+server.stopAll();   // 关闭全部
+```
+
+```javascript
+// 6) 端口冲突：重复启动同一端口不会崩溃，而是复用同一个实例
+let a = server.start(8099, function (req) { return "A"; });
+let b = server.start(8099, function (req) { return "B"; });
+console.log(a.id === b.id);   // true —— 复用同一实例，没有叠加
+console.log(b.error);         // ""  —— 没有错误
+server.stop(a.id);
+```
+
+> 提示：若要在「关闭服务器时不阻塞当前脚本」，直接调用 `srv.stop()` 即可（同步返回）。多个服务器可并存，只要端口不冲突。
+
+---
+
+## 26. 全局属性映射（globalThis / self / window / global）
+
+keight 引擎内置了 `globalThis`。为了让浏览器 / Node 生态的脚本可以直接跑，引擎启动时额外把下面这些
+标识符统一指向**同一个全局对象**（与浏览器一致：`window === self === frames === top === parent === globalThis`）：
+
+| 标识符 | 说明 |
+|--------|------|
+| `globalThis` | 标准全局对象 |
+| `global` | Node.js 风格别名 |
+| `self` | 浏览器 / Web Worker 风格别名 |
+| `window` | 浏览器风格别名 |
+| `frames` / `top` / `parent` | 浏览器风格别名 |
+
+典型用途：在多次脚本执行之间（例如弹窗内 `{{link:...}}` 点击回调、定时器、服务器 handler）
+共享数据 —— 因为普通 `var` 声明只在单次脚本执行内有效。
+
+```javascript
+globalThis.__count = (globalThis.__count || 0) + 1;
+console.log(self.__count);      // 与 globalThis.__count 完全等价
+console.log(window.__count);
 ```
 
 ---

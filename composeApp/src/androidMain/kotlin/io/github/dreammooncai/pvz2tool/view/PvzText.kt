@@ -32,43 +32,28 @@ import io.github.dreammooncai.pvz2tool.SectionItem
 import io.github.dreammooncai.pvz2tool.VersionDef
 import io.github.dreammooncai.pvz2tool.js.JsRichTextRefresher
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
-import io.github.dreammooncai.pvz2tool.ui.main.DynamicSectionState
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
+import io.github.dreammooncai.pvz2tool.ui.dialog.LocalUiFrame
+import io.github.dreammooncai.pvz2tool.ui.dialog.UiFrame
+import io.github.dreammooncai.pvz2tool.ui.main.DynamicSectionState
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.text.LinkInteractionListener
 import androidx.compose.ui.text.style.TextOverflow
 import io.github.dreammooncai.pvz2tool.InitializePvz2
+import io.github.dreammooncai.pvz2tool.js.code.JsExecutionContext
+import io.github.dreammooncai.pvz2tool.js.code.LocalJsExecutionContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-// JS 执行上下文：携带当前渲染环境信息，使 {{js:...}} 可访问 this.当前
-data class JsExecutionContext(
-    val section: DynamicSection? = null,
-    val item: SectionItem? = null,
-    val version: VersionDef,
-    val sectionStates: Map<String, DynamicSectionState> = emptyMap(),
-    val updateSectionState: ((String, (DynamicSectionState) -> DynamicSectionState) -> Unit)? = null,
-)
-
-// 通过 CompositionLocal 向下传递 JS 执行上下文，避免每个 PvzRichText 调用点手动传参
-val LocalJsExecutionContext = compositionLocalOf {
-    if (InitializePvz2.isConfigReady()) {
-        JsExecutionContext(
-            section = null,
-            item = null,
-            version = InitializePvz2.mPvz2ScreenStateFlow.value.selectedVersion ?: return@compositionLocalOf null,
-        )
-    } else null
-}
+import kotlin.time.Duration.Companion.milliseconds
 
 // --------------- JS 执行辅助方法 ---------------
 
@@ -76,46 +61,55 @@ val LocalJsExecutionContext = compositionLocalOf {
  * 在给定上下文中执行 JS 表达式（支持内联表达式和 .js 文件）
  * 使用 PvzToolJsEngine.executeScript 带上下文重载，使 JS 中可访问 this.当前
  */
-private suspend fun executeJsExprWithContext(expr: String, context: JsExecutionContext): String {
+private suspend fun executeJsExprWithContext(
+    expr: String,
+    context: JsExecutionContext,
+    text: String? = null,
+    onTextChange: ((String) -> Unit)? = null,
+    uiFrame: UiFrame? = null,
+): String {
+    // 统一执行入口（内联表达式或 .js 文件），返回 JS 引擎给出的字符串结果
+    val runScript: suspend (String) -> String? = { code ->
+        runCatching {
+            PvzToolJsEngine.executeScript(
+                script = code,
+                section = context.section,
+                item = context.item,
+                version = context.version,
+                sectionStates = context.sectionStates,
+                isRichText = true,
+                updateSectionState = context.updateSectionState,
+                text = text,
+                onTextChange = onTextChange,
+                uiFrame = uiFrame,
+            )
+        }.getOrNull()
+    }
     return try {
-        val result = if (expr.endsWith(".js")) {
+        val raw = if (expr.endsWith(".js", ignoreCase = true)) {
             val jsFile = if (expr.startsWith("/")) {
-                File(expr).inputStream()
-            } else AssetExtractorHolder.openInputStream("js/${expr.removePrefix("js/")}")
-            jsFile?.use { jsFile ->
-                val jsCode = jsFile.bufferedReader().readText()
-                PvzToolJsEngine.executeScript(
-                    script = jsCode,
-                    section = context.section,
-                    item = context.item,
-                    version = context.version,
-                    sectionStates = context.sectionStates,
-                    isRichText = true,
-                    updateSectionState = context.updateSectionState
-                )
-            } ?: // .js 文件未找到，降级为内联表达式执行
-            PvzToolJsEngine.executeScript(
-                script = expr,
-                section = context.section,
-                item = context.item,
-                version = context.version,
-                sectionStates = context.sectionStates,
-                isRichText = true,
-                updateSectionState = context.updateSectionState
-            )
+                runCatching { File(expr).inputStream() }.getOrNull()
+            } else runCatching { AssetExtractorHolder.openInputStream("js/${expr.removePrefix("js/")}") }.getOrNull()
+            // 只有 .js 文件未找到时才降级为内联表达式执行；
+            // 文件已找到并执行过则直接采纳其结果（即便为 null），不能因结果为 null 而回退，
+            // 否则会把 expr 这个路径字符串当 JS 源码编译，抛出误导性的 SyntaxError。
+            if (jsFile != null) {
+                jsFile.use { f -> runScript(f.bufferedReader().readText()) }
+            } else {
+                runScript(expr)
+            }
         } else {
-            // 内联表达式
-            PvzToolJsEngine.executeScript(
-                script = expr,
-                section = context.section,
-                item = context.item,
-                version = context.version,
-                sectionStates = context.sectionStates,
-                isRichText = true,
-                updateSectionState = context.updateSectionState
-            )
+            runScript(expr)
         }
-        result.ifBlank { "{{js:$expr}}" }
+        val rendered = raw?.takeIf { it.isNotBlank() } ?: "{{js:$expr}}"
+        // 表达式求值为对象时，引擎默认渲染成无意义的 "[object Object]"；
+        // 改用 JSON.stringify 给出可读表示（仅对内联表达式，避免把 .js 文件名当表达式求值）。
+        if (rendered == "[object Object]" && !expr.endsWith(".js", ignoreCase = true)) {
+            runScript("JSON.stringify($expr)")?.takeIf { it.isNotBlank() && it != "null" && it != "undefined" }
+                ?: rendered
+        } else {
+            rendered
+        }
     } catch (e: Exception) {
         "{{js:$expr}}"
     }
@@ -126,19 +120,31 @@ private suspend fun executeJsExprWithContext(expr: String, context: JsExecutionC
  * 使用 PvzToolJsEngine.executeScript(script: String) 无参重载
  */
 private suspend fun executeJsExprNoContext(expr: String): String {
+    val runScript: suspend (String) -> String? = { code ->
+        runCatching { PvzToolJsEngine.executeScript(code, source = "复合文本") }.getOrNull()
+    }
     return try {
-        val result = if (expr.endsWith(".js")) {
+        val raw = if (expr.endsWith(".js", ignoreCase = true)) {
             val jsFile = if (expr.startsWith("/")) {
-                File(expr).inputStream()
-            } else AssetExtractorHolder.openInputStream("js/${expr.removePrefix("js/")}")
-            jsFile?.use { jsFile ->
-                val jsCode = jsFile.bufferedReader().readText()
-                PvzToolJsEngine.executeScript(jsCode, source = "复合文本")
-            } ?: PvzToolJsEngine.executeScript(expr, source = "复合文本")
+                runCatching { File(expr).inputStream() }.getOrNull()
+            } else runCatching { AssetExtractorHolder.openInputStream("js/${expr.removePrefix("js/")}") }.getOrNull()
+            // 同 executeJsExprWithContext：只有文件未找到才降级为内联表达式，
+            // 执行结果为 null 属正常，不得回退去编译路径字符串。
+            if (jsFile != null) {
+                jsFile.use { f -> runScript(f.bufferedReader().readText()) }
+            } else {
+                runScript(expr)
+            }
         } else {
-            PvzToolJsEngine.executeScript(expr, source = "复合文本")
+            runScript(expr)
         }
-        result.ifBlank { "{{js:$expr}}" }
+        val rendered = raw?.takeIf { it.isNotBlank() } ?: "{{js:$expr}}"
+        if (rendered == "[object Object]" && !expr.endsWith(".js", ignoreCase = true)) {
+            runScript("JSON.stringify($expr)")?.takeIf { it.isNotBlank() && it != "null" && it != "undefined" }
+                ?: rendered
+        } else {
+            rendered
+        }
     } catch (e: Exception) {
         "{{js:$expr}}"
     }
@@ -151,13 +157,16 @@ private suspend fun executeJsExprNoContext(expr: String): String {
  */
 private suspend fun evaluateJsExpressions(
     expressions: List<String>,
-    context: JsExecutionContext?
+    context: JsExecutionContext?,
+    text: String? = null,
+    onTextChange: ((String) -> Unit)? = null,
+    uiFrame: UiFrame? = null,
 ): Map<String, String> {
     val results = mutableMapOf<String, String>()
     for (expr in expressions) {
         results[expr] = try {
             val result = if (context != null) {
-                executeJsExprWithContext(expr, context)
+                executeJsExprWithContext(expr, context, text, onTextChange, uiFrame)
             } else {
                 executeJsExprNoContext(expr)
             }
@@ -236,13 +245,19 @@ private fun handleLinkClick(
     context: Context,
     url: String,
     jsContext: JsExecutionContext?,
-    scope: CoroutineScope
+    text: String? = null,
+    onTextChange: ((String) -> Unit)? = null,
+    uiFrame: UiFrame? = null,
 ) {
     if (classifyLink(url) == LinkTarget.BROWSER) {
         openBrowser(context, url)
     } else {
-        scope.launch {
-            runCatching { executeJsFromLink(url, jsContext) }
+        // 🔴 必须用与弹窗组合生命周期解耦的稳定作用域（JsUiManager.uiScope）：
+        // 链接里的 JS（如 {{link|当前.backUI}}）可能直接关闭所在弹窗，组合离场后
+        // rememberCoroutineScope 会被 forget，仍在 executeScript（keight jsFn.call 会挂起）上
+        // 挂起的协程 resume 时即抛 ForgottenCoroutineScopeException。这与弹窗按钮回调同源，故统一走 uiScope。
+        JsUiManager.uiScope.launch {
+            runCatching { executeJsFromLink(url, jsContext, text, onTextChange, uiFrame) }
             // 链接点击属于用户交互，脚本执行完后刷新所有 {{js:...}}
             // （executeJsFromLink 内部按 isRichText = true 调用，不会自动触发刷新）
             JsRichTextRefresher.refresh()
@@ -255,7 +270,13 @@ private fun handleLinkClick(
  * - 以 .js 结尾 → 加载文件内容后执行
  * - 否则 → 作为内联 JS 代码直接执行
  */
-private suspend fun executeJsFromLink(url: String, jsContext: JsExecutionContext?) {
+private suspend fun executeJsFromLink(
+    url: String,
+    jsContext: JsExecutionContext?,
+    text: String? = null,
+    onTextChange: ((String) -> Unit)? = null,
+    uiFrame: UiFrame? = null,
+) {
     val trimmed = url.trim()
     val isJsFile = trimmed.substringBefore('?').substringBefore('#')
         .endsWith(".js", ignoreCase = true)
@@ -272,10 +293,39 @@ private suspend fun executeJsFromLink(url: String, jsContext: JsExecutionContext
             version = jsContext.version,
             sectionStates = jsContext.sectionStates,
             isRichText = true,
-            updateSectionState = jsContext.updateSectionState
+            updateSectionState = jsContext.updateSectionState,
+            text = text,
+            onTextChange = onTextChange,
+            uiFrame = uiFrame,
         )
     } else {
-        PvzToolJsEngine.executeScript(code, source = "复合文本")
+        // 弹窗内复合文本：若没有显式 jsContext（弹窗 Composable 未提供 LocalJsExecutionContext），
+        // 回退到所在帧的 ownerContext（由 JsUiManager.pushFrame 填充）。
+        // 这样链接里的 当前.backUI / 当前.xxx 才能正确解析；否则 当前 未定义、点击会抛错并被静默吞掉，
+        // 表现就是"点了没反应"。
+        val ownerCtx = uiFrame?.ownerContext
+        if (ownerCtx != null) {
+            // 🔴 修复：复合文本链接里的 当前.backUI 必须作用到「链接所在的那一帧」(uiFrame = 当前弹窗帧)，
+            // 而非 ownerContext 上残留的旧 uiFrame。该旧值由 JsUiManager.pushFrame 在「callbackStack 非空」
+            // （即本帧由某个祖先回调里打开）时**故意不覆盖**而来，恒比本帧浅一层（指向打开本帧的父帧）。
+            // 若直接用它，resolveBackTarget 会把链接的 backUI 判到父帧上，逐层返回时整层跳过
+            // （现象：four_level 第 4 层链接直接触发「第二层收到」、return_data 第 2 层链接直接触发根的 onResult）。
+            // 此处临时把 ownerContext.uiFrame 覆盖为本帧并在执行后还原，既让链接 backUI 命中本帧，
+            // 又不污染该 ownerContext 上其它链接 / 回调（同一 ownerContext 可能被多个帧共享）。
+            val prevUiFrame = ownerCtx.uiFrame
+            try {
+                ownerCtx.uiFrame = uiFrame
+                PvzToolJsEngine.executeScript(
+                    ownerCtx,
+                    script = code,
+                    isRichText = true,
+                )
+            } finally {
+                ownerCtx.uiFrame = prevUiFrame
+            }
+        } else {
+            PvzToolJsEngine.executeScript(code, source = "复合文本")
+        }
     }
 }
 
@@ -530,20 +580,27 @@ fun PvzRichText(
     val blurRadius = calculateBlurRadius(fontSize)
     val fixedOffset = Offset(2f, 2f)
 
+    // 让复合文本自身持有可变文本：this.text = "..." 才能触发重组重渲染
+    var textState by remember(text) { mutableStateOf(text) }
+    val onTextChange: (String) -> Unit = { textState = it }
+
     // 合并显式参数和 CompositionLocal 中的上下文
     val effectiveContext = jsContext ?: LocalJsExecutionContext.current
 
+    // 当前对话框帧（若此复合文本位于某个弹窗内，则为其对应的 UiFrame；
+    // 用于使弹窗内 {{js:}} 可调用 当前.backUI 返回上一层）。非弹窗内为 null。
+    val uiFrame = LocalUiFrame.current
+
     // 链接点击处理：JS 目标执行 JS，普通链接打开浏览器
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val linkListener: LinkInteractionListener = linkListener@ { annotation ->
         val linkUrl = (annotation as? LinkAnnotation.Url)?.url ?: return@linkListener
-        handleLinkClick(context, linkUrl, effectiveContext, scope)
+        handleLinkClick(context, linkUrl, effectiveContext, textState, onTextChange, uiFrame)
     }
 
     // 1. 从 text 中找出所有 {{js:...}} 表达式
-    val jsExpressions = remember(text) {
-        "\\{\\{js:([^}]+)\\}\\}".toRegex().findAll(text).map { it.groupValues[1] }.toList()
+    val jsExpressions = remember(textState) {
+        "\\{\\{js:([^}]+)\\}\\}".toRegex().findAll(textState).map { it.groupValues[1] }.toList()
     }
 
     // 2. 异步执行 JS 并缓存结果（使用 produceState 支持 suspend）
@@ -559,15 +616,15 @@ fun PvzRichText(
         // collectLatest：连续刷新信号会取消上一轮（含下面的 delay），天然合并成一次求值
         JsRichTextRefresher.revision.collectLatest {
             // 首帧立即求值；后续刷新做一个极短防抖，合并同一批次的多次通知
-            if (!isFirstEmission) delay(60)
+            if (!isFirstEmission) delay(60.milliseconds)
             isFirstEmission = false
-            value = evaluateJsExpressions(jsExpressions, effectiveContext)
+            value = evaluateJsExpressions(jsExpressions, effectiveContext, textState, onTextChange, uiFrame)
         }
     }
 
     // 3. 解析所有图标标签（包括原始文本和 JS 返回结果中的）
-    val allIconTags = remember(text, jsCache, fontSize) {
-        parseIconTags(text, jsCache, fontSize)
+    val allIconTags = remember(textState, jsCache, fontSize) {
+        parseIconTags(textState, jsCache, fontSize)
     }
 
     // 4. 动态构建 inlineContent 映射表（仅非浮层图标需要占位；浮层图标走覆盖渲染）
@@ -598,7 +655,7 @@ fun PvzRichText(
         )
 
         pushStyle(defaultSpanStyle)
-        parseRichText(this, text, jsCache, allIconTags, fixedOffset, blurRadius, defaultStyle, linkListener)
+        parseRichText(this, textState, jsCache, allIconTags, fixedOffset, blurRadius, defaultStyle, linkListener)
         pop()
     }
 

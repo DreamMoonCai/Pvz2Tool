@@ -34,6 +34,8 @@ import io.github.dreammooncai.pvz2tool.pop.core.rsb.util.toZlibInputStreamAndClo
 import io.github.dreammooncai.pvz2tool.pop.plugin.io.CoroutineBinaryStream
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetResourceExtractor.ExtractFileInfo
 import io.github.dreammooncai.pvz2tool.view.PvzProgressBar
+import io.github.dreammooncai.util.ExtractStateStore
+import io.github.dreammooncai.util.SmfHeader
 import io.github.dreammooncai.util.getAssetLastModified
 import io.github.dreammooncai.util.isAssetDirExist
 import io.github.dreammooncai.util.isAssetFileExist
@@ -403,6 +405,16 @@ class AssetResourceExtractor(
                 }
             }
 
+            // 解压成功：记录「源侧」指纹，下次据此判断 APK 内资源是否已更新。
+            // 🔴 必须放在文件真正写完之后：失败/重试路径不会写入，避免「以为已同步」而永久跳过。
+            if (fileInfo.stateKey.isNotEmpty()) {
+                ExtractStateStore.putFingerprint(
+                    context,
+                    fileInfo.stateKey,
+                    "${fileInfo.compareSize}@${fileInfo.sourceLastModified}"
+                )
+            }
+
             if (fileInfo.sourceLastModified > 0) {
                 val targetFile = fileInfo.targetDocument.toFile(context)
                 if (targetFile != null) {
@@ -685,13 +697,37 @@ class AssetResourceExtractor(
     data class ExtractFileInfo(
         val source: ResourceSource,
         val targetDocument: DocumentFile,
+        /** 源文件的**原始字节数**（打开输入流时声明长度用，不能换成归一化长度，否则流长度与实际不符） */
         val size: Long,
         val needExtract: Boolean,
         val forceOverride: Boolean = false,
         val sectionName: String = "",
-        val sourceLastModified: Long = 0L
+        val sourceLastModified: Long = 0L,
+        /**
+         * 归一化到「解压后域」的内容长度：源若是 SMF/zlib 压缩容器，则取容器头里记录的原始长度。
+         * `-1` 表示未知（按 [size] 比较）。
+         */
+        val compareSize: Long = size,
+        /** 源侧指纹记录键（解压成功后写入 [ExtractStateStore]）；空串表示不记录 */
+        val stateKey: String = ""
     )
 
+    /**
+     * 判断目标文件是否需要（重新）解压。
+     *
+     * 🔴 历史 bug（本方法修复的那条）：原实现直接拿 `targetDocument.length()` 与**源文件字节数**比较。
+     * SMF 做了压缩优化后，APK 内的 `.rsb.smf` 是 `SMF_MAGIC + 原始长度 + zlib` 压缩容器，
+     * 本地存的却是解压后的明文 —— 两者根本不在同一域；再加上「源时间戳 ≤ 目标时间戳就跳过」的短路，
+     * 一旦 ZIP 条目时间没随内容更新（aapt2 通常沿用源文件 mtime），就会**永久跳过重解压**：
+     * APK 里的 SMF 明明更新了，进游戏却还是旧数据。
+     *
+     * 现在的判据（顺序很重要）：
+     * 1. 目标缺失/空 → 必须解压；
+     * 2. 版本级强制覆盖；
+     * 3. **源侧指纹未变 → 跳过**（源内容没动，保持本地，从而保护 JS/用户对本地 SMF 的修改）；
+     * 4. 无记录（老版本升级上来）→ 退化为「归一化长度对比」，与压缩前的行为保持兼容；
+     * 5. 其余（指纹变了）→ 源更新了，重新解压。
+     */
     private fun getExtractFileInfo(
         source: ResourceSource,
         targetDocument: DocumentFile,
@@ -699,8 +735,9 @@ class AssetResourceExtractor(
         sectionName: String = ""
     ): ExtractFileInfo {
         val sourceSize: Long
-        var needExtract: Boolean
+        val comparableSourceSize: Long
         val sourceLastModified: Long
+        val sourceKey: String
 
         when (source) {
             is ResourceSource.AssetPath -> {
@@ -709,51 +746,61 @@ class AssetResourceExtractor(
                 } catch (e: IOException) {
                     runCatching { context.assets.open(source.path).use { it.available().toLong() } }.getOrElse { -1 }
                 }
+                comparableSourceSize = runCatching {
+                    context.assets.open(source.path).use { SmfHeader.readContentSize(it) }
+                }.getOrDefault(-1L)
                 sourceLastModified = context.getAssetLastModified(source.path)
-                val targetLength = targetDocument.length()
-
-                needExtract = if (!targetDocument.exists() || targetLength == 0L) {
-                    true
-                } else {
-                    if (forceOverride) {
-                        true
-                    }
-                    // 3. 【新增】时间校验：如果源文件时间 <= 目标文件时间，则不覆盖
-                    else if (sourceLastModified > 0L && sourceLastModified <= targetDocument.lastModified()) {
-                        Log.d(TAG, "源文件时间旧于目标文件，跳过覆盖: ${targetDocument.uri}")
-                        false
-                    }
-                    // 4. 原有逻辑：大小不同则覆盖
-                    else {
-                        targetDocument.length() != sourceSize
-                    }
-                }
+                sourceKey = "asset:${source.path}"
             }
             is ResourceSource.LocalDocument -> {
                 sourceSize = source.document.length()
-                sourceLastModified = source.document.lastModified() // 直接获取本地文件时间
-                val targetLength = targetDocument.length()
-
-                needExtract = if (!targetDocument.exists() || targetLength == 0L) {
-                    true
-                } else {
-                    if (forceOverride) {
-                        true
-                    }
-                    // 【新增】时间校验：如果源文件时间 <= 目标文件时间，则不覆盖
-                    else if (sourceLastModified <= targetDocument.lastModified()) {
-                        Log.d(TAG, "源文件时间旧于目标文件，跳过覆盖: ${targetDocument.uri}")
-                        false
-                    }
-                    // 原有逻辑：大小不同则覆盖
-                    else {
-                        targetDocument.length() != sourceSize
-                    }
-                }
+                comparableSourceSize = runCatching {
+                    val stream = source.document.toFile(context)?.inputStream()
+                        ?: context.contentResolver.openInputStream(source.document.uri)
+                    stream?.use { SmfHeader.readContentSize(it) } ?: -1L
+                }.getOrDefault(-1L)
+                sourceLastModified = source.document.lastModified()
+                sourceKey = "local:${source.document.uri}"
             }
         }
 
-        return ExtractFileInfo(source, targetDocument, sourceSize, needExtract, forceOverride, sectionName)
+        val targetLength = targetDocument.length()
+        val compareSize = if (comparableSourceSize > 0L) comparableSourceSize else sourceSize
+        val stateKey = "$sourceKey|${targetDocument.uri}"
+        val fingerprint = "$compareSize@$sourceLastModified"
+        val lastFingerprint = ExtractStateStore.fingerprint(context, stateKey)
+
+        val needExtract = when {
+            // 1. 目标不存在 / 空文件：必须解压
+            !targetDocument.exists() || targetLength == 0L -> true
+            // 2. 版本级强制覆盖
+            forceOverride -> true
+            // 3. 源侧内容没变 → 保持本地（既避免无谓重解压，也保护 JS/用户对本地 SMF 的修改）
+            lastFingerprint == fingerprint -> false
+            // 4. 无历史记录：按归一化后的内容长度判断（与压缩优化前的行为兼容）
+            lastFingerprint == null -> compareSize >= 0L && compareSize != targetLength
+            // 5. 源侧指纹变了 → APK 内资源已更新，必须重新解压
+            else -> true
+        }
+
+        Log.d(
+            TAG,
+            "解压判据 source=$sourceKey target=${targetDocument.name} " +
+                    "rawSize=$sourceSize compareSize=$compareSize targetLength=$targetLength " +
+                    "srcMtime=$sourceLastModified lastFp=$lastFingerprint fp=$fingerprint needExtract=$needExtract"
+        )
+
+        return ExtractFileInfo(
+            source = source,
+            targetDocument = targetDocument,
+            size = sourceSize,
+            needExtract = needExtract,
+            forceOverride = forceOverride,
+            sectionName = sectionName,
+            sourceLastModified = sourceLastModified,
+            compareSize = compareSize,
+            stateKey = stateKey
+        )
     }
 
     // ======================== 辅助方法 ========================
@@ -1013,9 +1060,12 @@ class AssetExtractorHolder(
         )
 
         /**
-         * 获取资源元信息（工作目录优先）
-         * 优先级：绝对路径(/开头) > getLocalWorkDir (SAF/本地文件) > Assets
-         * 返回一个 [ResourceInfo]，包含 exists / isDirectory / isFile / size / lastModified
+         * 获取资源元信息。
+         *
+         * 优先级（与 [open] / [exists] 保持一致，仅少一层 URL）：
+         * 绝对路径(`/`开头) > getLocalWorkDir (SAF/本地文件) > 目标 APK 底包源（更新模式预览）> Assets
+         *
+         * @return [ResourceInfo]，包含 exists / isDirectory / isFile / size / lastModified
          */
         fun resourceInfo(path: String): ResourceInfo {
             // 0. 绝对路径：使用本地文件系统

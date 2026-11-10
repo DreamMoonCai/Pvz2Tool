@@ -28,7 +28,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -37,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import io.github.dreammooncai.pvz2tool.ui.dialog.rememberAssetExtractor
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -53,10 +53,9 @@ import io.github.dreammooncai.pvz2tool.FloatingWindowItem
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.js.JsRichTextRefresher
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
-import io.github.dreammooncai.pvz2tool.view.JsExecutionContext
-import io.github.dreammooncai.pvz2tool.view.LocalJsExecutionContext
 import io.github.dreammooncai.pvz2tool.js.rememberJsVisibility
 import io.github.dreammooncai.pvz2tool.icon.Pvz2Icon
+import io.github.dreammooncai.pvz2tool.js.code.LocalJsExecutionContext
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzDialogCard
 import io.github.dreammooncai.pvz2tool.ui.main.RenderColoredButton
@@ -413,7 +412,6 @@ object FloatingBallController {
     @Composable
     private fun CardView() {
         val hostActivity = LocalActivity.current
-        val scope = rememberCoroutineScope()
         val floatingConfig = InitializePvz2.config.ui.floatingWindow
         val items = floatingConfig.items
 
@@ -481,7 +479,7 @@ object FloatingBallController {
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         visibleItems.forEach { item ->
-                            FloatingActionButton(item = item, scope = scope)
+                            FloatingActionButton(item = item)
                         }
                     }
                 }
@@ -494,7 +492,7 @@ object FloatingBallController {
      * 按钮颜色由 item.buttonColor 决定（blue/red/green/orange/purple）。
      */
     @Composable
-    private fun FloatingActionButton(item: FloatingWindowItem, scope: CoroutineScope) {
+    private fun FloatingActionButton(item: FloatingWindowItem) {
         val label = item.displayName
         val resolvedColor = (item.buttonColor ?: "blue").lowercase()
         // 在组合体内捕获当前 JS 执行上下文，使点击脚本优先走带上下文重载（this.当前 可用）
@@ -510,7 +508,7 @@ object FloatingBallController {
                         ?.use { it.bufferedReader().readText() }
                 }
             if (script != null) {
-                scope.launch {
+                JsUiManager.runUserScript(key = "floating:${item.id}") {
                     runCatching {
                         if (jsContext != null) {
                             PvzToolJsEngine.executeScript(

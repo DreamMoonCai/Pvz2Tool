@@ -1,36 +1,61 @@
 package io.github.dreammooncai.pvz2tool.controller
 
-import eu.iamkonstantin.kotlin.gadulka.GadulkaPlayer
+import android.os.Looper
 import androidx.core.net.toUri
+import eu.iamkonstantin.kotlin.gadulka.GadulkaPlayer
 import eu.iamkonstantin.kotlin.gadulka.isPlaying
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.Pvz2ToolConfig
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 object SoundController {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val playerMap = mutableMapOf<String, GadulkaPlayer>()
+
+    /**
+     * 引擎脚本运行在 Dispatchers.Default 工作线程上，keight 的 suspend 桥接不会真正切到主线程，
+     * 因此任何触碰 GadulkaPlayer 的操作都必须显式派发到 Dispatchers.Main。
+     */
+    private inline fun <T> runOnMain(crossinline block: () -> T): T =
+        if (Looper.myLooper() == Looper.getMainLooper()) block()
+        else runBlocking(Dispatchers.Main) { block() }
 
     // 全局音效音量（0.0 ~ 1.0），设置时同步更新所有已存在的播放器
     var globalSfxVolume: Float
         get() = InitializePvz2.initialSfxMusicVolume
         set(value) {
             val v = value.coerceIn(0f, 1f)
-            playerMap.values.forEach { it.setVolume(v) }
+            // GadulkaPlayer 必须在主线程访问
+            scope.launch { playerMap.values.forEach { it.setVolume(v) } }
             InitializePvz2.saveSfxMusicVolume(v)
         }
 
-    fun playSound(url: String?, volume: Float = globalSfxVolume) {
+    /**
+     * 播放音效。
+     *
+     * @param url 播放地址
+     * @param volume 音量 0~1；**null（缺省）= 播放那一刻读取全局音效音量 [globalSfxVolume]（实时跟随）**；
+     *               显式传值则固定该音量
+     */
+    fun playSound(url: String?, volume: Float? = null) {
         if (url == null) return
-
-        val player = playerMap.getOrPut(url) {
-            GadulkaPlayer().also { player ->
-                player.setVolume(volume)
-            }
+        // 播放器创建与播放必须在主线程；穿上 Main scope 派发（引擎脚本可能在工作线程调用）
+        scope.launch {
+            val player = playerMap.getOrPut(url) { GadulkaPlayer() }
+            // 关键：在「播放时」才解析音量——volume==null 时读取当时的全局音效音量，
+            // 而不是用调用入口的默认参数快照（否则调用与真正 play 之间改动的 setSfxVolume 会丢失）。
+            // 复用池里已存在的播放器同样拿到最新音量，不沿用首次播放时的旧值。
+            val effective = (volume ?: globalSfxVolume).coerceIn(0f, 1f)
+            player.setVolume(effective)
+            if (player.isPlaying()) return@launch
+            player.play(url)
         }
-
-        if (player.isPlaying()) return
-        player.play(url)
     }
 
     /**

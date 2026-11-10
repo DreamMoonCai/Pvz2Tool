@@ -11,11 +11,12 @@ import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.Undefined
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.InitializePvz2
-import io.github.dreammooncai.pvz2tool.Pvz2ToolConfig
 import io.github.dreammooncai.pvz2tool.ScheduleDef
 import io.github.dreammooncai.pvz2tool.controller.SoundController
 import io.github.dreammooncai.pvz2tool.js.JsConsole
-import io.github.dreammooncai.pvz2tool.js.JsFileResolver
+import io.github.dreammooncai.pvz2tool.js.JsLogger
+import io.github.dreammooncai.pvz2tool.js.JsLogLevel
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsVideoManager
 import io.github.dreammooncai.pvz2tool.js.code.JsDevice
 import io.github.dreammooncai.pvz2tool.js.code.JsNative
 import io.github.dreammooncai.pvz2tool.js.code.JsApp
@@ -31,6 +32,8 @@ import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
 import io.github.dreammooncai.pvz2tool.js.orNull
+import io.github.dreammooncai.pvz2tool.js.toBoolean
+import io.github.dreammooncai.pvz2tool.js.toNumber
 import io.github.dreammooncai.pvz2tool.timer.TimerManager
 import io.github.dreammooncai.pvz2tool.pop.plugin.crypt.Pvz2NumberCrypt
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
@@ -48,7 +51,7 @@ import io.github.dreammooncai.pvz2tool.ui.dialog.JsPopupItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsPopupPage
 import io.github.dreammooncai.pvz2tool.ui.popup.SubPopup
 import io.github.dreammooncai.pvz2tool.ui.popup.PvzPopupNavigator
-import io.github.dreammooncai.pvz2tool.ui.music.BackgroundMusicState
+import io.github.dreammooncai.pvz2tool.controller.PvzMusicController
 import io.github.dreammooncai.util.getAssetLastModified
 import io.github.dreammooncai.util.isAssetDirExist
 import io.github.dreammooncai.util.isAssetFileExist
@@ -56,28 +59,101 @@ import io.github.dreammooncai.util.openUriInputStreamOrAssetNull
 import android.app.Activity
 import androidx.core.graphics.drawable.IconCompat
 import io.github.dreammooncai.pvz2tool.controller.GameDisplayFloatingController
+import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine.getJsToolContext
 import io.github.dreammooncai.pvz2tool.service.LocalVpnService
 import io.github.dreammooncai.pvz2tool.ui.main.SettingsDialogState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
 import java.io.File
+import java.net.URLDecoder
+import java.net.URLEncoder
 import android.util.Base64 as AndroidBase64
+
+/**
+ * 仅当该全局名尚未被 keight 暴露时才注入，避免覆盖引擎自带的同名实现（若有）。
+ * keight 只内置最小全局集，绝大多数宿主环境函数（URI 编解码 / base64 / escape 等）都不存在，
+ * 但用 setIfAbsent 注册可保证「无则补、有则不碰」的安全语义。
+ */
+private suspend fun ScriptRuntime.setIfAbsent(key: JsAny, value: JsAny, type: VariableType = VariableType.Global) {
+    val existing = runCatching { get(key) }.getOrNull()
+    if (existing == null || existing is Undefined) set(key, value, type)
+}
+
+/** JS atob：base64 -> 二进制字符串（每字符一字节，Latin-1），对齐浏览器语义。标准字母表优先，失败回退 URL-safe */
+private fun jsAtob(encoded: String): String = runCatching {
+    val clean = encoded.replace(Regex("\\s"), "")
+    val bytes = runCatching { AndroidBase64.decode(clean, AndroidBase64.DEFAULT or AndroidBase64.NO_WRAP) }
+        .getOrElse { AndroidBase64.decode(clean, AndroidBase64.URL_SAFE or AndroidBase64.NO_WRAP) }
+    bytes.joinToString("") { (it.toInt() and 0xFF).toChar().toString() }
+}.getOrDefault("")
+
+/** JS btoa：二进制字符串 -> base64（超 255 的字符取低字节，对齐不可信输入兜底） */
+private fun jsBtoa(data: String): String =
+    AndroidBase64.encodeToString(data.map { (it.code and 0xFF).toByte() }.toByteArray(), AndroidBase64.NO_WRAP)
+
+/** JS escape：仅 A-Za-z0-9 @*_+-./ 与空格保留（空格->%20），其余 Latin1->%XX、非 Latin1->%uXXXX */
+private fun jsEscape(s: String): String = buildString {
+    for (ch in s) {
+        when {
+            ch.isLetterOrDigit() || ch in "@*_+-./" -> append(ch)
+            ch == ' ' -> append("%20")
+            ch.code < 256 -> append("%${ch.code.toString(16).padStart(2, '0').uppercase()}")
+            else -> append("%u${ch.code.toString(16).padStart(4, '0').uppercase()}")
+        }
+    }
+}
+
+/** JS unescape：反转义 %XX / %uXXXX（无法解析的 % 序列原样保留） */
+private fun jsUnescape(s: String): String = buildString {
+    var i = 0
+    while (i < s.length) {
+        val c = s[i]
+        var consumed = 1
+        if (c == '%' && i + 1 < s.length && s[i + 1] == 'u' && i + 6 <= s.length) {
+            s.substring(i + 2, i + 6).toIntOrNull(16)?.let { ch -> append(ch.toChar()); consumed = 6 }
+        }
+        if (consumed == 1 && c == '%' && i + 3 <= s.length) {
+            s.substring(i + 1, i + 3).toIntOrNull(16)?.let { ch -> append(ch.toChar()); consumed = 3 }
+        }
+        if (consumed == 1) append(c)
+        i += consumed
+    }
+}
 
 object PvzToolGlobals {
 
-    // 持有 BackgroundMusicState 引用，供 audio 对象访问（由 Pvz2InitializeActivity 注入）
-    var bgMusicState: BackgroundMusicState? = null
-
-    /** 将 options 中的 JS 函数字段绑定为 Kotlin 挂起回调（value 透传给 JS 函数作为第一个参数）。 */
+    /**
+     * 将 options 中的 JS 函数字段绑定为 Kotlin 挂起回调（value 透传给 JS 函数作为第一个参数）。
+     *
+     * 🔴 必须等 JS 函数体**真正跑完**（尤其是 async 函数体里 await 之后的代码）：
+     * 否则回调一返回，「当前回调帧」槽位就被还原成 null，
+     * 回调内 await 之后才执行的 `当前.backUI(...)` 拿不到帧 → 「点确认只关弹窗、不返回数据」。
+     *
+     * 🔴 等待方式经实测确定（见 jvmTest/…/KeightScopeProbeTest）：
+     * - 用 `call(...)` 而**不是** `invoke(...)`：对 async 函数体，invoke 只返回 JsPromiseWrapper 且**不等待**；
+     * - `toKotlin()` 要**直接**调，不能先 `as? Callable` 再调（那样恒为 null）；
+     * - 同步函数体 → toKotlin 得到完成值（非 Job），说明 invoke/call 返回时函数体已跑完，无需等待；
+     *   异步函数体 → 得到 Job，join() 才会推进到 await 之后。
+     *
+     * 🔴 thisArg 必须传 globalThis，**不能传 null**：`invoke()` 的 this 是 globalThis，
+     * 而 `call(null, ...)` 的 this 会是 null，两者不一致会让回调里 `this.xxx` 的写法静默失效。
+     */
     private suspend fun bindJsCallback(
         options: JsObject?,
         key: String,
         runtime: ScriptRuntime
     ): (suspend (JsAny?) -> Unit)? {
         val jsFn = options?.get(key.js, runtime)?.orNull as? JSFunction ?: return null
-        return { value -> runCatching { jsFn.invoke(listOf(value), runtime) } }
+        return { value ->
+            runCatching {
+                val ret = jsFn.invoke(listOf(value), runtime)
+                val job = ret?.toKotlin(runtime) as? Job
+                job?.join()
+            }.onFailure { JsConsole.error("回调 $key 执行失败:", it) }
+        }
     }
 
     val ui = Object("ui") { // 提示弹窗（单按钮）：ui.alert(title, message, options?) -> void
@@ -86,14 +162,15 @@ object PvzToolGlobals {
         ) { args ->
             val runtime = this
             val title = toString(args[0])
-            val message = toString(args[1])
+            val message = messageToString(args[1], this)
             val options = args[2].orNull as? JsObject
             val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
             val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
             val dismissible = options?.get("dismissible".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
                 ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val onConfirm = bindJsCallback(options, "onConfirm", runtime)
-            JsUiManager.showAlert(title, message, confirmText, confirmColor, dismissible, onConfirm).await()
+            val onResult = bindJsCallback(options, "onResult", runtime)
+            JsUiManager.showAlert(getJsToolContext(),title, message, confirmText, confirmColor, dismissible, onConfirm, onResult).await()
             null
         }
 
@@ -103,7 +180,7 @@ object PvzToolGlobals {
         ) { args ->
             val runtime = this
             val title = toString(args[0])
-            val message = toString(args[1])
+            val message = messageToString(args[1], this)
             val options = args[2].orNull as? JsObject
             val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确认"
             val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
@@ -113,7 +190,8 @@ object PvzToolGlobals {
                 ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val onConfirm = bindJsCallback(options, "onConfirm", runtime)
             val onCancel = bindJsCallback(options, "onCancel", runtime)
-            JsUiManager.showConfirm(title, message, confirmText, cancelText, confirmColor, cancelColor, dismissible, onConfirm, onCancel).await().js
+            val onResult = bindJsCallback(options, "onResult", runtime)
+            JsUiManager.showConfirm(getJsToolContext(),title, message, confirmText, cancelText, confirmColor, cancelColor, dismissible, onConfirm, onCancel, onResult).await().js
         }
 
         // 输入弹窗：ui.prompt(title, message, defaultValue?, placeholder?, options?) -> string|null
@@ -126,7 +204,7 @@ object PvzToolGlobals {
         ) { args ->
             val runtime = this
             val title = toString(args[0])
-            val message = toString(args[1])
+            val message = messageToString(args[1], this)
             val defaultValue = args.getOrNull(2).orNull?.let { toString(it) } ?: ""
             val placeholder = args.getOrNull(3).orNull?.let { toString(it) } ?: ""
             val options = args[4].orNull as? JsObject
@@ -138,7 +216,8 @@ object PvzToolGlobals {
                 ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val onConfirm = bindJsCallback(options, "onConfirm", runtime)
             val onCancel = bindJsCallback(options, "onCancel", runtime)
-            JsUiManager.showPrompt(title, message, defaultValue, placeholder, confirmText, cancelText, confirmColor, cancelColor, dismissible, onConfirm, onCancel).await()?.js
+            val onResult = bindJsCallback(options, "onResult", runtime)
+            JsUiManager.showPrompt(getJsToolContext(),title, message, defaultValue, placeholder, confirmText, cancelText, confirmColor, cancelColor, dismissible, onConfirm, onCancel, onResult).await()?.js
         }
 
         // 进度弹窗：ui.progress(title, options?) -> progressController
@@ -234,7 +313,8 @@ object PvzToolGlobals {
                 ?: options?.get("最高形态".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onSelect = bindJsCallback(options, "onSelect", runtime)
-            JsUiManager.showSelect(title, items, columns, cancelable, showIndex, showIndexColor, confirmText, cancelText, confirmColor, cancelColor, forceMaxForm, onCancel, onSelect).await()?.js
+            val onResult = bindJsCallback(options, "onResult", runtime)
+            JsUiManager.showSelect(getJsToolContext(),title, items, columns, cancelable, showIndex, showIndexColor, confirmText, cancelText, confirmColor, cancelColor, forceMaxForm, onCancel, onSelect, onResult).await()?.js
         }
 
         // 多项选择弹窗：ui.multiSelect(title, items, options?) -> string[]
@@ -262,7 +342,8 @@ object PvzToolGlobals {
                 ?: options?.get("最高形态".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onSelect = bindJsCallback(options, "onSelect", runtime)
-            JsUiManager.showMultiSelect(title, items, defaultValues, columns, cancelable, showIndex, showIndexColor, confirmText, cancelText, confirmColor, cancelColor, forceMaxForm, onCancel, onSelect).await().map { it.js }.js
+            val onResult = bindJsCallback(options, "onResult", runtime)
+            JsUiManager.showMultiSelect(getJsToolContext(),title, items, defaultValues, columns, cancelable, showIndex, showIndexColor, confirmText, cancelText, confirmColor, cancelColor, forceMaxForm, onCancel, onSelect, onResult).await().map { it.js }.js
         }
 
         // 操作菜单弹窗：ui.actionSheet(title, actions, options?) -> string|null
@@ -284,7 +365,8 @@ object PvzToolGlobals {
                 ?: options?.get("最高形态".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onSelect = bindJsCallback(options, "onSelect", runtime)
-            JsUiManager.showActionSheet(title, items, cancelable, cancelText, cancelColor, forceMaxForm, onCancel, onSelect).await()?.js
+            val onResult = bindJsCallback(options, "onResult", runtime)
+            JsUiManager.showActionSheet(getJsToolContext(),title, items, cancelable, cancelText, cancelColor, forceMaxForm, onCancel, onSelect, onResult).await()?.js
         }
 
         // 数值滑块弹窗：ui.slider(title, options?) -> number|null
@@ -311,7 +393,8 @@ object PvzToolGlobals {
             val onChange = bindJsCallback(options, "onChange", runtime)
             val onConfirm = bindJsCallback(options, "onConfirm", runtime)
             val onCancel = bindJsCallback(options, "onCancel", runtime)
-            JsUiManager.showSlider(title, min, max, step, default, unit, decimals, showValue, confirmText, cancelText, confirmColor, cancelColor, dismissible, onChange, onConfirm, onCancel).await()?.js
+            val onResult = bindJsCallback(options, "onResult", runtime)
+            JsUiManager.showSlider(getJsToolContext(),title, min, max, step, default, unit, decimals, showValue, confirmText, cancelText, confirmColor, cancelColor, dismissible, onChange, onConfirm, onCancel, onResult).await()?.js
         }
 
         // 加载指示弹窗：ui.loading(title, options?) -> controller{ close(), 关闭(), update(), 更新() }
@@ -328,7 +411,8 @@ object PvzToolGlobals {
             val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
             val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
             val onDismiss = bindJsCallback(options, "onDismiss", runtime)
-            JsUiManager.showLoading(title, message, dismissible, cancelText, cancelColor, onDismiss)
+            val onResult = bindJsCallback(options, "onResult", runtime)
+            JsUiManager.showLoading(getJsToolContext(),title, message, dismissible, cancelText, cancelColor, onDismiss, onResult)
             Object("controller") {
                 listOf("close".js, "关闭".js).func { _ ->
                     JsUiManager.hideLoading()
@@ -387,28 +471,10 @@ object PvzToolGlobals {
             val title = toString(args[0])
             val itemsRaw = args.getOrNull(1).orNull?.toKotlin(this) as? List<*> ?: emptyList<Any>()
             val options = args[2].orNull as? JsObject
-            val items = parsePopupItems(itemsRaw)
+            val items = JsPopupNavigator.parsePopupItems(itemsRaw)
             val onClose = bindJsCallback(options, "onClose", runtime)
-            // 构造 nav 对象：push 进入子页面、pop 返回、close 关闭
-            val navObj = Object("nav") {
-                listOf("push".js, "进入子页面".js, "pushPage".js).func(FunctionParam("page")) { a ->
-                    val pageRaw = a.getOrNull(0).orNull as? JsObject
-                    if (pageRaw != null) {
-                        val page = parsePopupPage(pageRaw)
-                        JsUiManager.popupNavigatorRef?.navigate(SubPopup(page.title, page))
-                    }
-                    null
-                }
-                listOf("pop".js, "返回".js, "back".js).func { _ ->
-                    JsUiManager.popupNavigatorRef?.pop()
-                    null
-                }
-                listOf("close".js, "关闭".js).func { _ ->
-                    JsUiManager.hidePopup()
-                    null
-                }
-            }
-            JsUiManager.showPopup(title, items, navObj, onClose)
+            val onResult = bindJsCallback(options, "onResult", runtime)
+            JsUiManager.showPopup(getJsToolContext(),title, items, onClose, onResult)
             null
         }
     }
@@ -454,7 +520,7 @@ object PvzToolGlobals {
         listOf("show".js, "显示".js).func(
             FunctionParam("title"), FunctionParam("message"), FunctionParam("options")
         ) { args ->
-            val title = toString(args[0]); val message = toString(args[1])
+            val title = toString(args[0]); val message = messageToString(args[1], this)
             val opts = args[2].orNull as? JsObject
             val ctx = InitializePvz2.context
             // Android 13+ 需要在 Manifest 声明并运行时授予 POST_NOTIFICATIONS，未授权时系统会静默丢弃通知。
@@ -652,7 +718,7 @@ object PvzToolGlobals {
     val audio = Object("audio") {
         // 获取背景音乐音量：audio.getBgmVolume() -> number (0.0 ~ 1.0)
         listOf("getBgmVolume".js, "获取背景音乐音量".js).func {
-            (bgMusicState?.currentVolume ?: 1.0f).js
+            PvzMusicController.getBgmCurrentVolume().js
         }
 
         // 设置背景音乐音量：audio.setBgmVolume(volume) -> void
@@ -660,7 +726,7 @@ object PvzToolGlobals {
         listOf("setBgmVolume".js, "设置背景音乐音量".js).func(FunctionParam("volume")) { args ->
             val volume = toNumber(args[0]).toFloat().coerceIn(0f, 1f)
             withContext(Dispatchers.Main) {
-                bgMusicState?.setVolume(volume)
+                PvzMusicController.setBgmVolume(volume)
                 null
             }
         }
@@ -678,6 +744,197 @@ object PvzToolGlobals {
                 SoundController.globalSfxVolume = volume
                 null
             }
+        }
+
+        // 播放音乐：audio.playMusic(url, options?) -> void
+        // url: 音频路径（支持 URL / 绝对路径 / 占位符 $WORK_DIR 等 / 相对 sound/ 或 assets/pvz2tool/sound/ 兜底）
+        // options: { volume?:0~1, loop?:bool, fade?:ms(默认1000) }
+        //   volume 缺省（不传）= 跟随 audio.setBgmVolume 的当前值，且播放期间改动实时生效；显式传值则固定该音量。
+        // 全局唯一：新调用会先结束并释放上一段，绝不会叠加出多段音乐。
+        // 播放期间背景音乐让位（渐隐暂停）；即使此时用户在设置里打开背景音乐、或从后台返回界面，
+        // 背景音乐也会保持静默，直到本段音乐播放结束 / 被 stopMusic / 被新的 playMusic 取代后统一恢复。
+        listOf("playMusic".js, "播放音乐".js).func(FunctionParam("url"), FunctionParam("options")) { args ->
+            val url = toString(args[0])
+            if (url.isBlank()) return@func Undefined
+            val opts = args.getOrNull(1)?.orNull as? JsObject
+            // 未指定 volume → null → 控制器按「跟随 setBgmVolume」处理
+            val volume = opts?.get("volume".js, this)?.orNull?.let { toNumber(it).toFloat() }?.coerceIn(0f, 1f)
+            val loop = opts?.get("loop".js, this)?.orNull?.toBoolean() ?: false
+            val fade = opts?.get("fade".js, this)?.orNull?.let { toNumber(it).toLong() }?.coerceAtLeast(0) ?: 1000L
+            val audioUrl = PvzMusicController.resolveAudioUri(url)
+            withContext(Dispatchers.Main) {
+                PvzMusicController.playMusic(audioUrl, loop, volume, fade)
+                null
+            }
+        }
+
+        // 停止当前音乐：audio.stopMusic() -> void（若其曾让背景音乐让位，则随之恢复）
+        listOf("stopMusic".js, "停止音乐".js).func {
+            withContext(Dispatchers.Main) {
+                PvzMusicController.stopMusic()
+                null
+            }
+        }
+
+        // 查询音乐是否正在播放：audio.isMusicPlaying() -> bool
+        listOf("isMusicPlaying".js, "是否正在播放音乐".js).func {
+            PvzMusicController.isMusicPlaying().js
+        }
+
+        // 播放音效（不受背景音乐影响）：audio.playSound(url, volume?) -> void
+        // 路径解析同 playMusic；volume 可选（0~1，默认跟随全局音效音量）
+        listOf("playSound".js, "播放音效".js).func(FunctionParam("url"), FunctionParam("volume")) { args ->
+            val url = toString(args[0])
+            if (url.isBlank()) return@func Undefined
+            val vol = args.getOrNull(1)?.orNull?.let { toNumber(it).toFloat() }?.coerceIn(0f, 1f)
+            withContext(Dispatchers.Main) {
+                if (vol != null) SoundController.playSoundFromAssets(url, vol)
+                else SoundController.playSoundFromAssets(url)
+                null
+            }
+        }
+    }
+
+    // ======================== 视频播放 API ========================
+    /**
+     * 视频播放。画面承载在 Compose 弹窗（`JsVideoDialog`）上，与 `ui.alert` / `ui.popup` 同一套弹窗栈，
+     * 主界面与悬浮窗都能弹出，**不新起 Activity**；播放链路直接复用游戏内 CG 播放器
+     * （ExoPlayer → MediaPlayer → 海报三级自动降级、加载动画、跳过按钮、后台自动暂停），
+     * 全局唯一：新的 play 会替换上一段。
+     */
+    val video = Object("video") {
+        // 播放视频：video.play(url, options?) -> void
+        // url: 视频路径（支持 URL / 绝对路径 / 占位符 $WORK_DIR 等 / 资源层本地覆盖与 APK assets / video- 目录兜底）
+        // options: { loop?:bool, volume?:0~1, poster?:string(海报兜底图), start?:ms(起始位置) }
+        listOf("play".js, "播放".js).func(FunctionParam("url"), FunctionParam("options")) { args ->
+            val url = toString(args[0])
+            if (url.isBlank()) return@func Undefined
+            val opts = args.getOrNull(1)?.orNull as? JsObject
+            val loop = opts?.get("loop".js, this)?.orNull?.toBoolean() ?: false
+            val volume = opts?.get("volume".js, this)?.orNull?.let { toNumber(it).toFloat() }?.coerceIn(0f, 1f) ?: 1f
+            val poster = opts?.get("poster".js, this)?.orNull?.let { toString(it) }?.takeIf { it.isNotBlank() }
+            val start = opts?.get("start".js, this)?.orNull?.let { toNumber(it).toLong() } ?: 0L
+            val videoPath = JsVideoManager.resolveVideoPath(url)
+            withContext(Dispatchers.Main) {
+                JsVideoManager.play(videoPath, loop, volume, poster, start)
+                null
+            }
+        }
+
+        // 暂停播放（画面保留）：video.pause() -> void
+        listOf("pause".js, "暂停".js).func {
+            withContext(Dispatchers.Main) { JsVideoManager.pause(); null }
+        }
+
+        // 继续播放：video.resume() -> void
+        listOf("resume".js, "继续".js).func {
+            withContext(Dispatchers.Main) { JsVideoManager.resume(); null }
+        }
+
+        // 停止播放并关闭弹窗：video.stop() -> void
+        listOf("stop".js, "停止".js).func {
+            withContext(Dispatchers.Main) { JsVideoManager.stop(); null }
+        }
+
+        // 跳转：video.seekTo(positionMs) -> void
+        listOf("seekTo".js, "跳转".js).func(FunctionParam("position")) { args ->
+            val ms = toNumber(args[0]).toLong().coerceAtLeast(0L)
+            withContext(Dispatchers.Main) { JsVideoManager.seekTo(ms); null }
+        }
+
+        // 设置音量：video.setVolume(volume) -> void（0~1）
+        listOf("setVolume".js, "设置音量".js).func(FunctionParam("volume")) { args ->
+            val v = toNumber(args[0]).toFloat().coerceIn(0f, 1f)
+            withContext(Dispatchers.Main) { JsVideoManager.setVolume(v); null }
+        }
+
+        // 是否正在播放：video.isPlaying() -> bool
+        listOf("isPlaying".js, "是否播放中".js).func {
+            withContext(Dispatchers.Main) { JsVideoManager.isPlaying().js }
+        }
+
+        // 视频弹窗是否正在显示：video.isVisible() -> bool
+        listOf("isVisible".js, "是否显示中".js).func {
+            JsVideoManager.isVisible().js
+        }
+
+        // 总时长（毫秒，未知为 0）：video.getDuration() -> number
+        listOf("getDuration".js, "获取时长".js).func {
+            withContext(Dispatchers.Main) { JsVideoManager.duration().js }
+        }
+
+        // 当前播放位置（毫秒）：video.getPosition() -> number
+        listOf("getPosition".js, "获取位置".js).func {
+            withContext(Dispatchers.Main) { JsVideoManager.position().js }
+        }
+    }
+
+    // ======================== 日志 API ========================
+    /**
+     * 读取 / 写入工具箱的日志（即界面上「日志」面板显示的那份，最多保留 200 条）。
+     * 可用于脚本内自检、把关键信息写进日志面板、或导出日志排查问题。
+     */
+    val log = Object("log") {
+        // 获取日志数组：log.get(options?) -> [{ level, message, time }]
+        // options: { limit?:number(取最近 N 条), level?:'info'|'warn'|'error'|'success'(按级别过滤) }
+        listOf("get".js, "获取".js).func(FunctionParam("options")) { args ->
+            val opts = args.getOrNull(0)?.orNull as? JsObject
+            // 🔴 options 里的数字/布尔必须走 toNumber/toBoolean（context receiver），
+            // 直接 `as? Number` / `as? Boolean` 拿到的是 keight 包装对象，参数会被静默忽略。
+            val limit = opts?.get("limit".js, this)?.orNull?.let { toNumber(it).toInt() } ?: -1
+            val level = opts?.get("level".js, this)?.orNull?.let { toString(it).trim().lowercase() }
+                ?.takeIf { it.isNotEmpty() }
+            var entries = JsLogger.logs.value
+            if (!level.isNullOrEmpty()) {
+                entries = entries.filter { it.level.name.lowercase() == level }
+            }
+            if (limit > 0) entries = entries.takeLast(limit)
+            entries.map { entry ->
+                Object("entry") {
+                    "level".js eq entry.level.name.lowercase().js
+                    "message".js eq entry.message.js
+                    "time".js eq entry.timestamp.js
+                } as JsAny
+            }.js
+        }
+
+        // 获取日志纯文本（每行一条，便于写文件）：log.text(options?) -> string
+        listOf("text".js, "文本".js).func(FunctionParam("options")) { args ->
+            val opts = args.getOrNull(0)?.orNull as? JsObject
+            val limit = opts?.get("limit".js, this)?.orNull?.let { toNumber(it).toInt() } ?: -1
+            var entries = JsLogger.logs.value
+            if (limit > 0) entries = entries.takeLast(limit)
+            entries.joinToString("\n") { "[${it.timestamp}] ${it.level.name} ${it.message}" }.js
+        }
+
+        // 追加一条日志：log.add(message, level?) -> void
+        // level: 'info'(默认) | 'warn' | 'error' | 'success'
+        listOf("add".js, "添加".js, "write".js, "写入".js).func(
+            FunctionParam("message"),
+            FunctionParam("level")
+        ) { args ->
+            val message = toString(args[0])
+            val levelName = args.getOrNull(1)?.orNull?.let { toString(it).trim().lowercase() }
+                ?.takeIf { it.isNotEmpty() }
+            val level = when (levelName) {
+                "warn", "警告", "warning" -> JsLogLevel.WARN
+                "error", "错误" -> JsLogLevel.ERROR
+                "success", "成功" -> JsLogLevel.SUCCESS
+                else -> JsLogLevel.INFO
+            }
+            JsLogger.appendLog(level, message)
+            Undefined
+        }
+
+        // 清空日志：log.clear() -> void
+        listOf("clear".js, "清空".js).func {
+            JsLogger.clearLogs()
+            Undefined
+        }
+
+        // 当前日志条数：log.count() -> number
+        listOf("count".js, "数量".js).func {
+            JsLogger.logs.value.size.js
         }
     }
 
@@ -697,11 +954,7 @@ object PvzToolGlobals {
     }
 
     suspend fun attached(runtime: ScriptRuntime) {
-        listOf("console".js, "控制台".js).forEach { key ->
-            runtime.set(key, console, VariableType.Global)
-        }
-        // JsConsole 别名：部分脚本直接引用 JsConsole（与 console 等价），避免 ReferenceError
-        listOf("JsConsole".js).forEach { key ->
+        listOf("console".js, "控制台".js,"JsConsole".js).forEach { key ->
             runtime.set(key, console, VariableType.Global)
         }
         listOf("pvz".js, "植物大战僵尸".js).forEach { key ->
@@ -715,6 +968,12 @@ object PvzToolGlobals {
         }
         listOf("audio".js, "音频".js).forEach { key ->
             runtime.set(key, audio, VariableType.Global)
+        }
+        listOf("video".js, "视频".js).forEach { key ->
+            runtime.set(key, video, VariableType.Global)
+        }
+        listOf("log".js, "日志记录".js).forEach { key ->
+            runtime.set(key, log, VariableType.Global)
         }
         listOf("http".js, "网络".js).forEach { key ->
             runtime.set(key, JsHttp.js, VariableType.Global)
@@ -757,6 +1016,59 @@ object PvzToolGlobals {
         }
         listOf("timer".js, "定时器".js).forEach { key ->
             runtime.set(key, timer, VariableType.Global)
+        }
+        listOf("server".js, "本地服务器".js, "服务器".js).forEach { key ->
+            runtime.set(key, JsServer.js, VariableType.Global)
+        }
+        // ======================== 标准 URI / base64 / escape 全局函数 ========================
+        // keight 只内置最小全局集（连 JSON 都是手动注册的），标准 ECMAScript「宿主环境」函数从未暴露，
+        // 脚本里用到 decodeURIComponent / atob / escape 等会直接 ReferenceError。
+        // 这里补齐浏览器标准集，实现用 Java 标准库，语义对齐 JS：
+        //   - Component 系列对空格编码为 %20、对 ! ~ * ' ( ) 等保留字符不编码（与浏览器一致），'+' 按字面量处理；
+        //   - encodeURI 比 encodeURIComponent 再多保留一组 URI 保留字符（; / ? : @ & = + $ , #）。
+        //   - atob/btoa 为 base64 编解码（二进制字符串，对齐浏览器语义）；escape/unescape 为遗留转义。
+        // 解码/解析失败时返回原串或空串，比 JS 抛异常更宽容，适合工具箱脚本对不可信输入做兜底。
+        // ★ 注册统一走 setIfAbsent：keight 若未来自带这些实现则不加覆盖；缺失则补齐，双向安全。
+        val uriFns = Object("__uri") {
+            listOf("decodeURIComponent".js, "解码URI组件".js).func(FunctionParam("encodedURIString")) { args ->
+                val s = toString(args[0])
+                runCatching { URLDecoder.decode(s.replace("+", "%2B"), "UTF-8") }.getOrDefault(s).js
+            }
+            listOf("encodeURIComponent".js, "编码URI组件".js).func(FunctionParam("uriComponent")) { args ->
+                val s = toString(args[0])
+                URLEncoder.encode(s, "UTF-8")
+                    .replace("+", "%20")
+                    .replace("%21", "!").replace("%27", "'")
+                    .replace("%28", "(").replace("%29", ")").replace("%7E", "~").js
+            }
+            listOf("decodeURI".js, "解码URI".js).func(FunctionParam("encodedURI")) { args ->
+                val s = toString(args[0])
+                runCatching { URLDecoder.decode(s.replace("+", "%2B"), "UTF-8") }.getOrDefault(s).js
+            }
+            listOf("encodeURI".js, "编码URI".js).func(FunctionParam("uri")) { args ->
+                val s = toString(args[0])
+                URLEncoder.encode(s, "UTF-8")
+                    .replace("+", "%20")
+                    .replace("%21", "!").replace("%27", "'")
+                    .replace("%28", "(").replace("%29", ")").replace("%7E", "~")
+                    .replace("%3B", ";").replace("%2F", "/").replace("%3F", "?")
+                    .replace("%3A", ":").replace("%40", "@").replace("%26", "&")
+                    .replace("%3D", "=").replace("%2B", "+").replace("%24", "$")
+                    .replace("%2C", ",").replace("%23", "#").js
+            }
+            listOf("atob".js).func(FunctionParam("encodedData")) { args -> jsAtob(toString(args[0])).js }
+            listOf("btoa".js).func(FunctionParam("stringToEncode")) { args -> jsBtoa(toString(args[0])).js }
+            listOf("escape".js).func(FunctionParam("str")) { args -> jsEscape(toString(args[0])).js }
+            listOf("unescape".js).func(FunctionParam("str")) { args -> jsUnescape(toString(args[0])).js }
+        }
+        listOf(
+            "decodeURIComponent", "解码URI组件",
+            "encodeURIComponent", "编码URI组件",
+            "decodeURI", "解码URI",
+            "encodeURI", "编码URI",
+            "atob", "btoa", "escape", "unescape"
+        ).forEach { name ->
+            uriFns.get(name.js, runtime)?.let { runtime.setIfAbsent(name.js, it) }
         }
         runtime.get("Number".js)?.get("prototype".js, runtime)?.let { it as? JsObject }?.let { prototype ->
             listOf("encrypt".js, "加密".js).forEach { key ->
@@ -833,49 +1145,36 @@ private suspend fun ScriptRuntime.parseActionItems(raw: List<*>): List<JsActionI
         }
     }
 }
-
-private suspend fun ScriptRuntime.parsePopupItems(raw: List<*>): List<JsPopupItem> {
-    return raw.mapNotNull { el ->
-        when (el) {
-            is JsObject -> {
-                val type = toString((el.get("type".js, this).orNull ?: el.get("类型".js, this).orNull ?: "".js))
-                val title = toString((el.get("title".js, this).orNull ?: el.get("标题".js, this).orNull ?: "".js))
-                val value = (el.get("value".js, this).orNull ?: el.get("值".js, this).orNull)
-                    ?.let { it.toKotlin(this) as? Boolean } ?: false
-                val text = toString((el.get("text".js, this).orNull ?: el.get("文本".js, this).orNull ?: "".js))
-                val onChangeJs = el.get("onChange".js, this).orNull as? JSFunction
-                val onClickJs = el.get("onClick".js, this).orNull as? JSFunction
-                val onChange: (suspend (JsAny?) -> Unit)? =
-                    onChangeJs?.let { fn -> { v -> runCatching { fn.invoke(listOf(v), this) } } }
-                val onClick: (suspend (JsAny?) -> Unit)? =
-                    onClickJs?.let { fn -> { v -> runCatching { fn.invoke(listOf(v), this) } } }
-                // 类型推断：未给 type 时按 text(含边距) 渲染；button 类型不再支持
-                val effectiveType = when {
-                    type == "switch" || type == "arrow" || type == "text" || type == "spacer" -> type
-                    text.isNotBlank() -> "text"
-                    else -> "text"
-                }
-                JsPopupItem(
-                    type = effectiveType,
-                    title = title,
-                    value = value,
-                    text = text,
-                    bare = false,
-                    onChange = onChange,
-                    onClick = onClick
-                )
-            }
-            is String -> JsPopupItem(type = "text", text = el, bare = true)
-            else -> null
+/**
+ * 将 JS 侧传入的 message 转为展示字符串。
+ * - 普通字符串原样返回；
+ * - 数组（如 ui.confirm 传入 [文本, 箭头项对象]）逐元素转换：字符串保留，对象提取
+ *   title/text/name/label 字段，避免出现无意义的 `[object Object]`。
+ */
+private suspend fun messageToString(arg: JsAny?, runtime: ScriptRuntime): String {
+    val converted = runCatching { arg?.toKotlin(runtime) }.getOrNull()
+    when (converted) {
+        is List<*> -> {
+            val text = converted.mapNotNull { elementToText(it) }
+                .joinToString("\n")
+                .replace(Regex("\\n{2,}"), "\n")
+                .trim()
+            return if (text.isBlank()) runtime.toString(arg) else text
+        }
+        is Map<*, *> -> {
+            val t = elementTitle(converted)
+            return t ?: runtime.toString(arg)
         }
     }
+    return runtime.toString(arg)
 }
 
-private suspend fun ScriptRuntime.parsePopupPage(raw: JsObject): JsPopupPage {
-    val title = toString((raw.get("title".js, this).orNull ?: raw.get("标题".js, this).orNull ?: "".js))
-    val itemsRaw = raw.get("items".js, this).orNull?.toKotlin(this) as? List<*> ?: emptyList<Any>()
-    val items = parsePopupItems(itemsRaw)
-    val bottomText = raw.get("bottomText".js, this).orNull?.let { toString(it) }
-        ?: raw.get("底部文本".js, this).orNull?.let { toString(it) }
-    return JsPopupPage(title = title, items = items, bottomText = bottomText)
+private fun elementToText(el: Any?): String? = when (el) {
+    is String -> el
+    is Map<*, *> -> elementTitle(el)
+    else -> el?.toString()?.takeIf { it != "[object Object]" && it.isNotBlank() }
 }
+
+private fun elementTitle(map: Map<*, *>): String? =
+    listOf("title", "text", "name", "label")
+        .firstNotNullOfOrNull { key -> (map[key] as? String)?.takeIf { it.isNotBlank() } }

@@ -2,6 +2,7 @@ package io.github.dreammooncai.pvz2tool.js
 
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.js.FunctionParam
+import io.github.alexzhirkevich.keight.js.JSFunction
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.ObjectScope
 import io.github.alexzhirkevich.keight.js.Undefined

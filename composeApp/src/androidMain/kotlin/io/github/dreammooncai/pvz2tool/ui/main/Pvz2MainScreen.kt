@@ -71,6 +71,7 @@ import io.github.dreammooncai.pvz2tool.bottomRoundedBorder
 import io.github.dreammooncai.pvz2tool.icon.*
 import io.github.dreammooncai.pvz2tool.topRoundedBorder
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzConfirmDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzExtractorDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.ResourcePair
@@ -118,8 +119,8 @@ import io.github.dreammooncai.pvz2tool.ui.dialog.JsDialogsHost
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzStyledDialog
 import io.github.dreammooncai.pvz2tool.ui.dialog.PvzTutorialDialog
 import io.github.dreammooncai.pvz2tool.view.PvzTextStyle
-import io.github.dreammooncai.pvz2tool.view.JsExecutionContext
-import io.github.dreammooncai.pvz2tool.view.LocalJsExecutionContext
+import io.github.dreammooncai.pvz2tool.js.code.JsExecutionContext
+import io.github.dreammooncai.pvz2tool.js.code.LocalJsExecutionContext
 import io.github.dreammooncai.pvz2tool.view.AsyncImageFromAssets
 import io.github.dreammooncai.pvz2tool.view.PvzTextOliveStyle
 import kotlinx.coroutines.CoroutineScope
@@ -381,7 +382,7 @@ private fun SectionButtonItem(
             val jsScript = item.readJs(section,version)
             if (jsScript != null) {
                 isRunning = true
-                scope.launch {
+                JsUiManager.runUserScript(key = "js:${section.id}:${item.id}") {
                     try {
                         PvzToolJsEngine.executeScript(
                             extractor = jsExtractor,
@@ -1467,8 +1468,6 @@ private fun DynamicSectionComponent(
                     when (item.type) {
                         SectionType.RADIO -> {
                             val isSelected = state.selectedPresetItemIds[item.groupId] == item.id
-                            val buttonScope = rememberCoroutineScope()
-
                             val jsExtractor = rememberAssetExtractor(
                                 context = LocalContext.current
                             )
@@ -1491,7 +1490,7 @@ private fun DynamicSectionComponent(
 
                                     val jsScript = item.readJs(section,version)
                                     if (jsScript != null) {
-                                        buttonScope.launch {
+                                        JsUiManager.runUserScript(key = "js:${section.id}:${item.id}") {
                                             PvzToolJsEngine.executeScript(
                                                 extractor = jsExtractor,
                                                 script = jsScript,
@@ -1509,8 +1508,6 @@ private fun DynamicSectionComponent(
 
                         SectionType.CHECKBOX -> {
                             val isChecked = state.checkedItemIds.contains(item.id)
-                            val checkboxScope = rememberCoroutineScope()
-
                             val jsExtractor = rememberAssetExtractor(
                                 context = LocalContext.current
                             )
@@ -1532,7 +1529,7 @@ private fun DynamicSectionComponent(
                                     val jsScript = item.readJs(section,version)
                                     // 如果有 jsScript 或 jsPath，执行 JS 并传入选中状态
                                     if (jsScript != null) {
-                                        checkboxScope.launch {
+                                        JsUiManager.runUserScript(key = "js:${section.id}:${item.id}") {
                                             PvzToolJsEngine.executeScript(
                                                 extractor = jsExtractor,
                                                 script = jsScript,
@@ -1606,8 +1603,6 @@ private fun DynamicSectionComponent(
                             val currentValue = state.sliderValues[item.id] ?: item.defaultValue ?: item.minValue
                             val displayValue = item.valueSuffix?.let { "${"%.2f".format(currentValue)}$it" } ?: currentValue.toString()
                             val sliderSteps = ((item.maxValue - item.minValue) / item.step).toInt() - 1
-                            val sliderScope = rememberCoroutineScope()
-
                             // 从主题获取 Slider 颜色和文字颜色
                             val activeColor = section.theme.sliderActiveColor
                             val inactiveColor = section.theme.sliderInactiveColor
@@ -1771,7 +1766,7 @@ private fun DynamicSectionComponent(
                                                 val jsScript = item.readJs(section,version)
                                                 // 如果有 jsScript 或 jsPath，拖动结束后执行
                                                 if (jsScript != null) {
-                                                    sliderScope.launch {
+                                                    JsUiManager.runUserScript(key = "js:${section.id}:${item.id}") {
                                                         PvzToolJsEngine.executeScript(
                                                             extractor = jsExtractor,
                                                             script = jsScript,
@@ -1954,7 +1949,6 @@ private fun DynamicSectionComponent(
 
             // 保存按钮（如果有配置）
             section.confirmButtonText?.let { btnText ->
-                val confirmScope = rememberCoroutineScope()
 
                 Spacer(modifier = Modifier.height(Pvz2Constants.Dimension.PADDING_SMALL.dp))
                 PvzRedButton(
@@ -1967,7 +1961,7 @@ private fun DynamicSectionComponent(
                     // 执行 section 级 JS（confirmButtonText 存在时由此处触发）
                     val sectionJs = section.readJs(version)
                     if (sectionJs != null) {
-                        confirmScope.launch {
+                        JsUiManager.runUserScript(key = "js:${section.id}:confirm") {
                             PvzToolJsEngine.executeScript(
                                 script = sectionJs,
                                 section = section,
@@ -2820,7 +2814,7 @@ fun Pvz2MainScreen(
                                                         )?.use { it.bufferedReader().readText() }
                                                     }
                                                 if (script != null) {
-                                                    scope.launch {
+                                                    JsUiManager.runUserScript(key = "jstop:${item.id}") {
                                                         runCatching {
                                                 if (jsContext != null) {
                                                     PvzToolJsEngine.executeScript(
@@ -2972,7 +2966,7 @@ fun Pvz2MainScreen(
                                             )
                                         )
                                         // 注意：功能项解压已移除，仅保留版本级和BASE级解压
-                                        fun runGotoGame() = scope.launch {
+                                        fun runGotoGame() = JsUiManager.runUserScript(key = "enterGame:${selectedVersion.id}") {
                                             // 1. section 级 JS（仅无 confirmButtonText 的栏目）
                                             config.sections
                                                 .filter { isSectionVisible(it) && it.confirmButtonText == null }

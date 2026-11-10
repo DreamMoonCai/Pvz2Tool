@@ -56,6 +56,7 @@
         android:icon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:largeHeap="true"
+        android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <provider

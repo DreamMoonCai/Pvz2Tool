@@ -1,9 +1,11 @@
 package io.github.dreammooncai.pvz2tool.js.code
 
+import androidx.compose.runtime.compositionLocalOf
 import io.github.alexzhirkevich.keight.Callable
 import io.github.alexzhirkevich.keight.ScriptRuntime
 import io.github.alexzhirkevich.keight.js.JsAny
 import io.github.alexzhirkevich.keight.js.JsObject
+import io.github.alexzhirkevich.keight.js.JsProperty
 import io.github.alexzhirkevich.keight.js.JsPropertyAccessor
 import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.ObjectScope
@@ -14,14 +16,42 @@ import io.github.dreammooncai.pvz2tool.SectionItem
 import io.github.dreammooncai.pvz2tool.SectionType
 import io.github.dreammooncai.pvz2tool.VersionDef
 import io.github.dreammooncai.pvz2tool.js.JsConsole
+import io.github.dreammooncai.pvz2tool.js.JsFileAccess
 import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
 import io.github.dreammooncai.pvz2tool.js.orNull
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
+import io.github.dreammooncai.pvz2tool.ui.dialog.UiFrame
 import io.github.dreammooncai.pvz2tool.ui.main.DynamicSectionState
 import io.github.dreammooncai.pvz2tool.ui.main.PvzLocalSaveManager
 import kotlin.collections.iterator
 
 private val config get() = InitializePvz2.config
+
+
+// JS 执行上下文：携带当前渲染环境信息，使 {{js:...}} 可访问 this.当前
+data class JsExecutionContext(
+    val section: DynamicSection? = null,
+    val item: SectionItem? = null,
+    val version: VersionDef,
+    val sectionStates: Map<String, DynamicSectionState> = emptyMap(),
+    val updateSectionState: ((String, (DynamicSectionState) -> DynamicSectionState) -> Unit)? = null,
+    // 复合文本专属：当前复合文本源串（只读视图），仅当 JS 由复合文本触发时非空
+    val text: String? = null,
+    // 复合文本专属：写入回调，this.text = "..." 时触发重渲染，仅当 JS 由复合文本触发时非空
+    val onTextChange: ((String) -> Unit)? = null,
+)
+
+// 通过 CompositionLocal 向下传递 JS 执行上下文，避免每个 PvzRichText 调用点手动传参
+val LocalJsExecutionContext = compositionLocalOf {
+    if (InitializePvz2.isConfigReady()) {
+        JsExecutionContext(
+            section = null,
+            item = null,
+            version = InitializePvz2.mPvz2ScreenStateFlow.value.selectedVersion ?: return@compositionLocalOf null,
+        )
+    } else null
+}
 
 /**
  * JS 工具上下文，构建完整的 this 对象供 JS 脚本使用。
@@ -33,6 +63,7 @@ private val config get() = InitializePvz2.config
  * - `this.gameActivity` - 当前配置的 gameActivity
  * - `this.checked` - CHECKBOX 当前状态（可读写）
  * - `this.value` - SLIDER 当前值（可读写）
+ * - `this.text` - 复合文本源串（可读写，仅当脚本由复合文本 {{js:...}} / {{link:...}} 触发时可用）
  *
  * ## 可用的 this 方法
  * - `this.setValue(itemId, value)` - 设置栏目项的值（CHECKBOX/INPUT/SLIDER）
@@ -41,22 +72,41 @@ private val config get() = InitializePvz2.config
  */
 class JsToolContext(
     private val sectionStates: Map<String, DynamicSectionState>,
-    private val version: VersionDef,
-    private val section: DynamicSection?,
-    private val item: SectionItem?,
+    val version: VersionDef,
+    val section: DynamicSection?,
+    val item: SectionItem?,
     /**
      * 状态变更回调：(sectionId, itemId, newValue) -> Unit
      * 用于将 JS 中的修改同步回 Compose 状态
      */
-    private val onStateChange: ((section: DynamicSection, item: SectionItem, newValue: Any) -> Unit)? = null,
+    val onStateChange: ((section: DynamicSection, item: SectionItem, newValue: Any) -> Unit)? = null,
     /**
      * call 方法的回调（用于执行其他 item 的 JS 效果）
      * 在 runtime 内部执行，需要正确的上下文
      */
     private val onCallJs: (suspend ScriptRuntime.(targetItemId: String) -> JsAny?)? = null,
-) {
+    /**
+     * 复合文本源串（只读视图）：仅当脚本由复合文本（{{js:...}} 内联或 {{link:...}} 点击）触发时非空，
+     * 用于 this.text 读取当前文本。
+     */
+    private val text: String? = null,
+    /**
+     * 写回回调：this.text = "..." 时触发，重渲染当前复合文本。
+     * 仅当脚本由复合文本触发时非空。
+     */
+    private val onTextChange: ((String) -> Unit)? = null,
+    /**
+     * 当前 JS 所处的跨弹窗调用栈帧（由 PvzText 透传；item 脚本体执行时为 null）。
+     *
+     * 「复合文本就地求值」通道（`{{js:}}` / `{{link}}`）的 `当前` 是求值那一刻新建的，
+     * 因此这个 uiFrame 就是脚本所在的那一帧。
+     */
+    var uiFrame: UiFrame? = null,
+    val onRunJsListener: (suspend ScriptRuntime.(section: DynamicSection?,item: SectionItem?) -> Unit)? = null
+): JsAny {
 
     val js = Object {
+        listOf("_context".js) eq this@JsToolContext
         listOf("findById".js, "查找".js).func("id") { args ->
             val id = toString(args[0])
             findItemGlobally(id) ?: findSectionById(id)
@@ -66,7 +116,20 @@ class JsToolContext(
         listOf("gameActivity".js, "游戏界面".js) eq config.gameActivity.js
 
         buildItemProperty(item,section,sectionStates[section?.id])
-        
+
+        // 复合文本专属：仅当脚本由复合文本（{{js:}} / {{link:}}）触发时，text/onTextChange 非空。
+        // this.text 可读（当前源串）、可写（this.text = "..." 触发重渲染当前复合文本）。
+        if (text != null) {
+            listOf("text".js, "文本".js) eq JsPropertyAccessor.BackedField(
+                getter = Callable { text.js },
+                setter = Callable { args ->
+                    val newText = args.getOrNull(0).orNull?.let { toString(it) } ?: return@Callable null
+                    onTextChange?.invoke(newText)
+                    null
+                }
+            )
+        }
+
         // 设置组件值的方法
         listOf("setValue".js, "设置值".js).func("itemId", "value") { args ->
             val itemId = toString(args[0])
@@ -84,6 +147,27 @@ class JsToolContext(
         // 刷新界面
         listOf("refresh".js, "刷新".js).func {
             InitializePvz2.mPvz2MainScreenReloadKey++
+            null
+        }
+
+        // 返回上一层 UI（嵌套弹窗通用）。
+        // 🔴 不能只在 uiFrame?.parent != null 时注册：onConfirm / onSelect / onClick 都是闭包，
+        // 词法捕获的 `当前` 可能 uiFrame = null，那样闭包里就永远没有 backUI 可调。
+        // 🔴 两个候选帧必须按 UiFrame.seq 严格取舍，不能简单地「谁优先」：
+        //   - 链接点击：uiFrame = 所在帧（准确），但槽位可能是**尚未结束的祖先回调**留下的外层帧；
+        //   - 弹窗回调：槽位 = 回调所属帧（准确），但闭包的 uiFrame 是**创建回调时**所在的外层帧。
+        //   恒取更内层（seq 更大）的那个，两种场景都成立。详见 UiFrame.seq 注释。
+        // 🔴 必须走 backUIFrame(frame, data) 而非 backUI(data)：后者取「运行时全局栈顶」，
+        // 而弹窗按钮回调是在「本帧已弹栈」之后才执行的，此刻栈顶已是父帧，
+        // 用栈顶会把父帧误关掉（表现为「确认后直接回到第一层」）。
+        listOf("backUI".js, "返回上一层UI".js).func("data") { args ->
+            val data = args.getOrNull(0).orNull
+            val frame = JsUiManager.resolveBackTarget(uiFrame, JsUiManager.currentCallbackFrame())
+            if (frame != null) {
+                JsUiManager.backUIFrame(frame, data)
+            } else {
+                JsConsole.warn("backUI: 当前不在任何弹窗帧上下文中，已忽略")
+            }
             null
         }
     }
