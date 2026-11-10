@@ -384,6 +384,36 @@ class JsToolContext(
                 listOf("placeholder".js, "占位符".js) eq (item.placeholder ?: "").js
             }
 
+            SectionType.NUMBER -> {
+                // 数量输入框：value/值 支持读写（Int）；min/max/step 暴露为只读，方便脚本自行钳制
+                listOf("value".js, "值".js) eq JsPropertyAccessor.BackedField(
+                    getter = Callable {
+                        (state.numberValues[item.id]
+                            ?: item.defaultValue?.toInt()
+                            ?: item.minValue.toInt()).js
+                    },
+                    setter = Callable { args ->
+                        val jsValue = args.getOrNull(0).orNull ?: return@Callable null
+                        // 依次尝试 Int / Double 文本，最后回退 0，避免脚本传字符串时报错
+                        val numeric = when (jsValue) {
+                            is Int -> jsValue
+                            is Number -> jsValue.toInt()
+                            else -> toString(jsValue).trim().toDoubleOrNull()?.toInt() ?: 0
+                        }
+                        onStateChange?.invoke(
+                            section,
+                            item,
+                            numeric.coerceIn(item.minValue.toInt(), item.maxValue.toInt())
+                        )
+                        null
+                    }
+                )
+                listOf("minValue".js, "最小值".js) eq item.minValue.toInt().js
+                listOf("maxValue".js, "最大值".js) eq item.maxValue.toInt().js
+                listOf("step".js, "步进".js) eq item.step.toInt().js
+                item.valueSuffix?.let { listOf("valueSuffix".js, "单位".js) eq it.js }
+            }
+
             SectionType.INFO -> {
                 listOf("value".js, "值".js) eq JsPropertyAccessor.BackedField(
                     getter = Callable { (state.infoValues[item.id] ?: item.infoValue ?: "-").js },

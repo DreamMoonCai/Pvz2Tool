@@ -203,6 +203,13 @@ enum class SectionType {
     SLIDER,
     /** 文本输入框 */
     INPUT,
+    /**
+     * 数量输入框：`[−] 数值 [+]`，支持长按连续增减，min/max/step 均可配置。
+     *
+     * 与 [SLIDER] 的区别：SLIDER 用拖动定位，本类型用 ± 精确步进，适合「买 3 个」这类数量场景。
+     * 复用 [SectionItem.minValue] / [maxValue] / [step] / [defaultValue] / [valueSuffix]。
+     */
+    NUMBER,
     /** 只读信息展示 */
     INFO
 }
@@ -358,6 +365,20 @@ data class SectionItem(
      * 仅对 INFO 类型生效：信息展示的当前值（通常由 JS 动态更新）。
      */
     val infoValue: String? = null,
+    /**
+     * 仅对 INFO / DESCRIPTION 生效：**最多显示几行**，超出的部分在卡片内滚动查看。
+     *
+     * `null`（默认）= 不限行，卡片随内容无限增高（旧行为）。
+     * 设置后卡片高度锁定为 `maxLines × 行高`，内容超出时可上下滚动——避免一条长信息把整栏推得很长。
+     *
+     * ```yaml
+     * - id: log_info
+     *   type: INFO
+     *   name: "运行日志"
+     *   maxLines: 5      # 只显示 5 行，超出滚动
+     * ```
+     */
+    val maxLines: Int? = null,
     // ========== 动态显隐（所有类型通用） ==========
     /**
      * 可见性判定 JS 表达式：返回真值才渲染该功能项；为空表示始终显示。

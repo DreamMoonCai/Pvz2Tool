@@ -430,6 +430,66 @@ object InitializePvz2 {
             settings["mLocalConfigDirUri"] = value?.toString() ?: ""
         }
 
+    // ======================== 下次启动跳过工具箱 ========================
+
+    private const val KEY_SKIP_TOOLBOX = "skipToolboxNextLaunch"
+    private const val KEY_SKIP_TOOLBOX_VERSION_CODE = "skipToolboxVersionCode"
+
+    /** 当前安装包的 versionCode；取不到时返回 -1（此时跳过逻辑一律视为失效，宁可不跳）。 */
+    private fun currentVersionCode(): Int = runCatching {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            info.longVersionCode.toInt()
+        } else {
+            @Suppress("DEPRECATION") info.versionCode
+        }
+    }.getOrDefault(-1)
+
+    /**
+     * **下次启动跳过工具箱、直接进入游戏**。
+     *
+     * 典型用法：游戏里用悬浮窗按钮执行脚本，实现「回工具箱 / 再直接进游戏」的往返：
+     * ```js
+     * // 下次冷启动直接进游戏（不会再看到工具箱主界面）
+     * app.skipToolboxNextLaunch(true);
+     * app.restart();          // 冷重启后按该开关直接进游戏
+     *
+     * app.isSkipToolboxNextLaunch();  // 查询当前设置
+     * ```
+     *
+     * 🔴 **更新 / 覆盖安装后自动失效并重置**：内部记录了设置时的 `versionCode`，
+     * 一旦检测到当前 `versionCode` 变化（说明 App 被升级/覆盖安装），立即清除该开关，
+     * 避免用户升级后仍然跳过、看不到新版本界面。
+     *
+     * @see consumeSkipToolboxNextLaunch 启动流程用它「读取即清除」，保证只生效一次。
+     */
+    var skipToolboxNextLaunch: Boolean
+        get() {
+            if (!::context.isInitialized) return false
+            val current = currentVersionCode()
+            val saved = settings[KEY_SKIP_TOOLBOX_VERSION_CODE, -1]
+            if (saved != current) {
+                // 版本变了（或从未记录）→ 视为失效并重置记录
+                if (saved != -1) {
+                    settings[KEY_SKIP_TOOLBOX] = false
+                    settings[KEY_SKIP_TOOLBOX_VERSION_CODE] = current
+                }
+                return false
+            }
+            return settings[KEY_SKIP_TOOLBOX, false]
+        }
+        set(value) {
+            settings[KEY_SKIP_TOOLBOX] = value
+            settings[KEY_SKIP_TOOLBOX_VERSION_CODE] = currentVersionCode()
+        }
+
+    /** 供入口 Activity 使用：读取后立即清除，保证「只跳过下一次启动」。 */
+    fun consumeSkipToolboxNextLaunch(): Boolean {
+        val value = skipToolboxNextLaunch
+        if (value) skipToolboxNextLaunch = false
+        return value
+    }
+
     var isBgMusicOn by mutableStateOf(false)
 
     /** 应用是否处于前台（Activity 处于 RESUMED 状态）。用于禁止后台播放音乐/视频。 */

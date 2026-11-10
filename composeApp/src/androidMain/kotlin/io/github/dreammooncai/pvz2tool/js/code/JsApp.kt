@@ -1,11 +1,14 @@
 package io.github.dreammooncai.pvz2tool.js.code
 
 import android.os.Process
+import io.github.alexzhirkevich.keight.js.FunctionParam
 import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.RestartPhoenixActivity
 import io.github.dreammooncai.pvz2tool.js.func
+import io.github.dreammooncai.pvz2tool.js.orNull
+import io.github.dreammooncai.pvz2tool.js.toBoolean
 import io.github.dreammooncai.util.ContextUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -106,6 +109,32 @@ object JsApp {
         listOf("exit".js, "退出".js, "退出应用".js, "退出APP".js).func {
             exitApp()
             null
+        }
+
+        // 设置「下次启动跳过工具箱、直接进入游戏」：
+        //   app.skipToolboxNextLaunch(true)  -> 下次冷启动不再显示工具箱主界面
+        //   app.skipToolboxNextLaunch(false) -> 取消
+        // 🔴 只生效一次：启动时「读取即清除」；App 更新 / 覆盖安装会依据 versionCode 自动失效并重置。
+        // 典型用法：悬浮窗按钮里 app.skipToolboxNextLaunch(true); app.restart();
+        listOf("skipToolboxNextLaunch".js, "跳过下次工具箱".js, "设置跳过工具箱".js).func(
+            FunctionParam("enable")
+        ) { args ->
+            // 🔴 布尔参数用字符串判定（true/1 → 开，false/0/空 → 关），
+            // 不依赖 toBoolean() 的数值投影，避免不同引擎版本下投影差异导致静默取反。
+            val raw = args.getOrNull(0)?.orNull
+            val enable = if (raw == null) {
+                true
+            } else {
+                val text = toString(raw).trim().lowercase()
+                text == "true" || text == "1"
+            }
+            InitializePvz2.skipToolboxNextLaunch = enable
+            null
+        }
+
+        // 查询当前是否已设置「下次启动跳过工具箱」：app.isSkipToolboxNextLaunch() -> boolean
+        listOf("isSkipToolboxNextLaunch".js, "是否跳过下次工具箱".js).func {
+            InitializePvz2.skipToolboxNextLaunch.js
         }
     }
 }

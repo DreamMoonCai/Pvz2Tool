@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import io.github.dreammooncai.pvz2tool.ui.PvzInput
+import io.github.dreammooncai.pvz2tool.ui.PvzNumberInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.material3.*
@@ -254,8 +255,33 @@ data class JsSliderState(
     val deferred: CompletableDeferred<Double?>? = null
 )
 
-/** 加载指示状态（轻量"请稍候"遮罩，无按钮，需手动关闭） */
-data class JsLoadingState(
+/**
+ * 数量输入弹窗状态（`ui.number`）。
+ *
+ * 交互形态：`[«] [−]  数值  [+] [»]` —— 单击 ± 步进、长按连续增减、
+ * `«` / `»` 一键跳到最小 / 最大值。比 `ui.slider` 更适合「买几个」这类精确步进场景。
+ */
+data class JsNumberState(
+    val isVisible: Boolean = false,
+    val title: String = "",
+    val min: Int = 0,
+    val max: Int = 100,
+    val step: Int = 1,
+    val value: Int = 0,
+    val suffix: String = "",
+    val confirmText: String = "确定",
+    val cancelText: String = "取消",
+    val confirmColor: String = "",
+    val cancelColor: String = "",
+    val dismissible: Boolean = false,
+    val showMinMaxButtons: Boolean = true,
+    val onChange: (suspend (JsAny?) -> Unit)? = null,
+    val onConfirm: (suspend (JsAny?) -> Unit)? = null,
+    val onCancel: (suspend (JsAny?) -> Unit)? = null,
+    val deferred: CompletableDeferred<Int?>? = null
+)
+
+/** 加载指示状态（轻量"请稍候"遮罩，无按钮，需手动关闭） */data class JsLoadingState(
     val isVisible: Boolean = false,
     val title: String = "",
     val message: String = "",
@@ -299,7 +325,7 @@ data class JsPopupState(
 
 /** 弹窗帧类型，与 _xxxState 一一对应（MULTISELECT 复用 SELECT） */
 enum class UiFrameKind {
-    CONFIRM, ALERT, PROMPT, SELECT, MULTISELECT, ACTIONSHEET, SLIDER, LOADING, POPUP
+    CONFIRM, ALERT, PROMPT, SELECT, MULTISELECT, ACTIONSHEET, SLIDER, NUMBER, LOADING, POPUP
 }
 
 /**
@@ -586,6 +612,7 @@ object JsUiManager {
         set(_selectState, JsSelectState(), UiFrameKind.SELECT, UiFrameKind.MULTISELECT)
         set(_actionSheetState, JsActionSheetState(), UiFrameKind.ACTIONSHEET)
         set(_sliderState, JsSliderState(), UiFrameKind.SLIDER)
+        set(_numberState, JsNumberState(), UiFrameKind.NUMBER)
         set(_loadingState, JsLoadingState(), UiFrameKind.LOADING)
         set(_popupState, JsPopupState(), UiFrameKind.POPUP)
     }
@@ -816,6 +843,10 @@ object JsUiManager {
     // 数值滑块状态流
     private val _sliderState = MutableStateFlow(JsSliderState())
     val sliderState: StateFlow<JsSliderState> = _sliderState.asStateFlow()
+
+    // 数量输入弹窗状态流（ui.number）
+    private val _numberState = MutableStateFlow(JsNumberState())
+    val numberState: StateFlow<JsNumberState> = _numberState.asStateFlow()
 
     // 加载指示状态流
     private val _loadingState = MutableStateFlow(JsLoadingState())
@@ -1239,6 +1270,79 @@ object JsUiManager {
     /** 隐藏数值滑块（级联关闭） */
     suspend fun hideSlider() {
         dismissKind(UiFrameKind.SLIDER)
+    }
+
+    // ======================== 数量输入（ui.number） ========================
+
+    /**
+     * 显示**数量输入弹窗**（`ui.number`）。
+     *
+     * 与 [showSlider] 的区别：滑块靠拖动定位，本弹窗靠 ± 精确步进（**长按可连续增减**），
+     * 并提供 `«` / `»` 按钮一键跳到最小值 / 最大值，更适合「买 N 个」这类场景。
+     *
+     * @param min 最小值，@param max 最大值，@param step 每次步进量
+     * @param default 初始值（会自动钳制到 min~max）
+     * @param suffix 数值后缀，如 `个`、`%`
+     * @param showMinMaxButtons 是否显示 `«` / `»` 跳转按钮
+     * @return 点「确定」时带回所选数值；取消 / 直接关闭返回 `null`
+     */
+    fun showNumber(
+        ownerContext: JsToolContext?,
+        title: String,
+        min: Int = 0,
+        max: Int = 100,
+        step: Int = 1,
+        default: Int = 0,
+        suffix: String = "",
+        showMinMaxButtons: Boolean = true,
+        confirmText: String = "确定",
+        cancelText: String = "取消",
+        confirmColor: String = "",
+        cancelColor: String = "",
+        dismissible: Boolean = false,
+        onChange: (suspend (JsAny?) -> Unit)? = null,
+        onConfirm: (suspend (JsAny?) -> Unit)? = null,
+        onCancel: (suspend (JsAny?) -> Unit)? = null,
+        onResult: (suspend (JsAny?) -> Unit)? = null
+    ): CompletableDeferred<Int?> {
+        val deferred = CompletableDeferred<Int?>()
+        val safeMin = minOf(min, max)
+        val safeMax = maxOf(min, max)
+        val state = JsNumberState(
+            isVisible = true,
+            title = title,
+            min = safeMin,
+            max = safeMax,
+            step = if (step <= 0) 1 else step,
+            value = default.coerceIn(safeMin, safeMax),
+            suffix = suffix,
+            confirmText = confirmText,
+            cancelText = cancelText,
+            confirmColor = confirmColor,
+            cancelColor = cancelColor,
+            dismissible = dismissible,
+            showMinMaxButtons = showMinMaxButtons,
+            onChange = onChange,
+            onConfirm = onConfirm,
+            onCancel = onCancel,
+            deferred = deferred
+        )
+        @Suppress("UNCHECKED_CAST") pushFrame(
+            UiFrame(
+                UiFrameKind.NUMBER,
+                state,
+                deferred as CompletableDeferred<Any?>,
+                null,
+                onResult = onResult,
+                ownerContext = ownerContext
+            )
+        )
+        return deferred
+    }
+
+    /** 隐藏数量输入弹窗（级联关闭） */
+    suspend fun hideNumber() {
+        dismissKind(UiFrameKind.NUMBER)
     }
 
     // ======================== 加载指示 ========================
@@ -2510,6 +2614,94 @@ fun JsLoadingDialog() {
  * 所有子弹窗内部均以 `BasicAlertDialog` 实现，空闲时各自 StateFlow 不可见、
  * 不渲染任何内容，因此本宿主在空闲态是空 Composition，不会拦截下层触摸。
  */
+/**
+ * 数量输入弹窗（`ui.number`）：PVZ 风格弹窗内嵌 [PvzNumberInput]。
+ *
+ * 交互：`[«] [−] 数值 [+] [»]` —— 单击 ± 步进、长按连续增减、`«`/`»` 直达最小/最大值。
+ */
+@Composable
+fun JsNumberDialog() {
+    val state by JsUiManager.numberState.collectAsState()
+    // key = deferred：每次新弹窗都以初始值重置；跨类型嵌套后重新可见时从帧草稿恢复
+    var numberValue by remember(state.deferred) {
+        mutableStateOf((JsUiManager.readDraft(state) as? Int) ?: state.value)
+    }
+
+    // 值变化即回写草稿：弹窗因嵌套短暂离场（remember 丢失）后回来可恢复
+    LaunchedEffect(state.deferred) {
+        snapshotFlow { numberValue }.distinctUntilChanged().collect { JsUiManager.saveDraft(state, it) }
+    }
+
+    if (!state.isVisible) return
+
+    CompositionLocalProvider(LocalUiFrame provides JsUiManager.topFrame()) {
+        val scope = rememberCoroutineScope()
+        PvzStyledDialog(
+            isVisible = true,
+            titleText = state.title,
+            onDismissRequest = {
+                scope.launch {
+                    JsUiManager.dismissSelfWithCallback(state, null) { state.onCancel?.invoke(null) }
+                }
+            },
+            dismissible = state.dismissible,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            bottomContent = {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    PvzRedButton(
+                        text = state.cancelText,
+                        backgroundColor = parseColorArg(state.cancelColor),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        onClick = {
+                            scope.launch {
+                                JsUiManager.dismissSelfWithCallback(state, null) { state.onCancel?.invoke(null) }
+                            }
+                        })
+                    PvzGreenButton(
+                        text = state.confirmText,
+                        backgroundColor = parseColorArg(state.confirmColor),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        onClick = {
+                            val picked = numberValue
+                            scope.launch {
+                                JsUiManager.dismissSelfWithCallback(state, picked) {
+                                    state.onConfirm?.invoke(picked.js)
+                                }
+                            }
+                        })
+                }
+            }
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
+            PvzNumberInput(
+                value = numberValue,
+                onValueChange = { newValue ->
+                    numberValue = newValue
+                    state.onChange?.let { callback -> scope.launch { callback(newValue.js) } }
+                },
+                min = state.min,
+                max = state.max,
+                step = state.step,
+                suffix = state.suffix.ifBlank { null },
+                showMinMaxButtons = state.showMinMaxButtons,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
 @Composable
 fun JsDialogsHost() {
     JsAlertDialog()
@@ -2523,4 +2715,5 @@ fun JsDialogsHost() {
     JsExtractorDialog()
     JsPopupDialog()
     JsVideoDialog()
+    JsNumberDialog()
 }

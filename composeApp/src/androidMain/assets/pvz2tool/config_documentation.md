@@ -203,6 +203,7 @@ notifications.show("标题", "消息内容", {
 | `BUTTON` | 按钮栏，每个功能项渲染为按钮，点击后执行 JS 脚本 |
 | `SLIDER` | 滑动条栏，用于数值调节（需配合 jsScript 使用） |
 | `INPUT` | 文本输入栏，用于文本输入（需配合 jsScript 使用） |
+| `NUMBER` | **数量输入栏**：`[−] 数值 [+]`，单击步进、长按连续增减，min/max/step 可配置（需配合 jsScript 使用） |
 | `INFO` | 只读信息栏，用于展示动态信息（JS 执行返回值显示在信息框中） |
 
 ---
@@ -211,7 +212,7 @@ notifications.show("标题", "消息内容", {
 | 属性 | 类型 | 适用类型 | 说明 |
 |------|------|----------|------|
 | `items[n].id` | String | 全部 | 功能项唯一标识 ID，不可重复 |
-| `items[n].type` | String | 全部 | **必填**，决定渲染类型：`RADIO` \| `CHECKBOX` \| `DESCRIPTION` \| `BUTTON` \| `SLIDER` \| `INPUT` \| `INFO` |
+| `items[n].type` | String | 全部 | **必填**，决定渲染类型：`RADIO` \| `CHECKBOX` \| `DESCRIPTION` \| `BUTTON` \| `SLIDER` \| `INPUT` \| `NUMBER` \| `INFO` |
 | `items[n].name` | String | 全部 | 功能项展示标题 |
 | `items[n].desc` | String | 全部 | 功能项描述文本 |
 | `items[n].icon` | String | 全部 | 图标路径，基于 `pvz2tool/images/` 目录；支持绝对路径（`/` 开头）和占位符变量 |
@@ -293,6 +294,45 @@ items:
 |------|------|------|
 | `placeholder` | String | 输入框占位提示文字 |
 | `inputDefault` | String | 输入框默认值 |
+
+**NUMBER 数量输入专属字段**（复用 SLIDER 的同名字段）：
+
+界面形态为 `[«] [−]  数值  [+] [»]`：单击 ± 步进一次，**长按 ± 连续增减**，
+`«` / `»` 一键跳到最小值 / 最大值（到边界后对应按钮自动禁用）。
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `minValue` | Float | 最小值，默认 `0`（脚本 `this.minValue` 只读可查） |
+| `maxValue` | Float | 最大值，默认 `100` |
+| `defaultValue` | Float | 默认值，不配置时取 `minValue` |
+| `step` | Float | 每次步进量，默认 `1` |
+| `valueSuffix` | String | 数值后缀，如 `个`、`%` |
+| `jsScript` | String | 执行时机同 INIT，可通过 `this.value` 读写当前值（写入会自动钳制到 min~max） |
+
+```yaml
+- id: buy_count
+  type: NUMBER
+  name: "购买数量"
+  desc: "1~99，长按 ± 可连续增减"
+  minValue: 1
+  maxValue: 99
+  step: 1
+  valueSuffix: "个"
+  jsScript: "console.log('当前数量', this.value);"
+```
+
+**INFO / DESCRIPTION 的限高字段**：
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `maxLines` | Int | **最多显示几行**，超出部分在卡片内上下滚动。不配置（默认）则随内容无限增高 |
+
+```yaml
+- id: long_info
+  type: INFO
+  name: "运行状态"
+  maxLines: 5        # 只显示 5 行，超出可滚动查看
+  jsScript: "this.value = 很长的动态文本;"
+```
 
 **INFO 只读信息专属字段**：
 | 属性 | 类型 | 说明 |

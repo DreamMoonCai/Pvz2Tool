@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import io.github.dreammooncai.pvz2tool.ui.PvzInput
+import io.github.dreammooncai.pvz2tool.ui.PvzNumberInput
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
@@ -214,6 +215,8 @@ data class DynamicSectionState(
     val sliderValues: Map<String, Float> = emptyMap(),
     /** INPUT 类型的输入值：itemId -> value */
     val inputValues: Map<String, String> = emptyMap(),
+    /** NUMBER（数量输入框）类型的值：itemId -> 数值 */
+    val numberValues: Map<String, Int> = emptyMap(),
     /** INFO 类型的动态值：itemId -> displayValue（JS 执行结果） */
     val infoValues: Map<String, String> = emptyMap(),
     /** DESCRIPTION 类型的动态值：itemId -> descValue（JS 执行结果） */
@@ -1575,13 +1578,33 @@ private fun DynamicSectionComponent(
                             }
 
                             if (!currentDescriptionValue.isNullOrBlank()) {
-                                PvzRichText(
-                                    text = currentDescriptionValue,
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp,
-                                    defaultStyle = PvzTextStyle(section.theme.secondaryTextColor),
-                                    modifier = Modifier.padding(4.dp)
-                                )
+                                // DESCRIPTION 同样支持 maxLines 限高 + 内部滚动（行高 16sp）
+                                val descMaxLines = item.maxLines ?: 0
+                                if (descMaxLines > 0) {
+                                    val descScrollState = rememberScrollState()
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = (16 * descMaxLines).dp)
+                                            .verticalScroll(descScrollState)
+                                    ) {
+                                        PvzRichText(
+                                            text = currentDescriptionValue,
+                                            fontSize = 12.sp,
+                                            lineHeight = 16.sp,
+                                            defaultStyle = PvzTextStyle(section.theme.secondaryTextColor),
+                                            modifier = Modifier.padding(4.dp)
+                                        )
+                                    }
+                                } else {
+                                    PvzRichText(
+                                        text = currentDescriptionValue,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp,
+                                        defaultStyle = PvzTextStyle(section.theme.secondaryTextColor),
+                                        modifier = Modifier.padding(4.dp)
+                                    )
+                                }
                             }
                         }
 
@@ -1842,6 +1865,80 @@ private fun DynamicSectionComponent(
                             }
                         }
 
+                        SectionType.NUMBER -> {
+                            val primaryTextStyle = PvzTextStyle(section.theme.primaryTextColor)
+                            val secondaryTextStyle = PvzTextStyle(section.theme.secondaryTextColor)
+
+                            // min/max/step 复用 SLIDER 的配置字段（yml 里同名配置对 NUMBER 同样生效）
+                            val numberMin = item.minValue.toInt()
+                            val numberMax = item.maxValue.toInt()
+                            val numberStep = item.step.toInt().coerceAtLeast(1)
+                            val numberValue = (
+                                    state.numberValues[item.id]
+                                        ?: item.defaultValue?.toInt()
+                                        ?: numberMin
+                                    ).coerceIn(numberMin, numberMax)
+
+                            val jsExtractor = rememberAssetExtractor(
+                                context = LocalContext.current
+                            )
+                            val uiState by jsExtractor.extractor.uiState
+                            PvzExtractorDialog(
+                                uiState = uiState,
+                                SettingsDialogState.isUseShowNotUpdate,
+                                onDismissRequest = { jsExtractor.extractor.dismiss() }
+                            )
+
+                            val jsScript = item.readJs(section, version)
+                            LaunchedEffect(item.id, version.id, jsScript) {
+                                if (jsScript != null) {
+                                    PvzToolJsEngine.executeScript(
+                                        extractor = jsExtractor,
+                                        script = jsScript,
+                                        section = section,
+                                        item = item,
+                                        version = version,
+                                        sectionStates = sectionStates,
+                                        updateSectionState = updateSectionState
+                                    )
+                                }
+                            }
+
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                item.name?.let {
+                                    PvzRichText(
+                                        text = it,
+                                        fontSize = 14.sp,
+                                        lineHeight = 18.sp,
+                                        defaultStyle = primaryTextStyle
+                                    )
+                                }
+                                item.desc?.let {
+                                    PvzRichText(
+                                        text = it,
+                                        fontSize = 11.sp,
+                                        lineHeight = 14.sp,
+                                        defaultStyle = secondaryTextStyle,
+                                        modifier = Modifier.padding(bottom = 4.dp)
+                                    )
+                                }
+
+                                // 数量输入：± 按钮单击步进、长按连续步进，min/max 由 yml 配置
+                                PvzNumberInput(
+                                    value = numberValue,
+                                    onValueChange = { newValue ->
+                                        onStateChange(
+                                            state.copy(numberValues = state.numberValues + (item.id to newValue))
+                                        )
+                                    },
+                                    min = numberMin,
+                                    max = numberMax,
+                                    step = numberStep,
+                                    suffix = item.valueSuffix
+                                )
+                            }
+                        }
+
                         SectionType.INFO -> {
                             val primaryTextStyle = PvzTextStyle(section.theme.primaryTextColor)
                             val secondaryTextStyle = PvzTextStyle(section.theme.secondaryTextColor)
@@ -1911,13 +2008,33 @@ private fun DynamicSectionComponent(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        PvzRichText(
-                                            text = currentInfoValue,
-                                            fontSize = 14.sp,
-                                            lineHeight = 18.sp,
-                                            defaultStyle = PvzTextStyle(infoTextColor),
-                                            modifier = Modifier.weight(1f)
-                                        )
+                                        // INFO 限高：配置了 maxLines 时把高度锁到 maxLines × 行高(18sp)，
+                                        // 超出部分在卡片内上下滚动；未配置则保持旧行为（随内容无限增高）。
+                                        val infoMaxLines = item.maxLines ?: 0
+                                        if (infoMaxLines > 0) {
+                                            val infoScrollState = rememberScrollState()
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .heightIn(max = (18 * infoMaxLines).dp)
+                                                    .verticalScroll(infoScrollState)
+                                            ) {
+                                                PvzRichText(
+                                                    text = currentInfoValue,
+                                                    fontSize = 14.sp,
+                                                    lineHeight = 18.sp,
+                                                    defaultStyle = PvzTextStyle(infoTextColor)
+                                                )
+                                            }
+                                        } else {
+                                            PvzRichText(
+                                                text = currentInfoValue,
+                                                fontSize = 14.sp,
+                                                lineHeight = 18.sp,
+                                                defaultStyle = PvzTextStyle(infoTextColor),
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
                                         item.icon?.let { rawIconPath ->
                                             val iconPath = JsFileResolver.resolvePlaceholders(rawIconPath)
                                             AsyncImageFromAssets(

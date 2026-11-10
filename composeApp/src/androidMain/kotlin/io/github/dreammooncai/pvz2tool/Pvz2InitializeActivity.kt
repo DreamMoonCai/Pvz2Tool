@@ -28,9 +28,14 @@ import android.view.Window
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,9 +45,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
@@ -173,6 +180,10 @@ class Pvz2InitializeActivity : ComponentActivity() {
                 // （versionName != mSfmVersion），init() 在 setContent 之前已执行，组合期调用安全。
                 // 避免「初始 false → 首帧先渲染 Pvz2MainScreen → LaunchedEffect 异步置 true →
                 // 切到 CG → 播完回到主界面」造成的「主界面→CG→主界面」闪现/重复显示。
+                // 「下次启动跳过工具箱」：脚本用 app.skipToolboxNextLaunch(true) 设置，
+                // 这里「读取即清除」保证只生效一次；App 更新/覆盖安装时该开关会自动失效（见 InitializePvz2）。
+                val skipToolbox = remember { InitializePvz2.consumeSkipToolboxNextLaunch() }
+
                 var showCgVideo by remember { mutableStateOf(InitializePvz2.hasVersionChanges()) }
                 var cgVideoSkipped by remember { mutableStateOf(false) }
 
@@ -182,8 +193,8 @@ class Pvz2InitializeActivity : ComponentActivity() {
                 }
 
                 if (showCgVideo) {
-                    // 重启后自动进入游戏：跳过开场 CG 视频
-                    if (autoEnterGame) {
+                    // 重启后自动进入游戏 / 跳过工具箱：跳过开场 CG 视频
+                    if (autoEnterGame || skipToolbox) {
                         LaunchedEffect(Unit) { onCgSkip() }
                     }
                     CgVideoPlayer(
@@ -229,22 +240,27 @@ class Pvz2InitializeActivity : ComponentActivity() {
                 )
                 key(InitializePvz2.mPvz2MainScreenReloadKey) {
                     val standalone = hasIntegratorActivity()
-                    Pvz2MainScreen(
-                        onGotoGameClick = ::onGotoGame,
-                        onResetDataClick = ::onResetDataClick,
-                        onCloseToolbox = {
-                            Process.killProcess(Process.myPid())
-                            exitProcess(0)
-                        },
-                        onStateChanged = {},
-                        isStandaloneApp = standalone,
-                        onGoToIntegrator = {
-                            startActivity(Intent(this@Pvz2InitializeActivity, ToolboxIntegratorActivity::class.java))
-                        },
-                    )
+                    Box(Modifier.fillMaxSize()) {
+                        Pvz2MainScreen(
+                            onGotoGameClick = ::onGotoGame,
+                            onResetDataClick = ::onResetDataClick,
+                            onCloseToolbox = {
+                                Process.killProcess(Process.myPid())
+                                exitProcess(0)
+                            },
+                            onStateChanged = {},
+                            isStandaloneApp = standalone,
+                            onGoToIntegrator = {
+                                startActivity(Intent(this@Pvz2InitializeActivity, ToolboxIntegratorActivity::class.java))
+                            },
+                        )
+                        // 「跳过工具箱」：主界面照常组合（资源解压、栏目脚本仍会完整执行），
+                        // 只是用不透明层盖住，视觉上完全看不到工具箱。
+                        if (skipToolbox) SkipToolboxOverlay()
+                    }
                 }
-                // 重启后自动进入游戏：主界面就绪即触发「进入游戏」逻辑
-                if (autoEnterGame) {
+                // 重启后自动进入游戏 / 跳过工具箱：主界面就绪即触发「进入游戏」逻辑
+                if (autoEnterGame || skipToolbox) {
                     LaunchedEffect(Unit) { onGotoGame() }
                 }
             }
@@ -675,4 +691,26 @@ private fun SimplifiedLaunchScreen(
             } catch (_: Exception) {}
         }
     }
+
+/**
+ * 「跳过工具箱」遮罩层。
+ *
+ * 主界面仍在后台正常组合（因此资源解压、栏目脚本等完整流程照常执行），
+ * 这一层把它完全盖住，视觉上等价于「不经过工具箱、直接进游戏」。
+ */
+@Composable
+private fun SkipToolboxOverlay() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0E1116)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("正在进入游戏…", color = Color.White, fontSize = 18.sp)
+            Spacer(Modifier.height(8.dp))
+            Text("已启用「跳过工具箱」（下次启动自动失效）", color = Color(0xFF8A9199), fontSize = 13.sp)
+        }
+    }
+}
 

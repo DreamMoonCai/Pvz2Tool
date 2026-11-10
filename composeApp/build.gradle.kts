@@ -223,11 +223,18 @@ android {
 }
 
 // ──────────────────────────────────────────────────────────────
-// 「一键看到 API 调用效果」的运行方式（演示用 Activity 在 src/androidDebug，不进 release 包）：
-//   ./gradlew :composeApp:connectedDebugAndroidTest \
-//     -Pandroid.testInstrumentationRunnerArguments.class=io.github.dreammooncai.pvz2tool.ApiShowcaseTest
-// 运行后模拟器屏幕会依次展示：日志面板刷新 → 视频全屏播放/暂停/继续/跳转/关闭 → 音效播放。
-// 想跑全部仪器化测试时去掉 -Pandroid.testInstrumentationRunnerArguments.class=... 即可。
+// 「一键看效果」的运行方式（演示用 Activity 在 src/androidDebug，不进 release 包）
+//
+// ① 新增 UI 组件演示（日常跑这个，约 15 秒；不含视频/音频）：
+//    弹 PVZ 风格弹窗展示「数量输入框 ±/长按/min-max」与「INFO 限高滚动」
+//    ./gradlew :composeApp:connectedDebugAndroidTest \
+//      -Pandroid.testInstrumentationRunnerArguments.class=io.github.dreammooncai.pvz2tool.UiShowcaseTest
+//
+// ② 完整 JS API 演示（日志 / 视频全屏播放 / 音效 / 跳过工具箱，约 40 秒）：
+//    ./gradlew :composeApp:connectedDebugAndroidTest \
+//      -Pandroid.testInstrumentationRunnerArguments.class=io.github.dreammooncai.pvz2tool.ApiShowcaseTest
+//
+// 想跑全部仪器化测试时，去掉 -Pandroid.testInstrumentationRunnerArguments.class=... 即可。
 // ──────────────────────────────────────────────────────────────
 
 // ============================================================

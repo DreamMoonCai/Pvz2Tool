@@ -248,6 +248,16 @@ object PvzToolJsEngine {
                             )
 
                             SectionType.SLIDER -> s.copy(sliderValues = s.sliderValues + (item.id to (newValue as? Float ?: newValue.toString().toFloat())))
+                            // NUMBER（数量输入框）：统一存 Int
+                            SectionType.NUMBER -> s.copy(
+                                numberValues = s.numberValues + (item.id to (
+                                        when (newValue) {
+                                            is Int -> newValue
+                                            is Number -> newValue.toInt()
+                                            else -> newValue.toString().toDoubleOrNull()?.toInt() ?: 0
+                                        }
+                                        ))
+                            )
                             SectionType.INFO ->  s.copy(infoValues = s.infoValues + (item.id to newValue.toString()))
                             SectionType.DESCRIPTION ->  s.copy(descriptionValues = s.descriptionValues + (item.id to newValue.toString()))
                             else -> s

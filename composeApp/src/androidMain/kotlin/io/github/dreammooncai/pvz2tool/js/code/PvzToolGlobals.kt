@@ -397,6 +397,45 @@ object PvzToolGlobals {
             JsUiManager.showSlider(getJsToolContext(),title, min, max, step, default, unit, decimals, showValue, confirmText, cancelText, confirmColor, cancelColor, dismissible, onChange, onConfirm, onCancel, onResult).await()?.js
         }
 
+        // 数量输入弹窗：ui.number(title, options?) -> number | null
+        // 形态：[«] [−] 数值 [+] [»]，单击步进 / 长按连续增减 / «» 直达最小最大
+        // options: { min?, max?, step?, default?, suffix?(或 unit?),
+        //            showMinMaxButtons?(是否显示 «» 按钮，默认 true),
+        //            confirmText?, cancelText?, confirmColor?, cancelColor?, dismissible?/可关闭?,
+        //            onChange?, onConfirm?, onCancel?, onResult? }
+        listOf("number".js, "数量".js, "数量输入".js).func(
+            FunctionParam("title"), FunctionParam("options")
+        ) { args ->
+            val runtime = this
+            val title = toString(args[0])
+            val options = args[1].orNull as? JsObject
+            val min = options?.get("min".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 0
+            val max = options?.get("max".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 100
+            val step = options?.get("step".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 1
+            val default = options?.get("default".js, this)?.orNull?.let { toNumber(it).toInt() } ?: min
+            val suffix = options?.get("suffix".js, this)?.orNull?.let { toString(it) }
+                ?: options?.get("unit".js, this)?.orNull?.let { toString(it) } ?: ""
+            // 布尔一律走字符串判定（toBoolean 的数值投影在不同场景下不可靠）
+            val showMinMax = options?.get("showMinMaxButtons".js, this)?.orNull
+                ?.let { toString(it).trim().lowercase() != "false" } ?: true
+            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
+            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
+            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val dismissible = (options?.get("dismissible".js, this)?.orNull
+                ?: options?.get("可关闭".js, this)?.orNull)
+                ?.let { toString(it).trim().lowercase() == "true" } ?: false
+            val onChange = bindJsCallback(options, "onChange", runtime)
+            val onConfirm = bindJsCallback(options, "onConfirm", runtime)
+            val onCancel = bindJsCallback(options, "onCancel", runtime)
+            val onResult = bindJsCallback(options, "onResult", runtime)
+            JsUiManager.showNumber(
+                getJsToolContext(), title, min, max, step, default, suffix, showMinMax,
+                confirmText, cancelText, confirmColor, cancelColor, dismissible,
+                onChange, onConfirm, onCancel, onResult
+            ).await()?.js
+        }
+
         // 加载指示弹窗：ui.loading(title, options?) -> controller{ close(), 关闭(), update(), 更新() }
         // options: { message?, dismissible?, cancelText?, cancelColor?, onDismiss? }  不阻塞 await，返回 controller 供手动关闭/实时更新文字
         listOf("loading".js, "加载".js).func(

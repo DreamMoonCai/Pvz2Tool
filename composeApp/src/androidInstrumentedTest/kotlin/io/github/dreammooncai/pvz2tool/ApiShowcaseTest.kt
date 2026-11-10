@@ -123,6 +123,21 @@ class ApiShowcaseTest {
             js("audio.playSound('sound/ui_switch_click.wav')")
             delay(2_000)
 
+            // ================= ⑧ 跳过工具箱 API =================
+            // 设置后下次冷启动直接进游戏（不再显示工具箱），App 更新/覆盖安装会自动失效
+            setStep("⑧ app.skipToolboxNextLaunch(true)：下次冷启动直接进游戏")
+            js("app.skipToolboxNextLaunch(true)")
+            val skipAfterSet = InitializePvz2.skipToolboxNextLaunch
+            println("[diag] skipToolbox after set: kotlin=$skipAfterSet js=${js("app.isSkipToolboxNextLaunch()")}")
+            assertTrue("应已设置「下次启动跳过工具箱」（Kotlin 侧读取）", skipAfterSet)
+            delay(1_500)
+            // 演示完复原，避免影响后续手动启动调试
+            js("app.skipToolboxNextLaunch(false)")
+            assertFalse(
+                "取消后应恢复为 false",
+                InitializePvz2.skipToolboxNextLaunch
+            )
+
             setStep("演示结束：全部 API 调用完成（可查看上方日志）")
             delay(1_500)
         } finally {

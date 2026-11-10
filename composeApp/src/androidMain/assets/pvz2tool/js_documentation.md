@@ -2096,6 +2096,62 @@ var vol = ui.slider("音量", {
 });
 ```
 
+#### ui.number / ui.数量 / ui.数量输入
+
+**语法**：`ui.number(title, options?) -> number|null`
+
+弹出**数量输入弹窗**（PVZ 风格：绿框黄底），形态为 `[«] [−] 数值 [+] [»]`：
+
+- 单击 `+` / `−` 步进一次；
+- **长按 `+` / `−` 连续增减**（按住 400ms 后每 80ms 一次）；
+- `«` / `»` 一键跳到最小值 / 最大值（到达边界后按钮自动禁用）。
+
+比 `ui.slider` 更适合「买几个」这类需要**精确步进**的场景（滑块靠拖动定位）。
+
+**参数**：
+- `title` (string) - 弹窗标题
+- `options` (object, 可选)：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `min` | number | 0 | 最小值 |
+| `max` | number | 100 | 最大值 |
+| `step` | number | 1 | 每次步进量（≤0 按 1 处理） |
+| `default` | number | = `min` | 初始值（自动钳制到 min~max） |
+| `suffix` / `unit` | string | "" | 数值后缀，如 `个`、`%` |
+| `showMinMaxButtons` | boolean | true | 是否显示 `«` / `»` 跳转按钮 |
+| `confirmText` | string | "确定" | 「确定」按钮文字 |
+| `cancelText` | string | "取消" | 「取消」按钮文字 |
+| `confirmColor` | string | "" | 确定按钮背景色 |
+| `cancelColor` | string | "" | 取消按钮背景色 |
+| `dismissible` / `可关闭` | boolean | false | 是否允许点外部关闭（等价于取消，触发 `onCancel`） |
+| `onChange` | function | 无 | 数值变化时实时触发（收到当前数值） |
+| `onConfirm` | function | 无 | 点击确定时触发（收到确认的数值） |
+| `onCancel` | function | 无 | 点击取消 / 点外部时触发（无参数） |
+
+**返回**：number|null - 确认后的数值；取消 / 直接关闭返回 `null`。
+
+**示例**：
+```javascript
+// 基础用法：买几个
+var count = ui.number("购买数量", { min: 1, max: 99, default: 1, suffix: "个" });
+if (count !== null) console.log("买了 " + count + " 个");
+
+// 自定义步进与按钮
+ui.number("设置数量", {
+    min: 0, max: 100, step: 5, default: 50, suffix: "%",
+    confirmText: "设定", confirmColor: "green",
+    onChange: function (v) { console.log("当前：" + v) },
+    onConfirm: function (v) { console.log("最终：" + v) }
+});
+
+// 中文别名
+var n = ui.数量("选择数量", { min: 1, max: 10 });
+```
+
+> 同一个组件也存在于**主页栏目条目**中：把 `dream.yml` 里的条目 `type` 写成 `NUMBER`
+> 即可在栏目里直接显示（配置项 `minValue` / `maxValue` / `step` / `valueSuffix`）。
+
 #### ui.loading / ui.加载
 
 **语法**：`ui.loading(title, options?) -> controller{ close(), 关闭() }`
@@ -4150,6 +4206,41 @@ app.重启游戏();
 ```javascript
 app.exit();
 app.退出();
+```
+
+### app.skipToolboxNextLaunch / app.跳过下次工具箱 / app.设置跳过工具箱
+
+设置**下次启动跳过工具箱、直接进入游戏**（不再显示工具箱主界面）。
+
+配合 `app.restart()` 使用，可实现「游戏内悬浮窗按钮 → 下次直接进游戏」的往返：
+
+```javascript
+app.skipToolboxNextLaunch(true);
+app.restart();          // 冷重启后不再经过工具箱，直接进游戏
+```
+
+**参数**：
+- `enable` (bool, 可选) - `true`（默认）设为跳过；`false` 取消
+
+**返回**：无（返回 `null`）
+
+> ⚠️ **只生效一次**：启动时读取后即清除，所以「跳过」只作用于紧接着的那一次冷启动。
+> ⚠️ **App 更新 / 覆盖安装后自动失效并重置**（内部记录设置时的 `versionCode`，版本变化即作废），
+> 避免升级后仍跳过、看不到新版本界面。
+> 💡 资源解压仍会照常执行（主界面在遮罩后正常组合），只是视觉上不出现工具箱。
+
+### app.isSkipToolboxNextLaunch / app.是否跳过下次工具箱
+
+查询当前是否已设置「下次启动跳过工具箱」。
+
+**参数**：无
+
+**返回**：`boolean`
+
+```javascript
+if (!app.isSkipToolboxNextLaunch()) {
+  app.skipToolboxNextLaunch(true);
+}
 ```
 
 ---
