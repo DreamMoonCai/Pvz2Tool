@@ -340,6 +340,23 @@ data class SectionItem(
      * 如 "%"、"倍"、"ms" 等。
      */
     val valueSuffix: String? = null,
+    /**
+     * 仅对 SLIDER 类型生效：是否在滑块下方显示「« − 数值 + »」步进行。
+     *
+     * - 单击 ± 步进 [step]，**长按连续增减**；
+     * - `«` / `»` 一键跳到 [minValue] / [maxValue]；
+     * - 默认 `true`（手写需求：滚动条也要 ± 与最小/最大按钮）。
+     *
+     * ```yaml
+     * - id: volume
+     *   type: SLIDER
+     *   minValue: 0
+     *   maxValue: 100
+     *   step: 5
+     *   showStepButtons: false   # 不想要这排按钮就关掉
+     * ```
+     */
+    val showStepButtons: Boolean = true,
     // ========== INPUT 文本输入字段 ==========
     /**
      * 仅对 INPUT 类型生效：输入框的占位提示文字。

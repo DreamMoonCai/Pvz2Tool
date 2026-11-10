@@ -1996,7 +1996,7 @@ var t = ui.select("难度", ["简单", "普通", "困难"]);
 | `onCancel` | function | 无 | 点击取消 / 点外部时触发（无参数） |
 | `selectAll` | boolean | false | 标题栏显示「全选」胶囊按钮，一键勾选/取消当前**过滤后可见**的全部条目 |
 | `searchable` | boolean | false | 标题栏显示「搜索」胶囊按钮，点击展开搜索框按 `name`/`value` 过滤 |
-| `quantity` | boolean \| object | false | 显示数量输入行（`« − 数值 + »`；单击步进、长按连续、`«»` 直达最小/最大）。传 `true` 用默认范围，传对象可自定义：`{min, max, step, default, suffix}` |
+| `quantity` | boolean \| object | false | 显示数量输入行（`Min − 数值 + Max`；单击步进、长按连续、`Min`/`Max` 直达边界）。传 `true` 用默认范围，传对象可自定义：`{min, max, step, default, suffix}` |
 
 **返回**：
 - 未开启 `selectAll` / `searchable` / `quantity` 时：`string[]` —— 选中条目的 `value` 数组（未选为空数组，保持旧行为）
@@ -2092,7 +2092,9 @@ var d = ui.actionSheet("确认删除？", [
 | `default` | number | `min` | 初始值（自动约束到 [min, max]） |
 | `unit` | string | "" | 单位后缀，如 "%"、"px"，仅用于显示 |
 | `decimals` | number | 2 | 当前数值显示的小数位数 |
-| `showValue` | boolean | true | 是否在滑块上方以大字体显示当前数值 |
+| `showValue` | boolean | true | 是否显示当前数值（步进行开启时显示在中间，关闭时在滑块上方大字体显示） |
+| `stepButtons` / `步进按钮` | boolean | true | 滑块**同一行**两侧显示 `Min −`（左）与 `+ Max`（右）：单击 ± 步进 `step`、**长按连续增减**、`Min`/`Max` 直达最小/最大 |
+| `minMaxButtons` / `最值按钮` | boolean | true | 是否显示 `Min` / `Max` 两个直达边界的按钮 |
 | `confirmText` | string | "确定" | 「确定」按钮文字 |
 | `cancelText` | string | "取消" | 「取消」按钮文字 |
 | `confirmColor` | string | "" | 确定按钮背景色 |
@@ -2123,11 +2125,11 @@ var vol = ui.slider("音量", {
 
 **语法**：`ui.number(title, options?) -> number|null`
 
-弹出**数量输入弹窗**（PVZ 风格：绿框黄底），形态为 `[«] [−] 数值 [+] [»]`：
+弹出**数量输入弹窗**（PVZ 风格：绿框黄底），形态为 `[Min] [−] 数值 [+] [Max]`：
 
 - 单击 `+` / `−` 步进一次；
 - **长按 `+` / `−` 连续增减**（按住 400ms 后每 80ms 一次）；
-- `«` / `»` 一键跳到最小值 / 最大值（到达边界后按钮自动禁用）。
+- `Min` / `Max` 一键跳到最小值 / 最大值（到达边界后按钮自动禁用）。
 
 比 `ui.slider` 更适合「买几个」这类需要**精确步进**的场景（滑块靠拖动定位）。
 
@@ -4960,3 +4962,4 @@ console.log(window.__count);
 *新增：notifications 通知对象（show/显示、cancel/取消）+ timer 定时器对象（schedule/注册、list/列表、cancel/取消、cancelAll/全部取消、nextTrigger/下次）。参见新增第 21、22 节*
 *新增：schedules 定时任务配置（dream.yml 顶层 schedules 列表，支持 cron 表达式或 "every Xh/Xm/Xd" 间隔描述，远程回调 JS 触发 notification 等）。参见 config_documentation.md*
 *新增：ui.multiSelect/ui.多选 的 options 新增 selectAll（标题栏「全选」胶囊，仅作用于当前过滤结果）、searchable（标题栏「搜索」胶囊，按 name/value 过滤）、quantity（数量行「±/长按/«»」，支持 true 或 {min,max,step,default,suffix}）。开启任意一项后返回 { values: string[], count: number }（count 未开启 quantity 时为 -1），未开启时仍返回 string[] 保持不变；同时修复 options 里 boolean 用 toKotlin as? Boolean 取值在 keight 下静默失效的问题（改用 toBoolean）*
+*新增：ui.slider/ui.滑块 的 options 新增 stepButtons（与滑块同一行的「Min − [轨道] + Max」：± 单击步进 step、长按 400ms 后每 80ms 连续增减、Min/Max 直达边界，按钮高 30dp 与 20dp 轨道同比例，默认 true）与 minMaxButtons（是否显示 Min/Max，默认 true）；配置栏目 SectionItem 的 SLIDER 同步新增 showStepButtons（默认 true）。最值按钮符号由 « » 改为文字 Min/Max，且与 ± 统一为同一套绿色实心胶囊（原轻量描边样式与 ± 并排像四个不同控件）*

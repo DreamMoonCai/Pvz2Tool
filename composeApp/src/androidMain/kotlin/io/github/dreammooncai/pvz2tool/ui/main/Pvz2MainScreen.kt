@@ -30,6 +30,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import io.github.dreammooncai.pvz2tool.ui.PvzInput
 import io.github.dreammooncai.pvz2tool.ui.PvzNumberInput
+import io.github.dreammooncai.pvz2tool.ui.PvzStepButton
+import io.github.dreammooncai.pvz2tool.ui.PvzJumpButton
+import io.github.dreammooncai.pvz2tool.ui.pvzStepColors
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
@@ -1659,39 +1662,80 @@ private fun DynamicSectionComponent(
                             // 齿轮旋转角度 = 进度 * 360度
                             val rotationAngle = ((currentValue - item.minValue) / (item.maxValue - item.minValue)) * 360f
 
-                            // 水平布局：标题(当前值) | Slider
+                            // 单行布局：标题/说明独占上方，下面一行是「Min − [轨道] + Max」
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                            item.name?.let {
+                                PvzRichText(
+                                    text = "$it ($displayValue)",
+                                    fontSize = 14.sp,
+                                    lineHeight = 18.sp,
+                                    defaultStyle = primaryTextStyle,
+                                )
+                            }
+                            item.desc?.let {
+                                PvzRichText(
+                                    text = "[${"%.2f".format(item.minValue)}~${"%.2f".format(item.maxValue)}${item.valueSuffix ?: ""}] $it",
+                                    fontSize = 11.sp,
+                                    lineHeight = 14.sp,
+                                    defaultStyle = secondaryTextStyle,
+                                )
+                            }
+
+                            val stepColors = pvzStepColors(section.theme)
+                            val stepLo = item.minValue
+                            val stepHi = item.maxValue
+                            val stepSize = if (item.step <= 0f) 1f else item.step
+                            // ⚠️ rememberAssetExtractor 是 @Composable，必须提前取好（局部函数里不能调 Composable）
+                            val stepExtractor = rememberAssetExtractor(context = LocalContext.current)
+
+                            // 步进后立刻写状态并执行该条目脚本；连点由 runUserScript 的 key 取消旧任务
+                            fun applyStep(next: Float) {
+                                val clamped = next.coerceIn(stepLo, stepHi)
+                                onStateChange(state.copy(sliderValues = state.sliderValues + (item.id to clamped)))
+                                val jsScript = item.readJs(section, version) ?: return
+                                JsUiManager.runUserScript(key = "js:${section.id}:${item.id}") {
+                                    PvzToolJsEngine.executeScript(
+                                        extractor = stepExtractor,
+                                        script = jsScript,
+                                        section = section,
+                                        item = item,
+                                        version = version,
+                                        sectionStates = sectionStates,
+                                        updateSectionState = updateSectionState
+                                    )
+                                }
+                            }
+
+                            // 单行：Min − [齿轮轨道] + Max
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
+                                    .padding(vertical = 4.dp)
+                                    .height(40.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // 左侧：标题+当前值
-                                Column(
-                                    modifier = Modifier.padding(end = 12.dp)
-                                ) {
-                                    item.name?.let {
-                                        PvzRichText(
-                                            text = "$it ($displayValue)",
-                                            fontSize = 14.sp,
-                                            lineHeight = 18.sp,
-                                            defaultStyle = primaryTextStyle,
-                                        )
-                                    }
-                                    item.desc?.let {
-                                        PvzRichText(
-                                            text = "[${"%.2f".format(item.minValue)}~${"%.2f".format(item.maxValue)}${item.valueSuffix ?: ""}] $it",
-                                            fontSize = 11.sp,
-                                            lineHeight = 14.sp,
-                                            defaultStyle = secondaryTextStyle,
-                                        )
-                                    }
+                                if (item.showStepButtons) {
+                                    PvzJumpButton(
+                                        label = "Min",
+                                        enabled = currentValue > stepLo,
+                                        colors = stepColors,
+                                        height = 30.dp,
+                                        width = 40.dp,
+                                        onClick = { applyStep(stepLo) }
+                                    )
+                                    PvzStepButton(
+                                        symbol = "−",
+                                        enabled = currentValue > stepLo,
+                                        colors = stepColors,
+                                        width = 36.dp,
+                                        fontSize = 16,
+                                        height = 30.dp,
+                                        onStep = { applyStep(currentValue - stepSize) }
+                                    )
                                 }
-
-                                // 右侧：自定义 PVZ2 齿轮 Slider
                                 val density = LocalDensity.current
                                 BoxWithConstraints(
-                                    modifier = Modifier.weight(1f).padding(end = 10.dp)
+                                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                                 ) {
                                     // 轨道高度和齿轮大小
                                     val trackHeight = 20.dp
@@ -1817,7 +1861,27 @@ private fun DynamicSectionComponent(
                                         )
                                     }
                                 }
-                            }
+                                if (item.showStepButtons) {
+                                    PvzStepButton(
+                                        symbol = "+",
+                                        enabled = currentValue < stepHi,
+                                        colors = stepColors,
+                                        width = 36.dp,
+                                        fontSize = 16,
+                                        height = 30.dp,
+                                        onStep = { applyStep(currentValue + stepSize) }
+                                    )
+                                    PvzJumpButton(
+                                        label = "Max",
+                                        enabled = currentValue < stepHi,
+                                        colors = stepColors,
+                                        height = 30.dp,
+                                        width = 40.dp,
+                                        onClick = { applyStep(stepHi) }
+                                    )
+                                }
+                            } // Column（标题/说明 + 单行 Min − 轨道 + Max）
+                            } // Column（上一行「标题 | 滑块」+ 本行步进）
                         }
 
                         SectionType.INPUT -> {

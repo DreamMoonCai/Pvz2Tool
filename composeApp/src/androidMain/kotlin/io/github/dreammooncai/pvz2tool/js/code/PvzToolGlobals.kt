@@ -448,18 +448,44 @@ object PvzToolGlobals {
             val default = options?.get("default".js, this)?.orNull?.let { toNumber(it).toDouble() } ?: min
             val unit = options?.get("unit".js, this)?.orNull?.let { toString(it) } ?: ""
             val decimals = options?.get("decimals".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 2
-            val showValue = options?.get("showValue".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: true
+            val showValue = options?.get("showValue".js, this)?.orNull?.toBoolean() ?: true
             val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
             val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
             val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
             val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val dismissible = options?.get("dismissible".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
-                ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val dismissible = options?.get("dismissible".js, this)?.orNull?.toBoolean()
+                ?: options?.get("可关闭".js, this)?.orNull?.toBoolean() ?: false
+            // 数量式步进行：「±」长按连续 + 「« »」直达最小/最大，默认开启
+            val showStepButtons = options?.get("stepButtons".js, this)?.orNull?.toBoolean()
+                ?: options?.get("步进按钮".js, this)?.orNull?.toBoolean() ?: true
+            val showMinMaxButtons = options?.get("minMaxButtons".js, this)?.orNull?.toBoolean()
+                ?: options?.get("最值按钮".js, this)?.orNull?.toBoolean() ?: true
             val onChange = bindJsCallback(options, "onChange", runtime)
             val onConfirm = bindJsCallback(options, "onConfirm", runtime)
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onResult = bindJsCallback(options, "onResult", runtime)
-            JsUiManager.showSlider(getJsToolContext(),title, min, max, step, default, unit, decimals, showValue, confirmText, cancelText, confirmColor, cancelColor, dismissible, onChange, onConfirm, onCancel, onResult).await()?.js
+            JsUiManager.showSlider(
+                ownerContext = getJsToolContext(),
+                title = title,
+                min = min,
+                max = max,
+                step = step,
+                default = default,
+                unit = unit,
+                decimals = decimals,
+                showValue = showValue,
+                confirmText = confirmText,
+                cancelText = cancelText,
+                confirmColor = confirmColor,
+                cancelColor = cancelColor,
+                dismissible = dismissible,
+                showStepButtons = showStepButtons,
+                showMinMaxButtons = showMinMaxButtons,
+                onChange = onChange,
+                onConfirm = onConfirm,
+                onCancel = onCancel,
+                onResult = onResult
+            ).await()?.js
         }
 
         // 数量输入弹窗：ui.number(title, options?) -> number | null

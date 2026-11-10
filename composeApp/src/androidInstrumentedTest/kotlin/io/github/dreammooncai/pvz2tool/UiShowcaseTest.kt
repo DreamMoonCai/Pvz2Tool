@@ -74,9 +74,32 @@ class UiShowcaseTest {
             delay(600)
             multiJob.cancel()
 
+            // ================= ② 滑块弹窗（带 ± / « » 步进） =================
+            instrumentation.runOnMainSync {
+                ApiShowcaseState.step = "② 滑块弹窗：ui.slider（滑块下方 ± / « » 步进，可手动点按/长按）"
+            }
+            val sliderJob = launch(Dispatchers.Main) {
+                runCatching {
+                    JsUiManager.showSlider(
+                        ownerContext = null,
+                        title = "音量调节",
+                        min = 0.0,
+                        max = 100.0,
+                        step = 5.0,
+                        default = 50.0,
+                        unit = "%",
+                        decimals = 0
+                    ).await()
+                }
+            }
+            delay(9_000)
+            JsUiManager.hideSlider()
+            delay(500)
+            sliderJob.cancel()
+
             // ================= ② 数量弹窗（ui.number） =================
             instrumentation.runOnMainSync {
-                ApiShowcaseState.step = "② 数量弹窗：ui.number（± / 长按 / « »）"
+                ApiShowcaseState.step = "③ 数量弹窗：ui.number（± / 长按 / « »）"
             }
             val numberJob = launch(Dispatchers.Main) {
                 runCatching {

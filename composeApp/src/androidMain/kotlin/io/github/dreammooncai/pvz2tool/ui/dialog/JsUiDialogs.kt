@@ -21,6 +21,10 @@ import androidx.compose.ui.graphics.SolidColor
 import io.github.dreammooncai.pvz2tool.Pvz2ToolConfigUIChoiceActions
 import io.github.dreammooncai.pvz2tool.ui.PvzInput
 import io.github.dreammooncai.pvz2tool.ui.PvzNumberInput
+import io.github.dreammooncai.pvz2tool.ui.PvzJumpButton
+import io.github.dreammooncai.pvz2tool.ui.PvzStepButton
+import io.github.dreammooncai.pvz2tool.ui.pvzStepColors
+import io.github.dreammooncai.pvz2tool.ui.stepSlider
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.material3.*
@@ -274,6 +278,8 @@ data class JsSliderState(
     val unit: String = "",
     val decimals: Int = 2, // 显示小数位
     val showValue: Boolean = true, // 是否显示当前数值大字体
+    val showStepButtons: Boolean = true, // 是否显示「« − 数值 + »」步进行（± 长按连续、«» 直达边界）
+    val showMinMaxButtons: Boolean = true, // 步进行里是否显示 « » 按钮
     val confirmText: String = "确定",
     val cancelText: String = "取消",
     val confirmColor: String = "",
@@ -1274,6 +1280,10 @@ object JsUiManager {
         confirmColor: String = "",
         cancelColor: String = "",
         dismissible: Boolean = false,
+        /** 是否显示「« − 数值 + »」步进行（± 长按连续、«» 直达边界） */
+        showStepButtons: Boolean = true,
+        /** 步进行里是否显示 « » 按钮 */
+        showMinMaxButtons: Boolean = true,
         onChange: (suspend (JsAny?) -> Unit)? = null,
         onConfirm: (suspend (JsAny?) -> Unit)? = null,
         onCancel: (suspend (JsAny?) -> Unit)? = null,
@@ -1293,6 +1303,8 @@ object JsUiManager {
             unit = unit,
             decimals = decimals.coerceAtLeast(0),
             showValue = showValue,
+            showStepButtons = showStepButtons,
+            showMinMaxButtons = showMinMaxButtons,
             confirmText = confirmText,
             cancelText = cancelText,
             confirmColor = confirmColor,
@@ -2707,6 +2719,7 @@ fun JsSliderDialog() {
                     }
                 }) {
                 Spacer(modifier = Modifier.height(8.dp))
+                // 数值仍显示在上方（大字），步进按钮与轨道合成一行：Min − [轨道] + Max
                 if (state.showValue) {
                     PvzRichText(
                         text = String.format(fmt, sliderValue) + unitSuffix,
@@ -2717,7 +2730,14 @@ fun JsSliderDialog() {
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                } // 自定义 PVZ2 齿轮滑块（样式参考 SectionType.SLIDER）
+                }
+                val stepColors = pvzStepColors(null)
+                // 步进 / 跳边界的统一入口：改值 + 触发 onChange
+                fun applySliderValue(next: Double) {
+                    sliderValue = next
+                    state.onChange?.let { cb -> scope.launch { cb(next.js) } }
+                }
+                Spacer(modifier = Modifier.height(6.dp)) // 自定义 PVZ2 齿轮滑块（样式参考 SectionType.SLIDER）
                 val activeColor = PvzCollapsiblePanelTheme.GREEN.sliderActiveColor
                 val inactiveColor = PvzCollapsiblePanelTheme.GREEN.sliderInactiveColor
                 val activeGradientTop = activeColor.copy(
@@ -2746,11 +2766,44 @@ fun JsSliderDialog() {
                 val gearSizePx =
                     with(density) { gearSize.toPx() } // 用 onSizeChanged 捕获宽度，避免 BoxWithConstraints(SubcomposeLayout) 在 Dialog 内被父布局请求 intrinsic 测量而崩溃
                 var trackWidthPx by remember { mutableFloatStateOf(0f) }
-                Box(
+                // 单行：[Min] [−] [轨道] [+] [Max]（手写需求：滚动条也要 ± 长按与最小/最大按钮）
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp)
-                        .onSizeChanged { trackWidthPx = it.width.toFloat() }) {
+                        .height(40.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (state.showStepButtons) {
+                        if (state.showMinMaxButtons) {
+                            PvzJumpButton(
+                                label = "Min",
+                                enabled = sliderValue > state.min,
+                                colors = stepColors,
+                                height = 30.dp,
+                                width = 40.dp,
+                                onClick = { applySliderValue(state.min) }
+                            )
+                        }
+                        PvzStepButton(
+                            symbol = "−",
+                            enabled = sliderValue > state.min,
+                            colors = stepColors,
+                            width = 38.dp,
+                            fontSize = 18,
+                            height = 30.dp,
+                            onStep = {
+                                applySliderValue(
+                                    stepSlider(sliderValue, -state.step, state.min, state.max, state.decimals)
+                                )
+                            }
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp)
+                            .onSizeChanged { trackWidthPx = it.width.toFloat() }) {
                     Box(
                         modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center
                     ) { // 轨道容器（圆角胶囊形状）
@@ -2810,7 +2863,7 @@ fun JsSliderDialog() {
                             steps = steps,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp),
+                                .height(40.dp),
                             colors = SliderDefaults.colors(
                                 thumbColor = Color.Transparent,
                                 activeTrackColor = Color.Transparent,
@@ -2819,6 +2872,32 @@ fun JsSliderDialog() {
                                 inactiveTickColor = Color.Transparent
                             )
                         )
+                    }
+                    }
+                    if (state.showStepButtons) {
+                        PvzStepButton(
+                            symbol = "+",
+                            enabled = sliderValue < state.max,
+                            colors = stepColors,
+                            width = 38.dp,
+                            fontSize = 18,
+                            height = 30.dp,
+                            onStep = {
+                                applySliderValue(
+                                    stepSlider(sliderValue, state.step, state.min, state.max, state.decimals)
+                                )
+                            }
+                        )
+                        if (state.showMinMaxButtons) {
+                            PvzJumpButton(
+                                label = "Max",
+                                enabled = sliderValue < state.max,
+                                colors = stepColors,
+                                height = 30.dp,
+                                width = 40.dp,
+                                onClick = { applySliderValue(state.max) }
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))

@@ -225,8 +225,33 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
 
         Spacer(Modifier.height(6.dp))
 
-        // ========== ② 数量弹窗 ==========
-        ShowcaseLabel("② 数量弹窗：ui.number(title, options)")
+        // ========== ② 滑块弹窗（同样带 ±/«» 步进） ==========
+        ShowcaseLabel("② 滑块弹窗：ui.slider(title, options)")
+        Text(
+            text = "滚动条下方同样有一排「« − 数值 + »」：单击 ± 步进 step、长按连续增减、" +
+                    "「«」「»」直达最小 / 最大。\n不需要这排按钮就传 { stepButtons:false }。",
+            color = Color(0xFF8A9199),
+            fontSize = 12.sp
+        )
+        ShowcaseActionButton("弹出滑块弹窗（ui.slider）") {
+            scope.launch {
+                JsUiManager.showSlider(
+                    ownerContext = null,
+                    title = "音量调节",
+                    min = 0.0,
+                    max = 100.0,
+                    step = 5.0,
+                    default = 50.0,
+                    unit = "%",
+                    decimals = 0
+                ).await()
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        // ========== ③ 数量弹窗 ==========
+        ShowcaseLabel("③ 数量弹窗：ui.number(title, options)")
         Text(
             text = "ui.number('购买数量', {min:1, max:99, step:1, suffix:'个'}) 弹窗，点确定返回数值（取消返回 null）。",
             color = Color(0xFF8A9199),
