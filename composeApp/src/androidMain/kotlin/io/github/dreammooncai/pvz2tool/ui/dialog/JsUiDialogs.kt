@@ -2695,7 +2695,12 @@ fun JsNumberDialog() {
                 step = state.step,
                 suffix = state.suffix.ifBlank { null },
                 showMinMaxButtons = state.showMinMaxButtons,
-                modifier = Modifier.fillMaxWidth()
+                // ⚠️ PvzStyledDialog 的 modifier（padding horizontal 20dp）只作用于探测层与
+                // 底部按钮区，内容槽拿不到 → 必须自己补左右边距，否则数量条会贴到弹窗内边
+                //（与 slider / prompt 等弹窗的既有写法一致）。
+                modifier = Modifier
+                    .padding(horizontal = 20.dp)
+                    .fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
