@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  仅 androidTest 使用的清单：注册「JS API 调用演示」Activity。
-  它不会打进正式 APK（只合并进 test APK）。
+  仅 debug 变体使用的清单：注册「JS API 调用演示」Activity。
+  它不会打进正式 APK（只合并进 debug 包）。
+
+  ⚠️ exported="true" 只是为了能用 `adb shell am start` 手动打开演示页
+  （instrumented 测试走 targetContext 启动，不依赖导出）。仅 debug，不进 release。
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application>
         <activity
             android:name="io.github.dreammooncai.pvz2tool.ApiShowcaseActivity"
-            android:exported="false"
+            android:exported="true"
             android:label="JS API 演示"
             android:theme="@android:style/Theme.Material.Light.NoActionBar"
             android:configChanges="density|keyboardHidden|layoutDirection|navigation|orientation|screenLayout|screenSize|smallestScreenSize" />

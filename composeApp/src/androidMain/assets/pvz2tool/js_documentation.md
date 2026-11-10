@@ -148,7 +148,7 @@
 | `ui.progress().isCancelled()` | `ui.进度.是否已取消()` | 是否已取消 |
 | `ui.extract()` | `ui.解压()` | 解压根资源 |
 | `ui.select()` | `ui.选择()` | 单项选择弹窗（图标网格 / 列表 / 纯文字单选） |
-| `ui.multiSelect()` | `ui.多选()` | 多项选择弹窗（返回选中值数组） |
+| `ui.multiSelect()` | `ui.多选()` | 多项选择弹窗（返回选中值数组；开启 selectAll/searchable/quantity 时返回 `{values, count}`） |
 | `ui.showGameDisplay()` | `ui.弹出画面设置()` / `ui.画面设置()` | 弹出游戏画面设置全屏浮窗（同悬浮球"画面设置"） |
 | `ui.isCustomGameDisplayEnabled()` | `ui.是否启用自定义画面()` / `ui.画面设置是否可用()` | 「自定义游戏画面」开关是否已开启（可用作 `isShowFromJs` 条件） |
 | `ui.refreshAll()` | `ui.刷新所有()` / `ui.刷新复合文本()` | 主动刷新所有复合文本与动态显隐（见下方详解） |
@@ -1994,10 +1994,17 @@ var t = ui.select("难度", ["简单", "普通", "困难"]);
 | `cancelColor` | string | "" | 取消按钮背景色 |
 | `onSelect` | function | 无 | 选中集合变化时触发（收到当前选中 `value` 数组） |
 | `onCancel` | function | 无 | 点击取消 / 点外部时触发（无参数） |
+| `selectAll` | boolean | false | 标题栏显示「全选」胶囊按钮，一键勾选/取消当前**过滤后可见**的全部条目 |
+| `searchable` | boolean | false | 标题栏显示「搜索」胶囊按钮，点击展开搜索框按 `name`/`value` 过滤 |
+| `quantity` | boolean \| object | false | 显示数量输入行（`« − 数值 + »`；单击步进、长按连续、`«»` 直达最小/最大）。传 `true` 用默认范围，传对象可自定义：`{min, max, step, default, suffix}` |
 
-**返回**：string[] - 选中条目的 `value` 数组（未选返回空数组）
+**返回**：
+- 未开启 `selectAll` / `searchable` / `quantity` 时：`string[]` —— 选中条目的 `value` 数组（未选为空数组，保持旧行为）
+- 开启任意一项后：`{ values: string[], count: number }` —— `count` 为数量输入值（未开启 `quantity` 时为 `-1`）
 
 **布局**：与 `ui.select` 一致；纯文字模式每条目前带勾选标记，有图标模式选中后在图标右上角显示勾标。需点击「确定」确认，或「取消」清空。
+
+> 「全选」只作用于**当前过滤结果**：搜索「阳光」时点全选，只会勾选名字含「阳光」的条目，被过滤掉的条目选中状态不变。
 
 **示例**：
 ```javascript
@@ -2009,6 +2016,22 @@ var arr = ui.multiSelect("选择水果", items, {
     onSelect: function (vals) { console.log("当前选择：" + vals.join(",")) }
 });
 console.log("已选：" + arr.join(", "));
+```
+
+**示例（全选 + 搜索 + 数量）**：
+```javascript
+var result = ui.multiSelect("选择要启用的功能", [
+    { name: "阳光无限", value: "sun" },
+    { name: "冷却无CD", value: "cool" },
+    { name: "自动收集", value: "auto" }
+], {
+    defaultValues: ["sun"],
+    selectAll: true,          // 标题栏「全选」
+    searchable: true,         // 标题栏「搜索」
+    quantity: { min: 1, max: 99, step: 1, default: 3, suffix: "个" }
+});
+// result.values -> ["sun", "cool"]，result.count -> 3
+console.log("已选 " + result.values.length + " 项，数量 " + result.count);
 ```
 
 #### ui.actionSheet / ui.操作菜单
@@ -4936,3 +4959,4 @@ console.log(window.__count);
 *修正：dex/reflect 句柄机制由「id 注册表 + 句柄」重构为 keight 原生 `Wrapper<T>` 子类（消除全局注册表与所有 `.id` 属性，`convertArg` 退化为 `arg.toKotlin(runtime)`）；并移除 `dex.of/取加载器` 与 `reflect.of/取类` 两个按 id 取回的方法（句柄本身即携带原始对象，无需按 id 找回）*
 *新增：notifications 通知对象（show/显示、cancel/取消）+ timer 定时器对象（schedule/注册、list/列表、cancel/取消、cancelAll/全部取消、nextTrigger/下次）。参见新增第 21、22 节*
 *新增：schedules 定时任务配置（dream.yml 顶层 schedules 列表，支持 cron 表达式或 "every Xh/Xm/Xd" 间隔描述，远程回调 JS 触发 notification 等）。参见 config_documentation.md*
+*新增：ui.multiSelect/ui.多选 的 options 新增 selectAll（标题栏「全选」胶囊，仅作用于当前过滤结果）、searchable（标题栏「搜索」胶囊，按 name/value 过滤）、quantity（数量行「±/长按/«»」，支持 true 或 {min,max,step,default,suffix}）。开启任意一项后返回 { values: string[], count: number }（count 未开启 quantity 时为 -1），未开启时仍返回 string[] 保持不变；同时修复 options 里 boolean 用 toKotlin as? Boolean 取值在 keight 下静默失效的问题（改用 toBoolean）*

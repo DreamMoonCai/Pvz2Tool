@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,6 +52,11 @@ import kotlinx.coroutines.launch
 fun PvzDialogCard(
     title: String? = null,
     modifier: Modifier = Modifier,
+    /**
+     * 标题栏右侧的操作插槽（如多选弹窗的「全选 / 搜索」按钮）。
+     * 传了内容时标题改为居中布局 + 右侧浮层，按钮不挤占标题。
+     */
+    headerTrailingContent: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit
 ) {
     Box(
@@ -69,7 +76,7 @@ fun PvzDialogCard(
             modifier = Modifier.padding(vertical = if (title != null) 10.dp else 8.dp)
         ) {
             if (title != null) {
-                // 标题栏
+                // 标题栏（标题居中；右侧浮层放操作按钮，避免挤占/换行）
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -81,7 +88,16 @@ fun PvzDialogCard(
                         title,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        defaultStyle = PvzTextWhiteStyle.copy(shadowColor = null)
+                        defaultStyle = PvzTextWhiteStyle.copy(shadowColor = null),
+                        // 左右留出胶囊按钮的空间，标题过长时在中间区域换行而不是与按钮重叠
+                        modifier = Modifier.padding(horizontal = 112.dp)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        content = headerTrailingContent
                     )
                 }
                 Box(modifier = Modifier.height(20.dp))
@@ -110,6 +126,8 @@ fun PvzStyledDialog(
     verticalArrangement: Arrangement.Vertical = Arrangement.Top,
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
     forceMaxForm: Boolean = false,
+    /** 标题栏右侧操作插槽（如多选弹窗的「全选 / 搜索」） */
+    headerTrailingContent: @Composable RowScope.() -> Unit = {},
     bottomContent: @Composable (ColumnScope.() -> Unit) = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -123,7 +141,8 @@ fun PvzStyledDialog(
         ) {
             PvzDialogCard(
                 title = titleText,
-                modifier = Modifier.fillMaxWidth(0.5f)
+                modifier = Modifier.fillMaxWidth(0.5f),
+                headerTrailingContent = headerTrailingContent
             ) {
                     // 核心：和 PvzPopupContent 完全一致的 探测+滚动显示 逻辑
                     PerfectAdaptiveLayout(

@@ -318,7 +318,13 @@ object PvzToolGlobals {
         }
 
         // 多项选择弹窗：ui.multiSelect(title, items, options?) -> string[]
-        // options: { defaultValues?, columns?, cancelable?, showIndex?, showIndexColor?, confirmText?, cancelText?, confirmColor?, cancelColor?, forceMaxForm?, onCancel?, onSelect? }
+        //   options.selectAll / searchable / quantity 任一开启时，确定返回对象：
+        //   { values: string[], count: number }（count 仅在 quantity 开启时有效）
+        // options: { defaultValues?, columns?, cancelable?, showIndex?, showIndexColor?, confirmText?, cancelText?,
+        //           confirmColor?, cancelColor?, forceMaxForm?,
+        //           selectAll?（右上角全选）, searchable?（右上角搜索）,
+        //           quantity?（数量输入：true 或 {min,max,step,default,suffix}）,
+        //           onCancel?, onSelect?, onResult? }
         //   forceMaxForm: true 时以最高形态展示（内容区固定上限高度，跳过探测重测，适合内容很多的场景）
         listOf("multiSelect".js, "多选".js).func(
             FunctionParam("title"), FunctionParam("items"), FunctionParam("options")
@@ -331,19 +337,78 @@ object PvzToolGlobals {
             val defaultValues = options?.get("defaultValues".js, this)?.let { it.toKotlin(this) as? List<*> }
                 ?.mapNotNull { it?.toString() }
             val columns = (options?.get("columns".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 4).coerceIn(2, 6)
-            val cancelable = options?.get("cancelable".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
-            val showIndex = options?.get("showIndex".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            // 🔴 布尔一律走 toBoolean()：`toKotlin() as? Boolean` 在 keight 下取不到值会静默变 false
+            val cancelable = options?.get("cancelable".js, this)?.orNull?.toBoolean() ?: false
+            val showIndex = options?.get("showIndex".js, this)?.orNull?.toBoolean() ?: false
             val showIndexColor = toString((options?.get("showIndexColor".js, this).orNull ?: options?.get("序号颜色".js, this).orNull ?: "black".js))
             val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
             val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
             val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
             val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val forceMaxForm = options?.get("forceMaxForm".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
-                ?: options?.get("最高形态".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            var forceMaxForm = options?.get("forceMaxForm".js, this)?.orNull?.toBoolean()
+                ?: options?.get("最高形态".js, this)?.orNull?.toBoolean() ?: false
+
+            // ===== 多选增强：全选 / 搜索 / 数量 =====
+            val selectAllEnabled = options?.get("selectAll".js, this)?.orNull?.toBoolean()
+                ?: options?.get("全选".js, this)?.orNull?.toBoolean() ?: false
+            val searchEnabled = options?.get("searchable".js, this)?.orNull?.toBoolean()
+                ?: options?.get("search".js, this)?.orNull?.toBoolean()
+                ?: options?.get("搜索".js, this)?.orNull?.toBoolean() ?: false
+            // quantity: false | true | {min,max,step,default,suffix}
+            val quantityRaw = options?.get("quantity".js, this)?.orNull
+                ?: options?.get("数量".js, this)?.orNull
+            val quantityObject = quantityRaw as? JsObject
+            val quantityEnabled = when {
+                quantityObject != null -> true
+                else -> quantityRaw?.toBoolean() ?: false
+            }
+            val quantityMin = quantityObject?.get("min".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 1
+            val quantityMax = quantityObject?.get("max".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 99
+            val quantityStep = quantityObject?.get("step".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 1
+            val quantityDefault = quantityObject?.get("default".js, this)?.orNull?.let { toNumber(it).toInt() }
+                ?: quantityObject?.get("value".js, this)?.orNull?.let { toNumber(it).toInt() }
+                ?: quantityMin
+            val quantitySuffix = quantityObject?.get("suffix".js, this)?.orNull?.let { toString(it) }
+                ?: quantityObject?.get("unit".js, this)?.orNull?.let { toString(it) } ?: ""
+
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onSelect = bindJsCallback(options, "onSelect", runtime)
             val onResult = bindJsCallback(options, "onResult", runtime)
-            JsUiManager.showMultiSelect(getJsToolContext(),title, items, defaultValues, columns, cancelable, showIndex, showIndexColor, confirmText, cancelText, confirmColor, cancelColor, forceMaxForm, onCancel, onSelect, onResult).await().map { it.js }.js
+            val result = JsUiManager.showMultiSelect(
+                ownerContext = getJsToolContext(),
+                title = title,
+                items = items,
+                defaultValues = defaultValues,
+                columns = columns,
+                cancelable = cancelable,
+                showIndex = showIndex,
+                showIndexColor = showIndexColor,
+                confirmText = confirmText,
+                cancelText = cancelText,
+                confirmColor = confirmColor,
+                cancelColor = cancelColor,
+                forceMaxForm = forceMaxForm,
+                selectAllEnabled = selectAllEnabled,
+                searchEnabled = searchEnabled,
+                quantityEnabled = quantityEnabled,
+                quantityMin = quantityMin,
+                quantityMax = quantityMax,
+                quantityStep = quantityStep,
+                quantityDefault = quantityDefault,
+                quantitySuffix = quantitySuffix,
+                onCancel = onCancel,
+                onSelect = onSelect,
+                onResult = onResult
+            ).await()
+            // 未开启增强能力时保持旧返回：纯 string[]；开启后返回 { values, count }
+            if (!selectAllEnabled && !searchEnabled && !quantityEnabled) {
+                result.values.map { it.js }.js
+            } else {
+                Object {
+                    listOf("values".js).eq(result.values.map { it.js }.js)
+                    listOf("count".js).eq(result.count.js)
+                }
+            }
         }
 
         // 操作菜单弹窗：ui.actionSheet(title, actions, options?) -> string|null

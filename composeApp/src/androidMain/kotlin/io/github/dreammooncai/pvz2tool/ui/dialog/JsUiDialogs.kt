@@ -11,7 +11,14 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.graphics.SolidColor
+import io.github.dreammooncai.pvz2tool.Pvz2ToolConfigUIChoiceActions
 import io.github.dreammooncai.pvz2tool.ui.PvzInput
 import io.github.dreammooncai.pvz2tool.ui.PvzNumberInput
 import androidx.compose.ui.draw.clip
@@ -208,10 +215,33 @@ data class JsSelectState(
     val showIndex: Boolean = false, // 是否在图标上居中叠加序号（1 开始）
     val showIndexColor: String = "black", // 序号颜色：外层统一控制，"black" | "white"
     val forceMaxForm: Boolean = false, // 开启后以最高形态展示（内容区固定上限高度，跳过探测重测）
+    // ===== 多选增强（对应手写需求：右上角全选、右上角搜索、数量输入 ± ）=====
+    /** 标题栏显示「全选」按钮（仅对当前**过滤后可见**的条目生效，与搜索可叠加） */
+    val selectAllEnabled: Boolean = false,
+    /** 标题栏显示「搜索」按钮，点击展开搜索框按名称过滤 */
+    val searchEnabled: Boolean = false,
+    /** 显示数量输入行（±/长按/min-max），确定时把数值一并返回 */
+    val quantityEnabled: Boolean = false,
+    val quantityMin: Int = 1,
+    val quantityMax: Int = 99,
+    val quantityStep: Int = 1,
+    val quantityDefault: Int = 1,
+    val quantitySuffix: String = "",
     val onCancel: (suspend (JsAny?) -> Unit)? = null,
     val onSelect: (suspend (JsAny?) -> Unit)? = null, // 单选：选中某项(value)即触发；多选：选中集合(values)变化时触发
     val deferredSingle: CompletableDeferred<String?>? = null,
-    val deferredMulti: CompletableDeferred<List<String>>? = null
+    val deferredMulti: CompletableDeferred<MultiSelectResult>? = null
+)
+
+/**
+ * 多选弹窗的确认结果。
+ *
+ * [values] 是选中项的值列表（与旧版返回值完全一致）；
+ * [count] 是数量输入的值，未开启 `quantity` 时为 `-1`（JS 侧据此决定返回数组还是对象）。
+ */
+data class MultiSelectResult(
+    val values: List<String> = emptyList(),
+    val count: Int = -1
 )
 
 /** 操作菜单中的单个动作 */
@@ -1040,8 +1070,11 @@ object JsUiManager {
     }
 
     /**
-     * 显示多项选择弹窗，返回 CompletableDeferred<List<String>>（选中项 value 列表）
+     * 显示多项选择弹窗，返回 CompletableDeferred<MultiSelectResult>
      * @param defaultValues 默认选中项的 name 或 value 列表
+     * @param selectAllEnabled 标题栏显示「全选」按钮（作用于过滤后可见条目）
+     * @param searchEnabled 标题栏显示「搜索」按钮
+     * @param quantityEnabled 显示数量输入行（±/长按/min-max），确定时把数值随结果一起返回
      */
     fun showMultiSelect(
         ownerContext: JsToolContext?,
@@ -1057,11 +1090,19 @@ object JsUiManager {
         confirmColor: String = "",
         cancelColor: String = "",
         forceMaxForm: Boolean = false,
+        selectAllEnabled: Boolean = false,
+        searchEnabled: Boolean = false,
+        quantityEnabled: Boolean = false,
+        quantityMin: Int = 1,
+        quantityMax: Int = 99,
+        quantityStep: Int = 1,
+        quantityDefault: Int = 1,
+        quantitySuffix: String = "",
         onCancel: (suspend (JsAny?) -> Unit)? = null,
         onSelect: (suspend (JsAny?) -> Unit)? = null,
         onResult: (suspend (JsAny?) -> Unit)? = null
-    ): CompletableDeferred<List<String>> {
-        val deferred = CompletableDeferred<List<String>>()
+    ): CompletableDeferred<MultiSelectResult> {
+        val deferred = CompletableDeferred<MultiSelectResult>()
         val defaults = defaultValues ?: emptyList()
         val defaultIndices = items.mapIndexedNotNull { i, it ->
             if (it.value in defaults || it.name in defaults) i else null
@@ -1081,6 +1122,14 @@ object JsUiManager {
             confirmColor = confirmColor,
             cancelColor = cancelColor,
             forceMaxForm = forceMaxForm,
+            selectAllEnabled = selectAllEnabled,
+            searchEnabled = searchEnabled,
+            quantityEnabled = quantityEnabled,
+            quantityMin = quantityMin,
+            quantityMax = quantityMax,
+            quantityStep = quantityStep,
+            quantityDefault = quantityDefault.coerceIn(quantityMin, quantityMax),
+            quantitySuffix = quantitySuffix,
             onCancel = onCancel,
             onSelect = onSelect,
             deferredMulti = deferred
@@ -1896,7 +1945,31 @@ fun JsItemChoiceDialog() {
             .collect { JsUiManager.saveDraft(state, it) }
     }
 
+    // ===== 多选增强：搜索 / 数量（纯 UI 状态，随弹窗实例重置）=====
+    val isMulti = state.mode == "multi"
+    val actionTexts = if (InitializePvz2.isConfigReady()) {
+        InitializePvz2.config.ui.choiceActions
+    } else {
+        Pvz2ToolConfigUIChoiceActions()
+    }
+    var searchVisible by remember(choiceKey) { mutableStateOf(false) }
+    var searchQuery by remember(choiceKey) { mutableStateOf("") }
+    var quantity by remember(choiceKey) { mutableIntStateOf(state.quantityDefault) }
+
+    // 过滤后仍保留**原始下标**：选中态以原始下标为键，搜索期间勾选不会串条目
+    val visibleChoices = ChoiceFilter.filterWithIndex(state.items, searchQuery)
+    val visibleIndices = visibleChoices.map { it.first }
+    val allVisibleSelected = ChoiceFilter.isAllSelected(selectedIndices, visibleIndices)
+
     val scope = rememberCoroutineScope()
+
+    /** 把当前选中集合推给 onSelect 回调（与逐项点选保持同一套语义） */
+    fun notifySelection() {
+        val vals = selectedIndices.sorted().map { state.items[it].value.js }
+        JsUiManager.uiScope.launch {
+            JsUiManager.launchCallback(JsUiManager.frameByState(state)) { state.onSelect?.invoke(vals.js) }
+        }
+    }
 
     // 统一选择处理：单项立即返回，多项切换选中集合
     val onSelect: (Int) -> Unit = { i ->
@@ -1905,8 +1978,7 @@ fun JsItemChoiceDialog() {
             scope.launch { JsUiManager.dismissSelfWithCallback(state, value) { state.onSelect?.invoke(value.js) } }
         } else {
             selectedIndices = if (i in selectedIndices) selectedIndices - i else selectedIndices + i
-            val vals = selectedIndices.sorted().map { state.items[it].value.js }
-            JsUiManager.uiScope.launch { JsUiManager.launchCallback(JsUiManager.frameByState(state)) { state.onSelect?.invoke(vals.js) } }
+            notifySelection()
         }
     }
 
@@ -1916,7 +1988,7 @@ fun JsItemChoiceDialog() {
                 isVisible = true,
                 titleText = state.title,
                 onDismissRequest = {
-                    val cancelResult: Any? = if (state.mode == "multi") emptyList<String>() else null
+                    val cancelResult: Any? = if (isMulti) MultiSelectResult() else null
                     scope.launch {
                         JsUiManager.dismissSelfWithCallback(state, cancelResult) {
                             state.onCancel?.invoke(
@@ -1931,6 +2003,31 @@ fun JsItemChoiceDialog() {
                     .padding(horizontal = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 forceMaxForm = state.forceMaxForm,
+                // 标题栏右侧：全选 / 搜索（PVZ 文字胶囊，仅多选且显式开启时出现）
+                headerTrailingContent = {
+                    if (isMulti && state.selectAllEnabled) {
+                        ChoiceHeaderChip(
+                            label = if (allVisibleSelected) actionTexts.unselectAll else actionTexts.selectAll,
+                            active = allVisibleSelected
+                        ) {
+                            selectedIndices = ChoiceFilter.applySelectAll(
+                                selected = selectedIndices,
+                                indices = visibleIndices,
+                                select = !allVisibleSelected
+                            )
+                            notifySelection()
+                        }
+                    }
+                    if (isMulti && state.searchEnabled) {
+                        ChoiceHeaderChip(
+                            label = if (searchVisible) actionTexts.searchClose else actionTexts.search,
+                            active = searchVisible
+                        ) {
+                            searchVisible = !searchVisible
+                            if (!searchVisible) searchQuery = ""
+                        }
+                    }
+                },
                 bottomContent = {
                     Spacer(modifier = Modifier.height(16.dp))
                     if (state.mode == "multi") {
@@ -1946,7 +2043,7 @@ fun JsItemChoiceDialog() {
                             ) {
                                 scope.launch {
                                     JsUiManager.dismissSelfWithCallback(
-                                        state, emptyList<String>()
+                                        state, MultiSelectResult()
                                     ) { state.onCancel?.invoke(null) }
                                 }
                             }
@@ -1958,7 +2055,12 @@ fun JsItemChoiceDialog() {
                                     .height(48.dp)
                             ) {
                                 val vals = selectedIndices.sorted().map { state.items[it].value }
-                                scope.launch { JsUiManager.dismissSelfWithCallback(state, vals) }
+                                // 数量未开启时 count = -1，JS 侧据此仍返回数组（保持旧行为）
+                                val result = MultiSelectResult(
+                                    values = vals,
+                                    count = if (state.quantityEnabled) quantity else -1
+                                )
+                                scope.launch { JsUiManager.dismissSelfWithCallback(state, result) }
                             }
                         }
                     } else {
@@ -1979,6 +2081,41 @@ fun JsItemChoiceDialog() {
                         }
                     }
                 }) {
+                // ===== 多选增强：搜索框 / 数量输入（顺序：搜索 → 数量 → 列表）=====
+                if (isMulti && state.searchEnabled && searchVisible) {
+                    ChoiceSearchField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        hint = actionTexts.searchHint,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                if (isMulti && state.quantityEnabled) {
+                    PvzNumberInput(
+                        value = quantity,
+                        onValueChange = { quantity = it },
+                        min = state.quantityMin,
+                        max = state.quantityMax,
+                        step = state.quantityStep,
+                        suffix = state.quantitySuffix.ifBlank { null },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                if (isMulti && searchQuery.isNotBlank() && visibleChoices.isEmpty()) {
+                    PvzRichText(
+                        text = actionTexts.searchEmpty,
+                        fontSize = 13.sp,
+                        defaultStyle = PvzTextStyle(Color(0xFF7A6A2A)),
+                        modifier = Modifier.padding(vertical = 10.dp)
+                    )
+                }
+
                 if (isGrid) {
                     val columns = state.columns.coerceIn(2, 6)
                     if (state.forceMaxForm) { // 最高形态：选项可能极多，用 LazyVerticalGrid 懒加载（仅组合可见项）
@@ -1988,7 +2125,8 @@ fun JsItemChoiceDialog() {
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            itemsIndexed(state.items) { i, item ->
+                            itemsIndexed(visibleChoices) { _, choice ->
+                                val (i, item) = choice
                                 GridChoiceCell(
                                     modifier = Modifier.fillMaxWidth(),
                                     item = item,
@@ -2002,8 +2140,7 @@ fun JsItemChoiceDialog() {
                             }
                         }
                     } else {
-                        val indexed = state.items.mapIndexed { i, item -> i to item }
-                        val rows = indexed.chunked(columns)
+                        val rows = visibleChoices.chunked(columns)
                         Column(
                             verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()
                         ) {
@@ -2033,7 +2170,8 @@ fun JsItemChoiceDialog() {
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()
                         ) {
-                            itemsIndexed(state.items) { i, item ->
+                            itemsIndexed(visibleChoices) { _, choice ->
+                                val (i, item) = choice
                                 ListChoiceRow(
                                     item = item,
                                     index = i,
@@ -2050,7 +2188,7 @@ fun JsItemChoiceDialog() {
                         Column(
                             verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()
                         ) {
-                            state.items.forEachIndexed { i, item ->
+                            visibleChoices.forEach { (i, item) ->
                                 ListChoiceRow(
                                     item = item,
                                     index = i,
@@ -2064,6 +2202,122 @@ fun JsItemChoiceDialog() {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 弹窗标题栏（绿色渐变条）上的小胶囊按钮：「全选 / 搜索」。
+ *
+ * 为什么用**文字胶囊**而不是纯图标（用户反馈「违和、图标不好看」）：
+ * Material 线性图标是细描边风格，放在 PVZ 的卡通厚描边绿条上格格不入；
+ * 改成奶黄底 + 深橄榄描边的胶囊，和弹窗本体（奶黄底 + 绿框）同一套配色，
+ * 文字也比图标更容易看懂当前状态。
+ *
+ * 激活态（已全选 / 搜索展开中）切到亮绿渐变，与「确定」按钮同族。
+ */
+@Composable
+private fun ChoiceHeaderChip(
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(9.dp)
+    val background = if (active) {
+        Brush.verticalGradient(listOf(Color(0xFFB7EA63), Color(0xFF8ED229)))
+    } else {
+        Brush.verticalGradient(listOf(Color(0xFFFBF8DC), Color(0xFFEFE9AE)))
+    }
+    val textColor = if (active) Color(0xFF2C3B06) else Color(0xFF42520F)
+    val interaction = if (InitializePvz2.isConfigReady()) {
+        rememberSoundInteractionSource(
+            InitializePvz2.config.ui.sounds.switchClickPress,
+            InitializePvz2.config.ui.sounds.switchClickRelease
+        )
+    } else {
+        remember { MutableInteractionSource() }
+    }
+
+    Box(
+        modifier = Modifier
+            .padding(start = 6.dp)
+            .height(24.dp)
+            .clip(shape)
+            .background(background)
+            .border(1.5.dp, Color(0xFF344702), shape)
+            .clickable(interactionSource = interaction, indication = null) {
+                if (InitializePvz2.isConfigReady()) {
+                    SoundController.playSoundFromAssets(InitializePvz2.config.ui.sounds.switchClick)
+                }
+                onClick()
+            }
+            .padding(horizontal = 9.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = textColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
+    }
+}
+
+/**
+ * 弹窗内的搜索框（紧凑单行）。
+ *
+ * 弹窗内容底色是奶黄（`0xFFF3EEB9`），搜索框用更亮的近白底 + 深橄榄描边，
+ * 保证在弹窗里「像一个可输入的凹槽」，同时不用 M3 输入框（高度/浮动 label 都不合适）。
+ */
+@Composable
+private fun ChoiceSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    hint: String,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(8.dp)
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = TextStyle(color = Color(0xFF3A4A1A), fontSize = 14.sp),
+        cursorBrush = SolidColor(Color(0xFF6E9E1F)),
+        modifier = modifier.height(36.dp)
+    ) { innerTextField ->
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(shape)
+                .background(Color(0xFFFBF8DC))
+                .border(1.dp, Color(0xFF8E9B4A), shape)
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = Color(0xFF6B7A2E),
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) {
+                    Text(text = hint, color = Color(0xFF8A8A5A), fontSize = 14.sp)
+                }
+                innerTextField()
+            }
+            if (value.isNotEmpty()) {
+                IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(20.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        tint = Color(0xFF6B7A2E),
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
         }

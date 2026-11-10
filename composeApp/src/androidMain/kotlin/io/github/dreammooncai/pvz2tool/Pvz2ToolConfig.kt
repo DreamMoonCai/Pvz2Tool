@@ -505,6 +505,8 @@ data class Pvz2ToolConfigUI(
     val dialog: Pvz2ToolConfigUIDialog = Pvz2ToolConfigUIDialog(),
     val error: Pvz2ToolConfigUIError = Pvz2ToolConfigUIError(),
     val welcome: Pvz2ToolConfigUIWelcome = Pvz2ToolConfigUIWelcome(),
+    /** 选择/多选弹窗（全选、搜索、数量）文案 */
+    val choiceActions: Pvz2ToolConfigUIChoiceActions = Pvz2ToolConfigUIChoiceActions(),
     val noValidDirTip: String,
     /** 功能属性（背景/音乐/视频等）*/
     val assets: Pvz2ToolConfigUIAssets = Pvz2ToolConfigUIAssets(),
@@ -766,6 +768,23 @@ data class Pvz2ToolConfigUIWelcome(
     val editUserNameTitle: String = "修改用户名",
     /** 编辑用户名输入框提示文字 */
     val editUserNameHint: String = "请输入新的用户名",
+)
+
+// 8. 【选择弹窗】全选 / 搜索 / 数量的文案
+@Serializable
+data class Pvz2ToolConfigUIChoiceActions(
+    /** 标题栏「全选」胶囊按钮文字 */
+    val selectAll: String = "全选",
+    /** 已全选时按钮文字（点击取消全选） */
+    val unselectAll: String = "取消",
+    /** 标题栏「搜索」胶囊按钮文字 */
+    val search: String = "搜索",
+    /** 搜索已展开时按钮文字（点击清空并收起） */
+    val searchClose: String = "关闭",
+    /** 搜索框占位文字 */
+    val searchHint: String = "搜索…",
+    /** 过滤后没有结果时的提示 */
+    val searchEmpty: String = "没有匹配的条目",
 )
 
 // 9. 【功能属性】背景/视频/音乐/权限等路径与开关

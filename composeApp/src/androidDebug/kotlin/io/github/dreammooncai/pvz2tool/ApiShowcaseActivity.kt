@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,7 +21,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,10 +38,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.dreammooncai.pvz2tool.js.JsLogger
-import io.github.dreammooncai.pvz2tool.ui.PvzNumberInput
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsChoiceItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsDialogsHost
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
-import io.github.dreammooncai.pvz2tool.view.PvzCollapsiblePanel
 import kotlinx.coroutines.launch
 
 /**
@@ -178,28 +175,60 @@ private fun JsApiShowcasePanel(modifier: Modifier = Modifier) {
 }
 
 /**
- * 页签 2：新增 UI 组件的**两种使用形态**
+ * 页签 2：新增的**两个 API 弹窗**
  *
- * 1. **API 弹窗**：点按钮调用正式 API `ui.number(...)`，弹出 PVZ 风格数量弹窗；
- * 2. **主页栏目条目**：用真实的 [PvzCollapsiblePanel] 承载 `NUMBER` 条目与 `INFO` 限高条目，
- *    与主界面栏目里的渲染完全一致。
+ * 1. **多选弹窗增强**：标题栏右上角「全选 / 搜索」+ 底部「数量 ±」，
+ *    对应手写需求里「复选支持全选、搜索、数量输入」的那套；
+ * 2. **数量弹窗**：`ui.number(...)` 的独立用法。
+ *
+ * 这里直接调用 `JsUiManager.showXxx(...)`——与 JS 调 `ui.multiSelect(...)` 走的是同一条链路，
+ * 所以屏幕上看到的就是脚本弹出来的效果。
  */
 @Composable
 private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
-    var quantity by remember { mutableStateOf(3) }
 
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // ========== ① API 弹窗形态 ==========
-        ShowcaseLabel("① API 弹窗：ui.number(title, options)")
+        // ========== ① 多选弹窗（全选 / 搜索 / 数量） ==========
+        ShowcaseLabel("① 多选弹窗：右上角「全选 / 搜索」+ 数量「±」")
         Text(
-            text = "脚本里一句 ui.number('购买数量', {min:1, max:99, step:1, suffix:'个'}) " +
-                    "即可弹出，点确定返回所选数值（取消返回 null）。\n" +
-                    "• ± 单击步进一次，长按连续增减\n" +
-                    "• « / » 一键跳到最小 / 最大值（到边界自动禁用）",
+            text = "ui.multiSelect('选择功能', items, {selectAll:true, searchable:true, quantity:{min:1,max:99,default:3,suffix:'个'}})\n" +
+                    "• 右上角「全选」：对当前**过滤后**的条目一键全选 / 取消全选\n" +
+                    "• 右上角「搜索」：按名称过滤条目（勾选状态不受过滤影响）\n" +
+                    "• 数量行：「±」步进、长按连续增减、「«」「»」直达最小 / 最大\n" +
+                    "• 确定返回 {values:[...], count:n}",
+            color = Color(0xFF8A9199),
+            fontSize = 12.sp
+        )
+        ShowcaseActionButton("弹出多选弹窗（ui.multiSelect）") {
+            scope.launch {
+                JsUiManager.showMultiSelect(
+                    ownerContext = null,
+                    title = "选择要启用的功能",
+                    items = DEMO_CHOICES,
+                    defaultValues = listOf("sun"),
+                    selectAllEnabled = true,
+                    searchEnabled = true,
+                    quantityEnabled = true,
+                    quantityMin = 1,
+                    quantityMax = 99,
+                    quantityStep = 1,
+                    quantityDefault = 3,
+                    quantitySuffix = "个",
+                    forceMaxForm = true
+                ).await()
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        // ========== ② 数量弹窗 ==========
+        ShowcaseLabel("② 数量弹窗：ui.number(title, options)")
+        Text(
+            text = "ui.number('购买数量', {min:1, max:99, step:1, suffix:'个'}) 弹窗，点确定返回数值（取消返回 null）。",
             color = Color(0xFF8A9199),
             fontSize = 12.sp
         )
@@ -216,100 +245,22 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
                 ).await()
             }
         }
-
-        Spacer(Modifier.height(6.dp))
-
-        // ========== ② 主页栏目条目形态 ==========
-        ShowcaseLabel("② 主页功能栏目里的效果")
-        Text(
-            text = "下面是真实栏目面板（PvzCollapsiblePanel）= 主界面同一套渲染：\n" +
-                    "NUMBER 数量条目 + INFO 限高滚动条目。",
-            color = Color(0xFF8A9199),
-            fontSize = 12.sp
-        )
-
-        PvzCollapsiblePanel(
-            title = "功能栏目示例",
-            isExpandedInit = true
-        ) { panelTheme ->
-            // —— NUMBER 条目（与主界面 SectionType.NUMBER 分支同构）——
-            Text(
-                text = "购买数量",
-                color = Color(0xFFE8E8E8),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = "1~99，长按 ± 可连续增减",
-                color = Color(0xFF9AA0A6),
-                fontSize = 11.sp
-            )
-            Spacer(Modifier.height(4.dp))
-            // theme 跟随栏目主题（与主界面 SectionType.NUMBER 分支一致）
-            PvzNumberInput(
-                value = quantity,
-                onValueChange = { quantity = it },
-                min = 1,
-                max = 99,
-                step = 1,
-                suffix = "个",
-                theme = panelTheme
-            )
-            Text(
-                text = "当前值 = $quantity",
-                color = Color(0xFF9AA0A6),
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-
-            Spacer(Modifier.height(10.dp))
-            HorizontalDivider(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                thickness = 0.5.dp,
-                color = Color(0x33FFFFFF)
-            )
-
-            // —— INFO 条目（maxLines = 5，超出滚动）——
-            Text(
-                text = "运行状态",
-                color = Color(0xFFE8E8E8),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = "maxLines = 5，超出可在卡片内滚动",
-                color = Color(0xFF9AA0A6),
-                fontSize = 11.sp
-            )
-            Spacer(Modifier.height(4.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = (18 * 5).dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFC9D8B6))
-                    .verticalScroll(rememberScrollState())
-                    .padding(12.dp)
-            ) {
-                Text(
-                    text = INFO_DEMO_TEXT,
-                    color = Color(0xFF1B2027),
-                    fontSize = 14.sp,
-                    lineHeight = 18.sp
-                )
-            }
-        }
     }
 }
 
-private val INFO_DEMO_TEXT = buildString {
-    appendLine("这是 INFO 类型信息卡的演示内容。")
-    repeat(8) { i ->
-        appendLine("第 ${i + 1} 行：INFO 条目通常用来展示 JS 动态计算出来的状态，")
-        appendLine("例如当前版本、解压进度、VPN 状态、存档信息等。")
-    }
-    append("（内容结束）")
-}
+/** 多选弹窗演示数据：10 条纯文字条目，便于体验搜索过滤 */
+private val DEMO_CHOICES = listOf(
+    JsChoiceItem(name = "阳光无限", value = "sun"),
+    JsChoiceItem(name = "冷却无CD", value = "cool"),
+    JsChoiceItem(name = "自动收集", value = "auto"),
+    JsChoiceItem(name = "自动种植", value = "plant"),
+    JsChoiceItem(name = "加速战斗", value = "speed"),
+    JsChoiceItem(name = "无限金币", value = "gold"),
+    JsChoiceItem(name = "无限钻石", value = "diamond"),
+    JsChoiceItem(name = "免内购", value = "iap"),
+    JsChoiceItem(name = "关卡解锁", value = "level"),
+    JsChoiceItem(name = "植物全解锁", value = "plants")
+)
 
 /** 演示用按钮 */
 @Composable
