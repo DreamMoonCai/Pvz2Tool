@@ -2305,21 +2305,7 @@ fun JsItemChoiceDialog() {
                             state = state,
                             selectedIndices = selectedIndices,
                             selectedIndex = selectedIndex,
-                            onSelect = onSelect,
-                            onOrderChange = { newOrder ->
-                                // 拖动（含跨「更多」边界）后同步全局顺序 + 持久化 + 回调
-                                itemOrder = newOrder + visibleIndices.filter { it !in newOrder }
-                                state.orderKey?.let { key ->
-                                    ChoiceOrderStore.save(key, newOrder.map { state.items[it].value })
-                                }
-                                state.onReorder?.let { cb ->
-                                    JsUiManager.uiScope.launch {
-                                        JsUiManager.launchCallback(JsUiManager.frameByState(state)) {
-                                            cb(newOrder.map { state.items[it].value.js }.js)
-                                        }
-                                    }
-                                }
-                            }
+                            onSelect = onSelect
                         )
                     } else if (state.forceMaxForm) { // 最高形态：选项可能极多，用 LazyVerticalGrid 懒加载（仅组合可见项）
                         LazyVerticalGrid(
@@ -2560,88 +2546,6 @@ private fun ChoiceSearchField(
  * 🔴 手势走 [PointerEventPass.Initial] 并 consume：否则手指往上下（外层竖向滚动）
  * 或往胶囊里（横滚）移动会被抢走，表现为「一移就跟松手了一样」。
  */
-/**
- * 可拖动的格子外壳（与 `ReorderableItemGrid` 同一套机制：**矩形命中**，不是步进）。
- *
- * 长按 → 放大 + 跟手平移；每帧把「被拖格子中心 + 位移」交给 [onDragMove]，
- * 由上层用所有格子的 `boundsInRoot` 命中目标 → 直接重排，所以能随便跨行、跨「更多」。
- *
- * 🔴 位移用每帧 `positionChange()` 累加，且必须在 `consume()` **之前**读（consume 后恒为 0）。
- *    不要用 `change.position` 绝对值：graphicsLayer 平移会反向改变指针局部坐标，形成正反馈直接飞走。
- * 🔴 手势走 [PointerEventPass.Initial] 并 consume，否则往上下/往胶囊里移动会被外层滚动抢走。
- */
-@Composable
-private fun DraggableChoiceCell(
-    id: Int,
-    reorderable: Boolean,
-    modifier: Modifier = Modifier,
-    onBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
-    onDragMove: (Offset, androidx.compose.ui.geometry.Rect) -> Unit = { _, _ -> },
-    onDragStart: () -> Unit = {},
-    onDragEnd: () -> Unit,
-    content: @Composable () -> Unit
-) {
-    val offX = remember(id) { Animatable(0f) }
-    val offY = remember(id) { Animatable(0f) }
-    val selfBounds = remember(id) { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
-    var dragging by remember(id) { mutableStateOf(false) }
-    val dragScope = rememberCoroutineScope()
-    val scale by animateFloatAsState(
-        targetValue = if (dragging) 1.08f else 1f,
-        animationSpec = tween(120),
-        label = "drag_scale_$id"
-    )
-    Box(
-        modifier = modifier
-            .onGloballyPositioned {
-                val b = it.boundsInRoot()
-                selfBounds.value = b
-                onBounds(b)
-            }
-            .graphicsLayer {
-                translationX = offX.value
-                translationY = offY.value
-                scaleX = scale
-                scaleY = scale
-            }
-            .then(
-                if (!reorderable) Modifier else Modifier.pointerInput(id) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        val longPress = awaitLongPressOrCancellation(down.id)
-                            ?: return@awaitEachGesture
-                        longPress.consume()
-                        dragging = true
-                        onDragStart()
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!change.pressed) break
-                            val delta = change.positionChange()
-                            change.consume()
-                            if (delta.x != 0f || delta.y != 0f) {
-                                val nx = offX.value + delta.x
-                                val ny = offY.value + delta.y
-                                dragScope.launch { offX.snapTo(nx) }
-                                dragScope.launch { offY.snapTo(ny) }
-                                onDragMove(Offset(nx, ny), selfBounds.value)
-                            }
-                        }
-                        dragging = false
-                        dragScope.launch {
-                            offX.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 620f))
-                            offY.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 620f))
-                        }
-                        onDragEnd()
-                    }
-                }
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        content()
-    }
-}
-
 @Composable
 private fun FoldedChoicesRow(
     all: List<Pair<Int, JsChoiceItem>>,
@@ -2649,57 +2553,25 @@ private fun FoldedChoicesRow(
     state: JsSelectState,
     selectedIndices: Set<Int>,
     selectedIndex: Int,
-    onSelect: (Int) -> Unit,
-    onOrderChange: (List<Int>) -> Unit
+    onSelect: (Int) -> Unit
 ) {
     val density = LocalDensity.current
-    val scope = rememberCoroutineScope()
     val limit = more.limit.coerceAtLeast(1)
     val visible = more.visible.coerceAtLeast(1)
     // 一行总槽位 = 每行显示数 + 每行最多藏几个（默认两者相等）；每行末尾挂一个「更多」胶囊
     val groupSize = more.groupSize
 
-    // 🔴 首屏 / 各行 / 胶囊共用一条顺序：拖动可以跨行、跨「更多」边界（外面的能拖进去、里面的能拖出来），
-    //    重排后按 groupSize 重新分组即可，语义和「一行平铺 N 个」完全一致。
     val byId = remember(all) { all.associate { it.first to it.second } }
-    var order by remember(state) { mutableStateOf(all.map { it.first }) }
     // 同时只展开一行的「更多」（多行各展开一个会互相挤）
     var expandedGroup by remember(state) { mutableStateOf(-1) }
-    // 🔴 拖动期间冻结「分组」：否则格子一挪进 limit 之后就被塞进胶囊、当场消失。
-    //    冻结后组内顺序仍实时变化（其它格子让位），松手再按新顺序重新分组。
-    var frozenGroups by remember(state) { mutableStateOf<List<List<Int>>?>(null) }
-    val groups = frozenGroups?.map { g -> g.sortedBy { order.indexOf(it) } }
-        ?: order.chunked(groupSize)
 
     var cellPx by remember { mutableIntStateOf(0) }
-    var rowHeightPx by remember { mutableIntStateOf(0) }
     // 每行胶囊的内容区宽各自一份（共用会被另一行覆盖 → 格子宽算错、最后一个露一半）
     var contentPxMap by remember { mutableStateOf(emptyMap<Int, Int>()) }
     val tailSpacing = 4.dp
-    val stepPx = cellPx.toFloat().coerceAtLeast(1f)
-
-    // 所有可见格子的根坐标矩形（首屏 + 胶囊内），拖动时用来命中目标（和普通网格同一套）
-    val cellBounds = remember(state) { mutableStateMapOf<Int, androidx.compose.ui.geometry.Rect>() }
-
-    /** 命中重排：被拖格子中心落到谁的矩形里，就插到谁的位置（可任意跨行 / 跨胶囊） */
-    val handleDragMove: (Int, Offset, androidx.compose.ui.geometry.Rect) -> Unit = { id, offset, self ->
-        if (self.width > 0f) {
-            val center = self.center + offset
-            val targetId = cellBounds.entries
-                .firstOrNull { (other, rect) -> other != id && rect.contains(center) }
-                ?.key
-            if (targetId != null && order.indexOf(id) != order.indexOf(targetId)) {
-                order = ItemOrder.move(
-                    order.map { it.toString() },
-                    id.toString(),
-                    targetId.toString()
-                ).mapNotNull { it.toIntOrNull() }
-            }
-        }
-    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        groups.forEachIndexed { groupIdx, groupIds ->
+        all.map { it.first }.chunked(groupSize).forEachIndexed { groupIdx, groupIds ->
             val headIds = groupIds.take(limit)
             val tailIds = groupIds.drop(limit)
             val expanded = expandedGroup == groupIdx
@@ -2715,27 +2587,16 @@ private fun FoldedChoicesRow(
             )
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onSizeChanged { if (it.height > 0 && groupIdx == 0) rowHeightPx = it.height },
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 headIds.forEach { id ->
                     val item = byId[id] ?: return@forEach
                     key("g${groupIdx}_h$id") {
-                        DraggableChoiceCell(
-                            id = id,
-                            reorderable = state.reorderable,
+                        Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .onSizeChanged { if (it.width > 0 && groupIdx == 0) cellPx = it.width },
-                            onBounds = { cellBounds[id] = it },
-                            onDragMove = { offset, self -> handleDragMove(id, offset, self) },
-                            onDragStart = { frozenGroups = order.chunked(groupSize) },
-                            onDragEnd = {
-                                frozenGroups = null
-                                onOrderChange(order)
-                            }
+                                .onSizeChanged { if (it.width > 0 && groupIdx == 0) cellPx = it.width }
                         ) {
                             GridChoiceCell(
                                 modifier = Modifier.fillMaxWidth(),
@@ -2766,27 +2627,16 @@ private fun FoldedChoicesRow(
                             modifier = Modifier.fillMaxSize(),
                             horizontalArrangement = Arrangement.spacedBy(tailSpacing),
                             // 末尾留一点内边距：滚到底时最后一项能完全贴边，不会卡在「半个」的位置
-                            contentPadding = PaddingValues(start = 4.dp, end = 16.dp),
+                            contentPadding = PaddingValues(end = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             items(tailIds, key = { it }) { id ->
                                 val item = byId[id]
                                 if (item != null) {
-                                    // 宽度 = (内容区宽 - 间距) / visible：正好排下 visible 个，
-                                    // 第 visible+1 个起需要横滚（contentPx 按行独立记录，不会被别的行覆盖）
-                                    DraggableChoiceCell(
-                                        id = id,
-                                        reorderable = state.reorderable,
-                                                    modifier = Modifier
+                                    Box(
+                                        modifier = Modifier
                                             .width(tailCellWidth.coerceAtLeast(36.dp))
-                                            .animateItem(),
-                                        onBounds = { cellBounds[id] = it },
-                                        onDragMove = { offset, self -> handleDragMove(id, offset, self) },
-                                        onDragStart = { frozenGroups = order.chunked(groupSize) },
-                                        onDragEnd = {
-                                            frozenGroups = null
-                                            onOrderChange(order)
-                                        }
+                                            .animateItem()
                                     ) {
                                         GridChoiceCell(
                                             modifier = Modifier.fillMaxWidth(),
