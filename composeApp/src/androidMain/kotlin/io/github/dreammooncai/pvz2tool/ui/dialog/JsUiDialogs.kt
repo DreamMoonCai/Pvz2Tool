@@ -18,8 +18,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -2534,6 +2539,14 @@ private fun ChoiceSearchField(
  * 可拖动的格子外壳：长按 → 放大 + **跟手平移**，每过一个槽位就换位，
  * 换位后把跟手位移扣掉一个槽位（否则位移与换位叠加会「飞出去」）。松手弹回原位。
  */
+/**
+ * 可拖动的格子外壳：长按 → 放大 + **跟手平移**，每过一个槽位就换位，
+ * 换位后把跟手位移扣掉一个槽位（否则位移与换位叠加会「飞出去」）。松手弹回原位。
+ *
+ * 🔴 手势必须走 [PointerEventPass.Initial] 并**吃掉所有后续事件**：
+ * 用 `detectDragGesturesAfterLongPress`（Main pass）时，手指往第二行或胶囊里移动会被
+ * 外层竖向滚动 / 胶囊横向滚动先抢走，表现为「一移就跟松手了一样」、跨不了行也进不了胶囊。
+ */
 @Composable
 private fun DraggableChoiceCell(
     id: Int,
@@ -2562,36 +2575,39 @@ private fun DraggableChoiceCell(
             }
             .then(
                 if (!reorderable) Modifier else Modifier.pointerInput(id, stepPx) {
-                    var acc = 0f
-                    detectDragGesturesAfterLongPress(
-                        onDragStart = {
-                            acc = 0f
-                            dragging = true
-                            onDragStart()
-                        },
-                        onDragEnd = {
-                            dragging = false
-                            dragScope.launch { offsetX.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 620f)) }
-                            onDragEnd()
-                        },
-                        onDragCancel = {
-                            dragging = false
-                            dragScope.launch { offsetX.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 620f)) }
-                            onDragEnd()
-                        },
-                        onDrag = { change, drag ->
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val longPress = awaitLongPressOrCancellation(down.id)
+                            ?: return@awaitEachGesture
+                        longPress.consume()
+                        dragging = true
+                        onDragStart()
+                        var acc = 0f
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+                            // 关键：Initial 通道消费，外层滚动/胶囊横滚都收不到
                             change.consume()
-                            acc += drag.x
-                            dragScope.launch { offsetX.snapTo(offsetX.value + drag.x) }
-                            val step = (acc / stepPx).toInt()
-                            if (step != 0) {
-                                if (onStep(step)) {
-                                    dragScope.launch { offsetX.snapTo(offsetX.value - step * stepPx) }
+                            val dx = change.positionChange().x
+                            if (dx != 0f) {
+                                acc += dx
+                                dragScope.launch { offsetX.snapTo(offsetX.value + dx) }
+                                val step = (acc / stepPx).toInt()
+                                if (step != 0) {
+                                    if (onStep(step)) {
+                                        dragScope.launch { offsetX.snapTo(offsetX.value - step * stepPx) }
+                                    }
+                                    acc -= step * stepPx
                                 }
-                                acc -= step * stepPx
                             }
                         }
-                    )
+                        dragging = false
+                        dragScope.launch {
+                            offsetX.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 620f))
+                        }
+                        onDragEnd()
+                    }
                 }
             ),
         contentAlignment = Alignment.Center
