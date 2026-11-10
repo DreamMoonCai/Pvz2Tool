@@ -2530,6 +2530,74 @@ private fun ChoiceSearchField(
  * 宽度不能用 `BoxWithConstraints` 取（SubcomposeLayout 在弹窗 intrinsic 探测下会崩），
  * 所以先用 `onSizeChanged` 拿父宽，首帧未测到就只占 1dp 高度，避免 48dp 兜底宽度闪一下。
  */
+/**
+ * 可拖动的格子外壳：长按 → 放大 + **跟手平移**，每过一个槽位就换位，
+ * 换位后把跟手位移扣掉一个槽位（否则位移与换位叠加会「飞出去」）。松手弹回原位。
+ */
+@Composable
+private fun DraggableChoiceCell(
+    id: Int,
+    reorderable: Boolean,
+    stepPx: Float,
+    modifier: Modifier = Modifier,
+    onStep: (Int) -> Boolean,
+    onDragEnd: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    val offsetX = remember(id) { Animatable(0f) }
+    var dragging by remember(id) { mutableStateOf(false) }
+    val dragScope = rememberCoroutineScope()
+    val scale by animateFloatAsState(
+        targetValue = if (dragging) 1.08f else 1f,
+        animationSpec = tween(120),
+        label = "drag_scale_$id"
+    )
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                translationX = offsetX.value
+                scaleX = scale
+                scaleY = scale
+            }
+            .then(
+                if (!reorderable) Modifier else Modifier.pointerInput(id, stepPx) {
+                    var acc = 0f
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = {
+                            acc = 0f
+                            dragging = true
+                        },
+                        onDragEnd = {
+                            dragging = false
+                            dragScope.launch { offsetX.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 620f)) }
+                            onDragEnd()
+                        },
+                        onDragCancel = {
+                            dragging = false
+                            dragScope.launch { offsetX.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 620f)) }
+                            onDragEnd()
+                        },
+                        onDrag = { change, drag ->
+                            change.consume()
+                            acc += drag.x
+                            dragScope.launch { offsetX.snapTo(offsetX.value + drag.x) }
+                            val step = (acc / stepPx).toInt()
+                            if (step != 0) {
+                                if (onStep(step)) {
+                                    dragScope.launch { offsetX.snapTo(offsetX.value - step * stepPx) }
+                                }
+                                acc -= step * stepPx
+                            }
+                        }
+                    )
+                }
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
+    }
+}
+
 @Composable
 private fun FoldedChoicesRow(
     all: List<Pair<Int, JsChoiceItem>>,
@@ -2560,57 +2628,24 @@ private fun FoldedChoicesRow(
     val tailSpacing = 4.dp
     val stepPx = cellPx.toFloat().coerceAtLeast(1f)
 
-    /** 长按图标拖动换位（跨行 / 跨更多都走同一条 order） */
-    val dragModifier: (Int) -> Modifier = { id ->
-        if (!state.reorderable) {
-            Modifier
+    /** 把某格挪 [step] 个槽位；返回是否真的换了位（换位后跟手位移要扣一个槽位） */
+    val moveOrder: (Int, Int) -> Boolean = { id, step ->
+        val cur = order.indexOf(id)
+        if (cur < 0) {
+            false
         } else {
-            Modifier.pointerInput(id, stepPx) {
-                var acc = 0f
-                detectDragGesturesAfterLongPress(
-                    onDragStart = { acc = 0f },
-                    onDragEnd = { onOrderChange(order) },
-                    onDragCancel = { onOrderChange(order) },
-                    onDrag = { change, drag ->
-                        change.consume()
-                        acc += drag.x
-                        val step = (acc / stepPx).toInt()
-                        if (step != 0) {
-                            val cur = order.indexOf(id)
-                            if (cur >= 0) {
-                                val target = (cur + step).coerceIn(0, order.lastIndex)
-                                if (target != cur) {
-                                    order = ItemOrder.move(
-                                        order.map { it.toString() },
-                                        id.toString(),
-                                        order[target].toString()
-                                    ).mapNotNull { it.toIntOrNull() }
-                                }
-                            }
-                            acc -= step * stepPx
-                        }
-                    }
-                )
+            val target = (cur + step).coerceIn(0, order.lastIndex)
+            if (target == cur) {
+                false
+            } else {
+                order = ItemOrder.move(
+                    order.map { it.toString() },
+                    id.toString(),
+                    order[target].toString()
+                ).mapNotNull { it.toIntOrNull() }
+                true
             }
         }
-    }
-
-    /** 换位后从旧位置滑到新位置（普通 Row 没有 animateItem，自己补一段 spring 位移） */
-    val placementModifier: @Composable (Int) -> Modifier = { id ->
-        var lastX by remember(id) { mutableFloatStateOf(Float.NaN) }
-        val shift = remember(id) { Animatable(0f) }
-        Modifier
-            .onGloballyPositioned { coords ->
-                val x = coords.positionInParent().x
-                if (!lastX.isNaN() && kotlin.math.abs(x - lastX) > 1f) {
-                    scope.launch {
-                        shift.snapTo(lastX - x)
-                        shift.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 620f))
-                    }
-                }
-                lastX = x
-            }
-            .offset { IntOffset(shift.value.roundToInt(), 0) }
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -2636,11 +2671,15 @@ private fun FoldedChoicesRow(
                 headIds.forEach { id ->
                     val item = byId[id] ?: return@forEach
                     key("g${groupIdx}_h$id") {
-                        Box(
+                        DraggableChoiceCell(
+                            id = id,
+                            reorderable = state.reorderable,
+                            stepPx = stepPx,
                             modifier = Modifier
                                 .weight(1f)
-                                .then(placementModifier(id))
-                                .onSizeChanged { if (it.width > 0 && groupIdx == 0) cellPx = it.width }
+                                .onSizeChanged { if (it.width > 0 && groupIdx == 0) cellPx = it.width },
+                            onStep = { step -> moveOrder(id, step) },
+                            onDragEnd = { onOrderChange(order) }
                         ) {
                             GridChoiceCell(
                                 modifier = Modifier.fillMaxWidth(),
@@ -2651,7 +2690,6 @@ private fun FoldedChoicesRow(
                                 showIndex = state.showIndex,
                                 showIndexColor = state.showIndexColor,
                                 onSelect = onSelect,
-                                dragHandleModifier = dragModifier(id),
                                 contentScale = if (expanded) 0.75f else 1f
                             )
                         }
@@ -2672,7 +2710,7 @@ private fun FoldedChoicesRow(
                             modifier = Modifier.fillMaxSize(),
                             horizontalArrangement = Arrangement.spacedBy(tailSpacing),
                             // 末尾留一点内边距：滚到底时最后一项能完全贴边，不会卡在「半个」的位置
-                            contentPadding = PaddingValues(end = 8.dp),
+                            contentPadding = PaddingValues(start = 4.dp, end = 16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             items(tailIds, key = { it }) { id ->
@@ -2680,10 +2718,15 @@ private fun FoldedChoicesRow(
                                 if (item != null) {
                                     // 宽度 = (内容区宽 - 间距) / visible：正好排下 visible 个，
                                     // 第 visible+1 个起需要横滚（contentPx 按行独立记录，不会被别的行覆盖）
-                                    Box(
+                                    DraggableChoiceCell(
+                                        id = id,
+                                        reorderable = state.reorderable,
+                                        stepPx = stepPx,
                                         modifier = Modifier
                                             .width(tailCellWidth.coerceAtLeast(36.dp))
-                                            .animateItem()
+                                            .animateItem(),
+                                        onStep = { step -> moveOrder(id, step) },
+                                        onDragEnd = { onOrderChange(order) }
                                     ) {
                                         GridChoiceCell(
                                             modifier = Modifier.fillMaxWidth(),
@@ -2694,8 +2737,7 @@ private fun FoldedChoicesRow(
                                             showIndex = state.showIndex,
                                             showIndexColor = state.showIndexColor,
                                             onSelect = onSelect,
-                                            contentScale = 0.75f,
-                                            dragHandleModifier = dragModifier(id)
+                                            contentScale = 0.75f
                                         )
                                     }
                                 }
