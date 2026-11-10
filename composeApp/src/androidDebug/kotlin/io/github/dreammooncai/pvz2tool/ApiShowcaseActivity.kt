@@ -231,7 +231,7 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
         PvzCollapsiblePanel(
             title = "功能栏目示例",
             isExpandedInit = true
-        ) { _ ->
+        ) { panelTheme ->
             // —— NUMBER 条目（与主界面 SectionType.NUMBER 分支同构）——
             Text(
                 text = "购买数量",
@@ -245,13 +245,15 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
                 fontSize = 11.sp
             )
             Spacer(Modifier.height(4.dp))
+            // theme 跟随栏目主题（与主界面 SectionType.NUMBER 分支一致）
             PvzNumberInput(
                 value = quantity,
                 onValueChange = { quantity = it },
                 min = 1,
                 max = 99,
                 step = 1,
-                suffix = "个"
+                suffix = "个",
+                theme = panelTheme
             )
             Text(
                 text = "当前值 = $quantity",

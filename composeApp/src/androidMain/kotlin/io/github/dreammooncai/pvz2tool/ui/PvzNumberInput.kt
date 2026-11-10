@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.dreammooncai.pvz2tool.view.PvzCollapsiblePanelTheme
 import kotlinx.coroutines.delay
 
 /**
@@ -45,38 +46,42 @@ fun stepNumber(value: Int, delta: Int, min: Int, max: Int): Int {
     return (value.toLong() + delta.toLong()).coerceIn(lo.toLong(), hi.toLong()).toInt()
 }
 
-// ======================== PVZ 配色（与 PvzStyledDialog / 栏目面板一致） ========================
-/** 外框深绿（与 PVZ 弹窗最外层描边同色） */
+// ======================== 默认（弹窗）配色：PVZ 绿框黄底 ========================
+/** 外框深绿 */
 private val PvzFrameDark = Color(0xFF344702)
 /** 内框亮绿 */
 private val PvzFrameLight = Color(0xFF8ED229)
 /** 卡片浅黄底 */
 private val PvzFill = Color(0xFFF3EEB9)
-/** 数值区稍深的黄（做出凹槽感） */
+/** 数值区凹槽 */
 private val PvzFillSunken = Color(0xFFE7E1A4)
 /** 深橄榄绿文字 */
 private val PvzInk = Color(0xFF33420A)
-/** 禁用态文字 / 按钮 */
+/** 禁用态 */
 private val PvzInkDisabled = Color(0xFF9AA37B)
-/** ± 按钮绿渐变（与弹窗标题栏同色系） */
+/** ± 按钮绿渐变 */
 private val PvzButtonTop = Color(0xFF9BE00B)
 private val PvzButtonBottom = Color(0xFF7CBE1C)
 
 /**
- * 数量输入组件：`[«] [−]  123  [+] [»]`，**PVZ 风格**（绿框黄底 + 绿色渐变按钮）。
+ * 数量输入组件：`[«] [−]  123  [+] [»]`
  *
  * 需求来源（手写需求图）：
  * - 数量输入框要能用 **+ / −** 控制；
  * - **长按 + / − 可连续增减**；
  * - **最小值 / 最大值可自定义**，并提供**一键跳到最小 / 最大**的按钮（`«` / `»`）。
  *
+ * ## 两种外观
+ * - **栏目条目**：传 [theme]（`section.theme`），配色跟随栏目主题（与同栏目 `PvzInput` 一致：
+ *   深色凹槽 + 栏目头渐变按钮），不会在棕色/蓝色栏目里突兀地出现一块绿色。
+ * - **JS 弹窗 / 独立使用**：不传 [theme]，使用 PVZ 默认的「绿框黄底」。
+ *
  * ## 实现要点
  * - **不修改 `PvzInput.kt`**（该文件有「一律不改」的硬约束），本组件为独立实现。
  * - 🔴 **组件内部维护一份「最新值」**（`internalValue`），长按循环每次都基于它计算：
  *   若直接用外部传入的 `value` 闭包，长按期间捕获的始终是**按下那一刻的旧值**，
  *   结果是「按住只会加一次、不持续变化」。
- * - 值变化时一次性回写外部状态，不产生中间态 → 不会每次步进都重建整个栏目
- *   （这正是工具箱输入框卡顿的成因）。
+ * - 值变化时一次性回写外部状态，不产生中间态 → 不会每次步进都重建整个栏目。
  * - 长按：按住 400ms 后以 80ms 间隔连续步进，松手立即停止。
  *
  * @param value 当前值（外部受控）
@@ -86,6 +91,7 @@ private val PvzButtonBottom = Color(0xFF7CBE1C)
  * @param step 每次步进量（≤0 时按 1 处理）
  * @param suffix 单位后缀，如 `"个"`
  * @param showMinMaxButtons 是否显示「跳到最小值 `«` / 跳到最大值 `»`」按钮
+ * @param theme 栏目主题；为 null 时使用 PVZ 默认绿框黄底
  */
 @Composable
 fun PvzNumberInput(
@@ -98,12 +104,36 @@ fun PvzNumberInput(
     suffix: String? = null,
     enabled: Boolean = true,
     showMinMaxButtons: Boolean = true,
+    theme: PvzCollapsiblePanelTheme? = null,
 ) {
     val lo = minOf(min, max)
     val hi = maxOf(min, max)
     val safeStep = if (step <= 0) 1 else step
     val outerShape = RoundedCornerShape(12.dp)
     val innerShape = RoundedCornerShape(9.dp)
+
+    // —— 按主题派生配色：有 theme 走栏目主题（与同栏 PvzInput 观感一致），无 theme 走 PVZ 默认 ——
+    val containerColor = theme?.sliderInactiveColor ?: PvzFill
+    val outerBorderColor = theme?.headerGradientStart ?: PvzFrameDark
+    val innerBorderColor = theme?.sliderActiveColor ?: PvzFrameLight
+    val valueBoxColor = theme?.sliderInactiveColor?.copy(alpha = 0.55f) ?: PvzFillSunken
+    val valueTextColor = if (theme != null) Color.White else PvzInk
+    val disabledText = if (theme != null) Color.White.copy(alpha = 0.38f) else PvzInkDisabled
+    val stepBrush = if (theme != null) {
+        Brush.verticalGradient(listOf(theme.headerGradientStart, theme.headerGradientEnd))
+    } else {
+        Brush.verticalGradient(listOf(PvzButtonTop, PvzButtonBottom))
+    }
+    val stepDisabledBrush = if (theme != null) {
+        Brush.verticalGradient(listOf(containerColor.copy(alpha = 0.8f), containerColor.copy(alpha = 0.8f)))
+    } else {
+        Brush.verticalGradient(listOf(Color(0xFFCFCBA0), Color(0xFFC2BE94)))
+    }
+    val stepBorderColor = theme?.headerGradientEnd ?: PvzFrameDark
+    val stepBorderDisabled = if (theme != null) theme.sliderActiveColor.copy(alpha = 0.35f) else Color(0xFF8E8B68)
+    val jumpTextColor = theme?.sliderActiveColor ?: PvzInk
+    val jumpBgColor = if (theme != null) theme.sliderActiveColor.copy(alpha = 0.18f) else PvzFillSunken
+    val jumpBorderColor = theme?.sliderActiveColor ?: PvzFrameLight
 
     // 🔴 内部持有的「最新值」：长按连续步进必须基于它，而不是外部 value 的旧闭包，
     // 否则长按期间每次计算都用按下瞬间的值 → 表现为「按住毫无反应 / 只跳一次」。
@@ -126,11 +156,11 @@ fun PvzNumberInput(
             .fillMaxWidth()
             .height(46.dp)
             .clip(outerShape)
-            .background(PvzFill)
-            // 双层描边：外深绿 + 内亮绿，与 PVZ 弹窗卡片的层次一致
-            .border(2.dp, PvzFrameDark, outerShape)
+            .background(containerColor)
+            // 双层描边：外框用栏目头色 / 内框用强调色，层次与栏目一致
+            .border(2.dp, outerBorderColor, outerShape)
             .padding(3.dp)
-            .border(1.dp, PvzFrameLight, innerShape)
+            .border(1.dp, innerBorderColor, innerShape)
             .padding(2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -139,6 +169,10 @@ fun PvzNumberInput(
             JumpButton(
                 symbol = "«",
                 enabled = enabled && internalValue > lo,
+                textColor = jumpTextColor,
+                backgroundColor = jumpBgColor,
+                borderColor = jumpBorderColor,
+                disabledTextColor = disabledText,
                 onClick = { commit(lo) }
             )
         }
@@ -146,6 +180,11 @@ fun PvzNumberInput(
         StepButton(
             symbol = "−",
             enabled = enabled && internalValue > lo,
+            enabledBrush = stepBrush,
+            disabledBrush = stepDisabledBrush,
+            borderColor = stepBorderColor,
+            disabledBorderColor = stepBorderDisabled,
+            disabledTextColor = disabledText,
             onStep = { stepBy(-safeStep) }
         )
 
@@ -156,12 +195,12 @@ fun PvzNumberInput(
                 .fillMaxHeight()
                 .padding(horizontal = 3.dp)
                 .clip(innerShape)
-                .background(PvzFillSunken),
+                .background(valueBoxColor),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = if (suffix.isNullOrBlank()) internalValue.toString() else "$internalValue$suffix",
-                color = PvzInk,
+                color = valueTextColor,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
@@ -171,6 +210,11 @@ fun PvzNumberInput(
         StepButton(
             symbol = "+",
             enabled = enabled && internalValue < hi,
+            enabledBrush = stepBrush,
+            disabledBrush = stepDisabledBrush,
+            borderColor = stepBorderColor,
+            disabledBorderColor = stepBorderDisabled,
+            disabledTextColor = disabledText,
             onStep = { stepBy(safeStep) }
         )
 
@@ -179,6 +223,10 @@ fun PvzNumberInput(
             JumpButton(
                 symbol = "»",
                 enabled = enabled && internalValue < hi,
+                textColor = jumpTextColor,
+                backgroundColor = jumpBgColor,
+                borderColor = jumpBorderColor,
+                disabledTextColor = disabledText,
                 onClick = { commit(hi) }
             )
         }
@@ -186,13 +234,18 @@ fun PvzNumberInput(
 }
 
 /**
- * ± 步进按钮：**绿色渐变胶囊**（PVZ 按钮观感），单击步进一次；
- * 按住 400ms 后每 80ms 连续步进，松手即停。
+ * ± 步进按钮：填充色由调用方按主题给出（栏目主题 → 栏目头渐变；默认 → PVZ 绿渐变）。
+ * 单击步进一次；按住 400ms 后每 80ms 连续步进，松手即停。
  */
 @Composable
 private fun StepButton(
     symbol: String,
     enabled: Boolean,
+    enabledBrush: Brush,
+    disabledBrush: Brush,
+    borderColor: Color,
+    disabledBorderColor: Color,
+    disabledTextColor: Color,
     onStep: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -214,17 +267,10 @@ private fun StepButton(
             .fillMaxHeight()
             .width(50.dp)
             .clip(shape)
-            .background(
-                if (enabled) Brush.verticalGradient(listOf(PvzButtonTop, PvzButtonBottom))
-                else Brush.verticalGradient(listOf(Color(0xFFCFCBA0), Color(0xFFC2BE94)))
-            )
+            .background(if (enabled) enabledBrush else disabledBrush)
             // 按下时压暗，给出明确的点击反馈
-            .background(if (pressed && enabled) Color.Black.copy(alpha = 0.12f) else Color.Transparent)
-            .border(
-                2.dp,
-                if (enabled) PvzFrameDark else Color(0xFF8E8B68),
-                shape
-            )
+            .background(if (pressed && enabled) Color.Black.copy(alpha = 0.14f) else Color.Transparent)
+            .border(2.dp, if (enabled) borderColor else disabledBorderColor, shape)
             .clickable(
                 enabled = enabled,
                 interactionSource = interaction,
@@ -234,7 +280,7 @@ private fun StepButton(
     ) {
         Text(
             text = symbol,
-            color = if (enabled) Color.White else PvzInkDisabled,
+            color = if (enabled) Color.White else disabledTextColor,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold
         )
@@ -242,12 +288,16 @@ private fun StepButton(
 }
 
 /**
- * 「跳到最小值 / 最大值」按钮（`«` / `»`）：未填充的轻量按钮，点击一次直达边界。
+ * 「跳到最小值 / 最大值」按钮（`«` / `»`）：轻量按钮，点击一次直达边界。
  */
 @Composable
 private fun JumpButton(
     symbol: String,
     enabled: Boolean,
+    textColor: Color,
+    backgroundColor: Color,
+    borderColor: Color,
+    disabledTextColor: Color,
     onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(9.dp)
@@ -256,12 +306,8 @@ private fun JumpButton(
             .fillMaxHeight()
             .width(34.dp)
             .clip(shape)
-            .background(if (enabled) PvzFillSunken else Color.Transparent)
-            .border(
-                1.5.dp,
-                if (enabled) PvzFrameLight else Color(0xFFB9B58C),
-                shape
-            )
+            .background(if (enabled) backgroundColor else Color.Transparent)
+            .border(1.5.dp, if (enabled) borderColor else borderColor.copy(alpha = 0.3f), shape)
             .clickable(
                 enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
@@ -272,7 +318,7 @@ private fun JumpButton(
     ) {
         Text(
             text = symbol,
-            color = if (enabled) PvzInk else PvzInkDisabled,
+            color = if (enabled) textColor else disabledTextColor,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
         )

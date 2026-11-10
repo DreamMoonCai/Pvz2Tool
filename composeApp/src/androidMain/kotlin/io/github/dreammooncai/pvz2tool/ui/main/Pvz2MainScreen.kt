@@ -1924,6 +1924,7 @@ private fun DynamicSectionComponent(
                                 }
 
                                 // 数量输入：± 按钮单击步进、长按连续步进，min/max 由 yml 配置
+                                // theme 跟随栏目主题（与同栏目 PvzInput 配色一致）
                                 PvzNumberInput(
                                     value = numberValue,
                                     onValueChange = { newValue ->
@@ -1934,7 +1935,8 @@ private fun DynamicSectionComponent(
                                     min = numberMin,
                                     max = numberMax,
                                     step = numberStep,
-                                    suffix = item.valueSuffix
+                                    suffix = item.valueSuffix,
+                                    theme = section.theme
                                 )
                             }
                         }
