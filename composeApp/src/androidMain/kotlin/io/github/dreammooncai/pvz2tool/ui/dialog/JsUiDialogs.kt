@@ -2548,10 +2548,9 @@ private fun FoldedChoicesRow(
     var expandedGroup by remember(state) { mutableStateOf(-1) }
 
     var cellPx by remember { mutableIntStateOf(0) }
-    var contentPx by remember { mutableIntStateOf(0) }
-    val tailCellWidth = with(density) {
-        (if (contentPx > 0) contentPx.toFloat() / visible else cellPx.toFloat()).toDp()
-    }
+    // 每行胶囊的内容区宽各自一份（共用会被另一行覆盖 → 格子宽算错、最后一个露一半）
+    var contentPxMap by remember { mutableStateOf(emptyMap<Int, Int>()) }
+    val tailSpacing = 4.dp
     val stepPx = cellPx.toFloat().coerceAtLeast(1f)
 
     /** 长按图标拖动换位（跨行 / 跨更多都走同一条 order） */
@@ -2612,6 +2611,11 @@ private fun FoldedChoicesRow(
             val headIds = groupIds.take(limit)
             val tailIds = groupIds.drop(limit)
             val expanded = expandedGroup == groupIdx
+            val contentPx = contentPxMap[groupIdx] ?: 0
+            val tailCellWidth = with(density) {
+                val spacingPx = tailSpacing.toPx() * (visible - 1)
+                (if (contentPx > 0) ((contentPx - spacingPx) / visible) else cellPx.toFloat()).toDp()
+            }
             val foldWeight by animateFloatAsState(
                 targetValue = if (expanded) (visible + 1).toFloat() else 1f,
                 animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
@@ -2647,11 +2651,6 @@ private fun FoldedChoicesRow(
                     }
                 }
 
-                // 不足一行的组补空位，保证每行的格子宽度一致（不会因为只剩 2 个就变宽）
-                repeat((limit - headIds.size).coerceAtLeast(0)) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-
                 if (tailIds.isNotEmpty()) {
                     RowFoldSegment(
                         text = more.text.ifBlank { null },
@@ -2660,16 +2659,18 @@ private fun FoldedChoicesRow(
                         buttonWidth = 40.dp,
                         barHeight = 74.dp,
                         onClick = { expandedGroup = if (expanded) -1 else groupIdx },
-                        onContentWidthChange = { contentPx = it }
+                        onContentWidthChange = { contentPxMap = contentPxMap + (groupIdx to it) }
                     ) {
                         LazyRow(
                             modifier = Modifier.fillMaxSize(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(tailSpacing),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             items(tailIds, key = { it }) { id ->
                                 val item = byId[id]
                                 if (item != null) {
+                                    // 宽度 = (内容区宽 - 间距) / visible：正好排下 visible 个，
+                                    // 第 visible+1 个起需要横滚（contentPx 按行独立记录，不会被别的行覆盖）
                                     Box(
                                         modifier = Modifier
                                             .width(tailCellWidth.coerceAtLeast(36.dp))

@@ -277,7 +277,7 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
             scope.launch {
                 JsUiManager.showMultiSelect(
                     ownerContext = null,
-                    title = "全部功能（12 项）",
+                    title = "全部功能（21 项）",
                     items = DEMO_MORE_CHOICES,
                     defaultValues = listOf("sun"),
                     columns = 5,
@@ -421,11 +421,19 @@ private val DEMO_GRID_CHOICES = listOf(
     JsChoiceItem(name = "植物全解锁", value = "plants", icon = "ic_floating_dave.png")
 )
 
-/** 「更多」折叠演示数据：12 条带图标（超过 limit=5，会收起 7 条） */
+/** 「更多」折叠演示数据：20 条带图标（每组 10 个 → 每行 5 个 + 更多里 5 个，共两行两胶囊） */
 private val DEMO_MORE_CHOICES = DEMO_GRID_CHOICES + listOf(
     JsChoiceItem(name = "昼夜切换", value = "daynight", icon = "new_version_icon.png"),
     JsChoiceItem(name = "无尽模式", value = "endless", icon = "old_version_icon.png"),
-    JsChoiceItem(name = "成就全解锁", value = "achievement", icon = "auto_collect.png")
+    JsChoiceItem(name = "成就全解锁", value = "achievement", icon = "auto_collect.png"),
+    JsChoiceItem(name = "十倍阳光", value = "sun10", icon = "auto_collect.png"),
+    JsChoiceItem(name = "自动收币", value = "coin", icon = "save_icon.png"),
+    JsChoiceItem(name = "免冷却卡", value = "nocd", icon = "new_version_icon.png"),
+    JsChoiceItem(name = "跳过关卡", value = "skip", icon = "old_version_icon.png"),
+    JsChoiceItem(name = "解锁商店", value = "shop", icon = "ic_floating_dave.png"),
+    JsChoiceItem(name = "无限能量", value = "energy", icon = "auto_collect.png"),
+    JsChoiceItem(name = "去广告", value = "noads", icon = "save_icon.png"),
+    JsChoiceItem(name = "全植物满级", value = "maxlevel", icon = "new_version_icon.png")
 )
 
 /** 演示用按钮 */
