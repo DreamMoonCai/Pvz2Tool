@@ -1997,6 +1997,9 @@ var t = ui.select("难度", ["简单", "普通", "困难"]);
 | `selectAll` | boolean | false | 标题栏显示「全选」胶囊按钮，一键勾选/取消当前**过滤后可见**的全部条目 |
 | `searchable` | boolean | false | 标题栏显示「搜索」胶囊按钮，点击展开搜索框按 `name`/`value` 过滤 |
 | `quantity` | boolean \| object | false | 显示数量输入行（`Min − 数值 + Max`；单击步进、长按连续、`Min`/`Max` 直达边界）。传 `true` 用默认范围，传对象可自定义：`{min, max, step, default, suffix}` |
+| `reorderable` | boolean | false | 长按拖动排序（列表拖行尾「≡」，网格拖图标），松手换位并回调 `onReorder` |
+| `orderKey` | string | 标题 | 排序持久化键：同一个 key 下次打开沿用上次顺序；传 `""` 表示不持久化 |
+| `more` | boolean \| object | 无 | 网格「更多」折叠：首行只显示前 `limit` 个，其余收进三段式胶囊，展开后在同一行里横滚显示 |
 
 **返回**：
 - 未开启 `selectAll` / `searchable` / `quantity` 时：`string[]` —— 选中条目的 `value` 数组（未选为空数组，保持旧行为）
@@ -2010,6 +2013,28 @@ var t = ui.select("难度", ["简单", "普通", "困难"]);
 > 返回的 `values` 与 `onReorder` 回调都按新顺序给出。
 > 顺序默认按 `orderKey`（缺省=标题）**持久化**，下次打开沿用；配置增删条目时自动合并。
 > 想每次都用配置顺序：`orderKey: ""`。
+
+**网格「更多」折叠（`more`）**：条目多时不用纵向铺一屏，一行就能装完。
+
+```javascript
+ui.multiSelect("全部功能", items12, {
+    columns: 5,
+    more: { text: "更多", limit: 5, visible: 4 }
+});
+```
+
+| more 属性 | 默认 | 说明 |
+|---|---|---|
+| `text` | `""` | 三段式**第一段文字**（可自定义，宽度跟着文字自适应）。不传则不显示这一段 |
+| `limit` | 5 | 首行显示几个格子，超过的部分收进胶囊 |
+| `visible` | = `limit` | 展开后中间内容区**一屏显示几个**，超出左右横滚 |
+
+行为：
+- 收起：`[格子 × limit] [文字 │ ▶]`，全部在同一行；
+- 展开：`[格子 × limit] [文字 │ 剩余格子（横滚） │ ◀]`，一行等于 `limit + visible + 1` 个槽位，
+  图标与文字整体缩小（否则文字会被截断），收起后自动放大回原尺寸；
+- 只有第三段（箭头按钮）能收起，点文字段/内容段不收起（内容段里的格子留给自己点）；
+- 条目数 ≤ `limit`（或搜索后变少）时自动恢复普通网格，不折叠。
 
 **示例**：
 ```javascript

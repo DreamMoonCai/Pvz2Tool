@@ -46,6 +46,7 @@ import android.content.Context
 import android.os.Build
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsActionItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsChoiceItem
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsMoreOptions
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsPopupItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsPopupPage
@@ -388,6 +389,32 @@ object PvzToolGlobals {
             } else {
                 null
             }
+            // 网格「更多」折叠：more: true | { text?, limit?, visible? }
+            //   limit   = 首屏最多显示几个（默认 5），其余收进三段式横条
+            //   visible = 展开后每屏可见几个（默认 = limit），超出横向滚动
+            //   text    = 三段式第一段文字（不传则不显示这一段）
+            val moreRaw = options?.get("more".js, this)?.orNull
+                ?: options?.get("更多".js, this)?.orNull
+            val moreObject = moreRaw as? JsObject
+            val moreOptions = when {
+                moreObject != null -> {
+                    val limit = moreObject.get("limit".js, this)?.orNull?.let { toNumber(it).toInt() }
+                        ?: moreObject.get("首屏".js, this)?.orNull?.let { toNumber(it).toInt() }
+                        ?: 5
+                    val visible = moreObject.get("visible".js, this)?.orNull?.let { toNumber(it).toInt() }
+                        ?: moreObject.get("可见".js, this)?.orNull?.let { toNumber(it).toInt() }
+                        ?: limit
+                    JsMoreOptions(
+                        text = moreObject.get("text".js, this)?.orNull?.let { toString(it) }
+                            ?: moreObject.get("文字".js, this)?.orNull?.let { toString(it) }
+                            ?: "",
+                        limit = limit.coerceAtLeast(1),
+                        visible = visible.coerceAtLeast(1)
+                    )
+                }
+                moreRaw?.toBoolean() == true -> JsMoreOptions()
+                else -> null
+            }
             val onReorder = bindJsCallback(options, "onReorder", runtime)
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onSelect = bindJsCallback(options, "onSelect", runtime)
@@ -417,6 +444,7 @@ object PvzToolGlobals {
                 reorderable = reorderable,
                 onReorder = onReorder,
                 orderKey = orderKey,
+                more = moreOptions,
                 onCancel = onCancel,
                 onSelect = onSelect,
                 onResult = onResult

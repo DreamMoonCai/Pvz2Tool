@@ -1,5 +1,14 @@
 package io.github.dreammooncai.pvz2tool.ui.dialog
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -7,6 +16,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -39,6 +49,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -80,8 +91,10 @@ import io.github.dreammooncai.pvz2tool.view.PvzGreenButton
 import io.github.dreammooncai.pvz2tool.view.PvzRedButton
 import io.github.dreammooncai.pvz2tool.view.PvzRichText
 import io.github.dreammooncai.pvz2tool.view.PvzSimpleCardBrown
+import io.github.dreammooncai.pvz2tool.view.PvzSlideBar
 import io.github.dreammooncai.pvz2tool.view.PvzTextOliveStyle
 import io.github.dreammooncai.pvz2tool.view.PvzTextStyle
+import io.github.dreammooncai.pvz2tool.view.PvzTextWhiteStyle
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -209,6 +222,23 @@ data class JsChoiceItem(
     val showIndexColor: String? = null // 单独控制序号颜色 "black"/"white"；null 时跟随外层 options.showIndexColor
 )
 
+/**
+ * 网格「更多」折叠配置（对应手写需求：单行超过 N 个时，多的收进三段式横条）。
+ *
+ * 只在**网格布局**（条目 >= 8 且有图标）且条目数超过 [limit] 时生效：
+ * 前 [limit] 个正常渲染，其余收进一条「[文字] [内容] [按钮]」三段式横条，
+ * 点开后在下方横向滚动展示剩余项。
+ *
+ * @param text 三段式第一段文字；空串 = 不显示这一段（变成两段式）
+ * @param limit 首屏（折叠前）最多显示几个，默认 5
+ * @param visible 展开后每屏可见几个，超出横向滚动，默认与 [limit] 相同
+ */
+data class JsMoreOptions(
+    val text: String = "",
+    val limit: Int = 5,
+    val visible: Int = 5
+)
+
 /** 选择弹窗状态（单项 / 多项通用） */
 data class JsSelectState(
     val isVisible: Boolean = false,
@@ -246,6 +276,8 @@ data class JsSelectState(
      * null = 不持久化（临时排序）。
      */
     val orderKey: String? = null,
+    /** 网格「更多」折叠（null = 不折叠，全部平铺） */
+    val more: JsMoreOptions? = null,
     val onCancel: (suspend (JsAny?) -> Unit)? = null,
     val onSelect: (suspend (JsAny?) -> Unit)? = null, // 单选：选中某项(value)即触发；多选：选中集合(values)变化时触发
     val deferredSingle: CompletableDeferred<String?>? = null,
@@ -1124,6 +1156,8 @@ object JsUiManager {
         onReorder: (suspend (JsAny?) -> Unit)? = null,
         /** 排序持久化 key（null = 不持久化） */
         orderKey: String? = null,
+        /** 网格「更多」折叠（null = 不折叠） */
+        more: JsMoreOptions? = null,
         onCancel: (suspend (JsAny?) -> Unit)? = null,
         onSelect: (suspend (JsAny?) -> Unit)? = null,
         onResult: (suspend (JsAny?) -> Unit)? = null
@@ -1159,6 +1193,7 @@ object JsUiManager {
             reorderable = reorderable,
             onReorder = onReorder,
             orderKey = orderKey,
+            more = more,
             onCancel = onCancel,
             onSelect = onSelect,
             deferredMulti = deferred
@@ -2016,6 +2051,14 @@ fun JsItemChoiceDialog() {
     val visibleIndices = visibleChoices.map { it.first }
     val allVisibleSelected = ChoiceFilter.isAllSelected(selectedIndices, visibleIndices)
 
+    // ===== 网格「更多」折叠 =====
+    // 条件：网格布局 + 显式开启 more + 过滤后条目数超过 limit（搜索到较少条目时自动恢复平铺）
+    val moreOptions = state.more
+    val moreLimit = (moreOptions?.limit ?: 5).coerceAtLeast(1)
+    val foldEnabled = isGrid && moreOptions != null && visibleChoices.size > moreLimit
+    val headChoices = if (foldEnabled) visibleChoices.take(moreLimit) else visibleChoices
+    val tailChoices = if (foldEnabled) visibleChoices.drop(moreLimit) else emptyList()
+
     val scope = rememberCoroutineScope()
 
     /** 把当前选中集合推给 onSelect 回调（与逐项点选保持同一套语义） */
@@ -2176,13 +2219,14 @@ fun JsItemChoiceDialog() {
                 // 多选 + reorderable：网格/列表都用可拖动容器（长按格子拖动换位）
                 if (isMulti && state.reorderable) {
                     ReorderableItemGrid(
-                        ids = visibleChoices.map { it.first.toString() },
+                        ids = headChoices.map { it.first.toString() },
                         columns = if (isGrid) state.columns.coerceIn(2, 6) else 1,
                         // 搜索过滤时禁用拖动：避免只对「过滤后的子集」重排，把其余条目顺序也打乱
                         enabled = searchQuery.isBlank(),
                         onOrderChange = { newIds ->
                             val newOrder = newIds.mapNotNull { it.toIntOrNull() }
-                            itemOrder = newOrder
+                            // 折叠区的条目不在可拖容器里，按原相对顺序接在后面，避免丢序
+                            itemOrder = newOrder + visibleIndices.filter { it !in newOrder }
                             // 持久化：同一个 orderKey 下次打开沿用这次的顺序
                             state.orderKey?.let { key ->
                                 ChoiceOrderStore.save(key, newOrder.map { state.items[it].value })
@@ -2229,14 +2273,26 @@ fun JsItemChoiceDialog() {
                     }
                 } else if (isGrid) {
                     val columns = state.columns.coerceIn(2, 6)
-                    if (state.forceMaxForm) { // 最高形态：选项可能极多，用 LazyVerticalGrid 懒加载（仅组合可见项）
+                    if (foldEnabled) {
+                        // 「更多」折叠：首行 head 个格子 + 折叠段 + 按钮，全部排在同一行，
+                        // 展开后格子整体缩小（一行 = head + visible + 1 个槽位）
+                        FoldedChoicesRow(
+                            head = headChoices,
+                            tail = tailChoices,
+                            more = moreOptions!!,
+                            state = state,
+                            selectedIndices = selectedIndices,
+                            selectedIndex = selectedIndex,
+                            onSelect = onSelect
+                        )
+                    } else if (state.forceMaxForm) { // 最高形态：选项可能极多，用 LazyVerticalGrid 懒加载（仅组合可见项）
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(columns),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            itemsIndexed(visibleChoices) { _, choice ->
+                            itemsIndexed(headChoices) { _, choice ->
                                 val (i, item) = choice
                                 GridChoiceCell(
                                     modifier = Modifier.fillMaxWidth(),
@@ -2251,7 +2307,7 @@ fun JsItemChoiceDialog() {
                             }
                         }
                     } else {
-                        val rows = visibleChoices.chunked(columns)
+                        val rows = headChoices.chunked(columns)
                         Column(
                             verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()
                         ) {
@@ -2276,6 +2332,7 @@ fun JsItemChoiceDialog() {
                             }
                         }
                     }
+
                 } else {
                     if (state.forceMaxForm) { // 最高形态：选项可能极多，用 LazyColumn 懒加载
                         LazyColumn(
@@ -2435,6 +2492,211 @@ private fun ChoiceSearchField(
     }
 }
 
+/**
+ * 网格「更多」折叠条（对应手写需求：单行超过 N 个时，多的收进三段式横条）。
+ *
+ * 一条 [PvzSlideBar] 三段：`[文字（more.text，可省）] [剩余数量提示] [展开按钮]`；
+ * 点开后横条下方出现横向滚动区，一次可见 [JsMoreOptions.visible] 个格子，超出左右滑动。
+ *
+ * 宽度不能用 `BoxWithConstraints` 取（SubcomposeLayout 在弹窗 intrinsic 探测下会崩），
+ * 所以先用 `onSizeChanged` 拿父宽，首帧未测到就只占 1dp 高度，避免 48dp 兜底宽度闪一下。
+ */
+@Composable
+private fun FoldedChoicesRow(
+    head: List<Pair<Int, JsChoiceItem>>,
+    tail: List<Pair<Int, JsChoiceItem>>,
+    more: JsMoreOptions,
+    state: JsSelectState,
+    selectedIndices: Set<Int>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit
+) {
+    val density = LocalDensity.current
+    var expanded by remember(state) { mutableStateOf(false) }
+    val visible = more.visible.coerceAtLeast(1)
+    var cellPx by remember { mutableIntStateOf(0) }
+    var contentPx by remember { mutableIntStateOf(0) }
+    val cellWidth = with(density) { cellPx.toDp() }
+    // 胶囊内容区里正好排下 visible 个格子
+    val tailCellWidth = with(density) {
+        (if (contentPx > 0) contentPx.toFloat() / visible else cellPx.toFloat()).toDp()
+    }
+
+    // 🔴 宽度一律用 weight 分配（弹窗里取不到可靠的父宽）：
+    //    收起 = [格子 × N 均分剩余] + [折叠胶囊（文字宽 + 按钮宽，自然宽度）]
+    //    展开 = [格子 × N 均分] + [折叠胶囊占 (可见数 + 1) 个槽位，内部三段]
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        head.forEach { entry ->
+            val (i, item) = entry
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .onSizeChanged { if (it.width > 0) cellPx = it.width }
+            ) {
+                GridChoiceCell(
+                    modifier = Modifier.fillMaxWidth(),
+                    item = item,
+                    index = i,
+                    selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
+                    isMulti = state.mode == "multi",
+                    showIndex = state.showIndex,
+                    showIndexColor = state.showIndexColor,
+                    onSelect = onSelect,
+                    // 展开时前面的格子也一起缩小，别让文字被截断
+                    contentScale = if (expanded) 0.75f else 1f
+                )
+            }
+        }
+
+        // 三段式：文字常驻，只有中间内容段受开关控制。
+        // 🔴 宽度用 **weight 动画**：每帧重新分配，视觉上就是「中间慢慢打开、前面格子同步缩小」。
+        val foldWeight by animateFloatAsState(
+            targetValue = if (expanded) (visible + 1).toFloat() else 1.3f,
+            animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+            label = "fold_row_weight"
+        )
+        RowFoldSegment(
+            text = more.text.ifBlank { null },
+            expanded = expanded,
+            modifier = Modifier.weight(foldWeight.coerceAtLeast(0.05f)),
+            buttonWidth = 40.dp,
+            barHeight = 74.dp,
+            onClick = { expanded = !expanded },
+            onContentWidthChange = { contentPx = it }
+        ) {
+            LazyRow(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items(tail, key = { it.first }) { entry ->
+                    val (i, item) = entry
+                    Box(modifier = Modifier.width(tailCellWidth.coerceAtLeast(36.dp))) {
+                        GridChoiceCell(
+                            modifier = Modifier.fillMaxWidth(),
+                            item = item,
+                            index = i,
+                            selected = if (state.mode == "multi") i in selectedIndices else selectedIndex == i,
+                            isMulti = state.mode == "multi",
+                            showIndex = state.showIndex,
+                            showIndexColor = state.showIndexColor,
+                            onSelect = onSelect,
+                            // 展开态的内容区格子同样缩小，保证文字完整
+                            contentScale = 0.75f
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 行内折叠胶囊：`[文字] │ [内容] │ [▶/◀]` 三段同行。
+ *
+ * * 文字段**常驻**（文案可自定义，宽度跟着文字走）；
+ * * 内容段只在 [expanded] 时组合，是唯一受开关控制的一段；
+ * * 只有第三段（按钮）能切换，点前两段不收起 —— 内容段里的格子要留给自己点。
+ */
+@Composable
+private fun RowFoldSegment(
+    text: String?,
+    expanded: Boolean,
+    modifier: Modifier = Modifier,
+    buttonWidth: Dp = 40.dp,
+    barHeight: Dp = 74.dp,
+    onClick: () -> Unit,
+    onContentWidthChange: ((Int) -> Unit)? = null,
+    content: @Composable BoxScope.() -> Unit = {}
+) {
+    val theme = PvzCollapsiblePanelTheme.BROWN
+    val shape = RoundedCornerShape(8.dp)
+    Row(
+        modifier = modifier
+            .height(barHeight)
+            .clip(shape)
+            .border(2.dp, theme.borderColor, shape)
+            .background(Brush.verticalGradient(listOf(theme.headerGradientStart, theme.headerGradientEnd))),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 第一段：文字（常驻）
+        if (!text.isNullOrEmpty()) {
+            PvzRichText(
+                text = text,
+                defaultStyle = PvzTextWhiteStyle,
+                fontSize = 14.sp,
+                maxLines = 1,
+                modifier = Modifier.padding(horizontal = 12.dp)
+            )
+        }
+
+        // 第二段：内容（受开关控制）
+        // 🔴 这一段**始终参与布局**（只靠 alpha 显隐）：如果用 if (expanded) 直接移除，
+        //    按钮会在收起瞬间跳到左侧、再随宽度收缩滑回来（用户看到的「瞬移」）。
+        val contentAlpha by animateFloatAsState(
+            targetValue = if (expanded) 1f else 0f,
+            animationSpec = tween(320),
+            label = "fold_content_alpha"
+        )
+        Box(
+            modifier = Modifier
+                // weight 必须 > 0，收起时给个极小数（宽度≈0，但按钮位置不跳）
+                .weight(if (expanded) 1f else 0.0001f)
+                .fillMaxHeight()
+                .clipToBounds()
+                .background(Color.Black.copy(alpha = 0.07f * contentAlpha))
+                .drawBehind { if (contentAlpha > 0.01f) drawFoldDivider(theme, contentAlpha) }
+                .onSizeChanged { onContentWidthChange?.invoke(it.width) }
+                .graphicsLayer { alpha = contentAlpha }
+        ) {
+            content()
+        }
+
+        // 第三段：按钮（唯一能开关的一段）
+        Box(
+            modifier = Modifier
+                .width(buttonWidth)
+                .fillMaxHeight()
+                .background(Color.Black.copy(alpha = 0.07f))
+                .drawBehind { drawFoldDivider(theme) }
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            // 方向直接按状态画（不再靠 graphicsLayer 旋转，避免某些节点上旋转不生效）
+            Canvas(modifier = Modifier.size(12.dp)) {
+                val w = size.width
+                val h = size.height
+                val p = Path().apply {
+                    if (expanded) {
+                        moveTo(w * 0.7f, h * 0.12f)
+                        lineTo(w * 0.24f, h * 0.5f)
+                        lineTo(w * 0.7f, h * 0.88f)
+                    } else {
+                        moveTo(w * 0.3f, h * 0.12f)
+                        lineTo(w * 0.76f, h * 0.5f)
+                        lineTo(w * 0.3f, h * 0.88f)
+                    }
+                    close()
+                }
+                drawPath(p, Color.White.copy(alpha = 0.95f))
+            }
+        }
+    }
+}
+
+/** 折叠胶囊里的分段竖线 */
+private fun DrawScope.drawFoldDivider(theme: PvzCollapsiblePanelTheme, alpha: Float = 1f) {
+    drawLine(
+        color = theme.borderColor.copy(alpha = 0.85f * alpha),
+        start = Offset(0f, size.height * 0.14f),
+        end = Offset(0f, size.height * 0.86f),
+        strokeWidth = (size.height * 0.045f).coerceAtLeast(1.5f)
+    )
+}
+
 /** 网格单元格：图标(或占位矩形)在上，文字在下，整体居中 */
 @Composable
 private fun GridChoiceCell(
@@ -2448,6 +2710,8 @@ private fun GridChoiceCell(
     onSelect: (Int) -> Unit,
     /** 拖动把手手势：贴到**图标**上（网格里只有长按图标才能拖） */
     dragHandleModifier: Modifier = Modifier,
+    /** 整体缩放（「更多」展开后一行要挤下 5+可见数+1 个格子，图标和文字一起缩，否则文字会被截断） */
+    contentScale: Float = 1f,
 ) {
     val interaction = rememberSoundInteractionSource(
         InitializePvz2.config.ui.sounds.switchClickPress, InitializePvz2.config.ui.sounds.switchClickRelease
@@ -2462,10 +2726,10 @@ private fun GridChoiceCell(
         // 容器给到 46dp（比图标 34dp 略大），长按更容易按中。
         Box(
             contentAlignment = Alignment.Center,
-            modifier = dragHandleModifier.size(46.dp)
+            modifier = dragHandleModifier.size(46.dp * contentScale)
         ) {
             ItemIconOrPlaceholder(
-                item, 48.dp, index, item.showIndex ?: showIndex, item.showIndexColor ?: showIndexColor
+                item, 48.dp * contentScale, index, item.showIndex ?: showIndex, item.showIndexColor ?: showIndexColor
             )
             if (isMulti && selected) {
                 Image(
@@ -2473,13 +2737,17 @@ private fun GridChoiceCell(
                     contentDescription = "已选中",
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .size(18.dp)
+                        .size(18.dp * contentScale)
                 )
             }
         }
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(4.dp * contentScale))
         PvzRichText(
-            item.name, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()
+            item.name,
+            fontSize = (11f * contentScale).coerceAtLeast(8f).sp,
+            maxLines = 1,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }

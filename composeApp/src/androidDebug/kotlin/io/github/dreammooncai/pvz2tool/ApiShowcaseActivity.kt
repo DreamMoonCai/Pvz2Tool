@@ -45,7 +45,10 @@ import io.github.dreammooncai.pvz2tool.ui.main.DynamicSectionComponent
 import io.github.dreammooncai.pvz2tool.ui.main.DynamicSectionState
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsChoiceItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsDialogsHost
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsMoreOptions
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
+import io.github.dreammooncai.pvz2tool.view.PvzCollapsiblePanelTheme
+import io.github.dreammooncai.pvz2tool.view.PvzSlideBar
 import kotlinx.coroutines.launch
 
 /**
@@ -260,6 +263,35 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
 
         Spacer(Modifier.height(6.dp))
 
+        // ========== ①-c 网格 + 「更多」折叠 ==========
+        ShowcaseLabel("①-c 网格 + 「更多」折叠（单行超过 5 个自动收起）")
+        Text(
+            text = "ui.multiSelect('...', items, { columns:5, more:{text:'更多', limit:5, visible:4} })\n" +
+                    "• 首屏只显示前 limit 个（默认 5），其余收进三段式横条：[文字] [计数] [按钮]\n" +
+                    "• 点开后横滚区一次可见 visible 个，超出左右滑动\n" +
+                    "• text 不传 → 两段式（只有计数 + 按钮）；条目数 ≤ limit 时自动平铺不折叠",
+            color = Color(0xFF8A9199),
+            fontSize = 12.sp
+        )
+        ShowcaseActionButton("弹出多选弹窗（网格 + 更多折叠）") {
+            scope.launch {
+                JsUiManager.showMultiSelect(
+                    ownerContext = null,
+                    title = "全部功能（12 项）",
+                    items = DEMO_MORE_CHOICES,
+                    defaultValues = listOf("sun"),
+                    columns = 5,
+                    selectAllEnabled = true,
+                    searchEnabled = true,
+                    more = JsMoreOptions(text = "更多", limit = 5, visible = 4),
+                    orderKey = "demo_more",
+                    forceMaxForm = true
+                ).await()
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
         // ========== ② 滑块弹窗（同样带 ±/«» 步进） ==========
         ShowcaseLabel("② 滑块弹窗：ui.slider(title, options)")
         Text(
@@ -305,6 +337,59 @@ private fun UiComponentShowcasePanel(modifier: Modifier = Modifier) {
                 ).await()
             }
         }
+
+        Spacer(Modifier.height(6.dp))
+
+        // ========== ④ 折叠横条栏目（向左展开） ==========
+        ShowcaseLabel("④ 折叠横条：点击按钮向左展开（左中右三段）")
+        Text(
+            text = "收起时右侧只剩一颗方按钮；点击后横条**向左生长**，按钮箭头翻转成「收起」。\n" +
+                    "• 展开后是**同一行的左中右三段**：`[文字] [内容] [按钮]`\n" +
+                    "• 文字可省略（传 null 即两段式）；内容横向排在中间段，超出部分自己滚\n" +
+                    "• 视觉与主界面栏目同源（主题渐变 + 2dp 深色描边 + 8dp 圆角）",
+            color = Color(0xFF8A9199),
+            fontSize = 12.sp
+        )
+        PvzSlideBar(
+            title = "常用功能",
+            theme = PvzCollapsiblePanelTheme.BROWN,
+            trailingContent = {
+                SlideDemoChip("加速")
+                SlideDemoChip("静音")
+                SlideDemoChip("自动收集")
+                SlideDemoChip("无限金币")
+            }
+        )
+
+        Spacer(Modifier.height(6.dp))
+
+        Text(
+            text = "同上，但 title = null：只有「内容 + 按钮」两段，适合窄屏或纯操作条。",
+            color = Color(0xFF8A9199),
+            fontSize = 12.sp
+        )
+        PvzSlideBar(
+            title = null,
+            theme = PvzCollapsiblePanelTheme.GREEN,
+            trailingContent = {
+                SlideDemoChip("阳光 +100")
+                SlideDemoChip("冷却 -5s")
+            }
+        )
+    }
+}
+
+/** 折叠横条演示用的内容槽小胶囊 */
+@Composable
+private fun SlideDemoChip(text: String) {
+    Box(
+        modifier = Modifier
+            .padding(end = 6.dp)
+            .clip(RoundedCornerShape(7.dp))
+            .background(Color(0x33FFFFFF))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+    ) {
+        Text(text = text, color = Color.White.copy(alpha = 0.92f), fontSize = 11.sp)
     }
 }
 
@@ -333,6 +418,13 @@ private val DEMO_GRID_CHOICES = listOf(
     JsChoiceItem(name = "无限钻石", value = "diamond", icon = "new_version_icon.png"),
     JsChoiceItem(name = "关卡解锁", value = "level", icon = "old_version_icon.png"),
     JsChoiceItem(name = "植物全解锁", value = "plants", icon = "ic_floating_dave.png")
+)
+
+/** 「更多」折叠演示数据：12 条带图标（超过 limit=5，会收起 7 条） */
+private val DEMO_MORE_CHOICES = DEMO_GRID_CHOICES + listOf(
+    JsChoiceItem(name = "昼夜切换", value = "daynight", icon = "new_version_icon.png"),
+    JsChoiceItem(name = "无尽模式", value = "endless", icon = "old_version_icon.png"),
+    JsChoiceItem(name = "成就全解锁", value = "achievement", icon = "auto_collect.png")
 )
 
 /** 演示用按钮 */
