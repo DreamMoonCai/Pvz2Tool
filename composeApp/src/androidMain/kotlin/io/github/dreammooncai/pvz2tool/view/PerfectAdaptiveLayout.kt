@@ -71,16 +71,29 @@ fun PerfectAdaptiveLayout(
         val bottomHeight = bottomPlaceable.height
 
         // 2. 【核心】查询探测组件的真实自然高度
-        // 探测组件不带 fillMaxHeight，所以它的 intrinsicHeight 是准确的
-        // —— 但以下情况可跳过重测：
+        // 探测组件不带 fillMaxHeight，所以它的自然高度是准的（不参与放置，只要高度）
+        // —— 以下情况可跳过重测：
         //   a) forceMaxForm=true：要求以最高形态展示，直接取上限值，无需任何探测计算；
         //   b) 已确认内容远超上限且 maxWidth 未变：精确值无意义（会被钳制、显示层本就滚动），
         //      直接复用上限值，完全等价。
-        // 其余情况（未超限）仍每帧重测，开销低且保证内容增删/缩小时的正确性。
+        //
+        // 🔴 其余情况用**普通测量**而不是 maxIntrinsicHeight：
+        //    intrinsic 是一条专用测量通道，每次都要按 maxWidth 重跑文字/子项布局，且不走
+        //    TextLayoutResult 等测量缓存。而探测层高度**每敲一个字符都会失效**（内容里有输入框时
+        //    文本变化 → 子项 dirty → 父级重新 layout），于是「每字符一次全量 intrinsic 测量」，
+        //    直接表现为输入框打字卡顿、IME 连打时吞字（单行/多行文本越界时最明显）。
+        //    探测层只需要「自然高度」这一个数：用无限高度约束正常测一次即可得到，
+        //    走的是标准测量路径（含缓存），比 intrinsic 便宜一个量级；
+        //    顺带消除「探测层里出现 Lazy* 会被 intrinsic 测量直接抛异常」的隐患。
         val realContentHeight: Int = when {
             forceMaxForm -> maxContentHeightPx
             probeCache.width == maxWidth && probeCache.height >= maxContentHeightPx -> maxContentHeightPx
-            else -> probeMeasurable.maxIntrinsicHeight(maxWidth).also {
+            else -> probeMeasurable.measure(
+                Constraints(
+                    minWidth = 0, maxWidth = maxWidth,
+                    minHeight = 0, maxHeight = Constraints.Infinity
+                )
+            ).height.also {
                 probeCache.width = maxWidth
                 probeCache.height = it
             }

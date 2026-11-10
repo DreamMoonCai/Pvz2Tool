@@ -114,9 +114,11 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
@@ -1926,13 +1928,17 @@ fun JsConfirmDialog() {
 @Composable
 fun JsPromptDialog() {
     val state by JsUiManager.promptState.collectAsState() // key = deferred：每次新弹窗（含同类型嵌套）都以 defaultValue 重新初始化； // 若 deferred 未变而只是「跨类型嵌套后重新可见」，则从帧上的草稿恢复用户已输入的内容。
-    var inputValue by remember(state.deferred) {
+    // 🔴 这里刻意保留 **MutableState 对象**而不是 `var x by remember`（拆箱成 String）：
+    //    值只在子组件 [PromptTextInput] 内部读 → 打字时重组范围收缩到输入框自身；
+    //    拆箱后父级每读一次 value，整张弹窗（含 PerfectAdaptiveLayout 的探测层，第二份内容）
+    //    都会跟着重组 + 重新测量，这才是「输入框卡、连打吞字」的主因。
+    val inputState = remember(state.deferred) {
         mutableStateOf((JsUiManager.readDraft(state) as? String) ?: state.defaultValue)
     }
 
     // 输入变化即回写草稿：本弹窗因嵌套短暂离场（remember 丢失）后回来可恢复
-    LaunchedEffect(state.deferred) {
-        snapshotFlow { inputValue }.distinctUntilChanged().collect { JsUiManager.saveDraft(state, it) }
+    LaunchedEffect(inputState) {
+        snapshotFlow { inputState.value }.distinctUntilChanged().collect { JsUiManager.saveDraft(state, it) }
     }
 
     if (state.isVisible) {
@@ -1975,7 +1981,7 @@ fun JsPromptDialog() {
                                 .weight(1f)
                                 .height(48.dp),
                             onClick = {
-                                val value = inputValue
+                                val value = inputState.value
                                 scope.launch {
                                     JsUiManager.dismissSelfWithCallback(
                                         state, value
@@ -1985,21 +1991,43 @@ fun JsPromptDialog() {
                     }
                 }) {
 
-                // 输入框
-                PvzInput(
-                    value = inputValue,
-                    onValueChange = { newValue -> inputValue = newValue },
+                // 输入框（值在子组件内部读，见 PromptTextInput 注释）
+                PromptTextInput(
+                    value = inputState,
                     placeholder = state.placeholder.ifEmpty { "请输入..." },
-                    modifier = Modifier
-                        .padding(horizontal = 12.dp)
-                        .fillMaxWidth(),
-                    theme = PvzCollapsiblePanelTheme.GREEN,
-                    label = state.message,
-                    multiline = true
+                    label = state.message
                 )
             }
         }
     }
+}
+
+/**
+ * 输入弹窗的文本框（把状态读取关在这一层）。
+ *
+ * 🔴 为什么不用 `PvzInput(value = inputValue)` 直接写在弹窗里：
+ *    弹窗内容会被 [PerfectAdaptiveLayout] 组合两份（探测层 + 显示层），
+ *    若在弹窗作用域里读文本状态，键盘上每敲一个字符都会让「两份内容 + 整棵 layout」重组并重测；
+ *    这里改成读传入的 State 对象，重组范围只剩本组件（和里面的 TextField），
+ *    弹窗尺寸由探测层按**未变化**的内容复用，输入才跟手、不丢字。
+ */
+@Composable
+private fun PromptTextInput(
+    value: androidx.compose.runtime.MutableState<String>,
+    placeholder: String,
+    label: String
+) {
+    PvzInput(
+        value = value.value,
+        onValueChange = { value.value = it },
+        placeholder = placeholder,
+        modifier = Modifier
+            .padding(horizontal = 12.dp)
+            .fillMaxWidth(),
+        theme = PvzCollapsiblePanelTheme.GREEN,
+        label = label,
+        multiline = true
+    )
 }
 
 /**
@@ -2046,6 +2074,23 @@ fun JsItemChoiceDialog() {
     }
     var searchVisible by remember(choiceKey) { mutableStateOf(false) }
     var searchQuery by remember(choiceKey) { mutableStateOf("") }
+    // 🔴 过滤用「防抖后的词」：输入框本身即时跟手，但列表**不要每个字符都重排**。
+    //    每敲一个字就重新过滤 + 重组整张网格（弹窗内容还会被探测层再组合一次），
+    //    连打时单帧开销直接翻倍到掉帧，IME 的合成文本跟着丢 —— 就是「输入框卡、有时吞字」。
+    //    停顿 120ms 才真正过滤；清空则立即生效（关搜索/清空要马上恢复列表）。
+    var filterQuery by remember(choiceKey) { mutableStateOf("") }
+    // ⚠️ 用 snapshotFlow 而不是 `LaunchedEffect(searchQuery)`：后者在组合期读 searchQuery，
+    //    等于把「整张弹窗」也绑到每个字符上，防抖就白做了。
+    LaunchedEffect(choiceKey) {
+        snapshotFlow { searchQuery }.collectLatest { q ->
+            if (q.isEmpty()) {
+                filterQuery = ""      // 清空/关搜索立即恢复列表
+            } else {
+                delay(120)            // 连打时合并成一次过滤
+                filterQuery = q
+            }
+        }
+    }
     var quantity by remember(choiceKey) { mutableIntStateOf(state.quantityDefault) }
 
     // 拖动排序后的下标顺序（仅多选 + reorderable 时可变）。
@@ -2068,7 +2113,7 @@ fun JsItemChoiceDialog() {
     // 过滤后仍保留**原始下标**：选中态以原始下标为键，搜索期间勾选不会串条目。
     // 再按 itemOrder 排序（未拖动时与原始顺序一致）。
     val orderRank = itemOrder.withIndex().associate { (rank, idx) -> idx to rank }
-    val visibleChoices = ChoiceFilter.filterWithIndex(state.items, searchQuery)
+    val visibleChoices = ChoiceFilter.filterWithIndex(state.items, filterQuery)
         .sortedBy { (index, _) -> orderRank[index] ?: Int.MAX_VALUE }
     val visibleIndices = visibleChoices.map { it.first }
     val allVisibleSelected = ChoiceFilter.isAllSelected(selectedIndices, visibleIndices)
@@ -2206,7 +2251,9 @@ fun JsItemChoiceDialog() {
                 // ===== 多选增强：搜索框 / 数量输入（顺序：搜索 → 数量 → 列表）=====
                 if (isMulti && state.searchEnabled && searchVisible) {
                     ChoiceSearchField(
-                        value = searchQuery,
+                        // 传「取值函数」而不是当场读值：打字时只有搜索框自己重组，
+                        // 弹窗（含网格 + 探测层第二份内容）不会跟着逐字符重组。
+                        value = { searchQuery },
                         onValueChange = { searchQuery = it },
                         hint = actionTexts.searchHint,
                         modifier = Modifier
@@ -2229,7 +2276,7 @@ fun JsItemChoiceDialog() {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
-                if (isMulti && searchQuery.isNotBlank() && visibleChoices.isEmpty()) {
+                if (isMulti && filterQuery.isNotBlank() && visibleChoices.isEmpty()) {
                     PvzRichText(
                         text = actionTexts.searchEmpty,
                         fontSize = 13.sp,
@@ -2245,7 +2292,7 @@ fun JsItemChoiceDialog() {
                         ids = headChoices.map { it.first.toString() },
                         columns = if (isGrid) state.columns.coerceIn(2, 6) else 1,
                         // 搜索过滤时禁用拖动：避免只对「过滤后的子集」重排，把其余条目顺序也打乱
-                        enabled = searchQuery.isBlank(),
+                        enabled = filterQuery.isBlank(),
                         onOrderChange = { newIds ->
                             val newOrder = newIds.mapNotNull { it.toIntOrNull() }
                             // 折叠区的条目不在可拖容器里，按原相对顺序接在后面，避免丢序
@@ -2464,14 +2511,15 @@ private fun ChoiceHeaderChip(
  */
 @Composable
 private fun ChoiceSearchField(
-    value: String,
+    /** 取值函数：把状态读取限制在本组件作用域内（见调用处注释） */
+    value: () -> String,
     onValueChange: (String) -> Unit,
     hint: String,
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(8.dp)
     BasicTextField(
-        value = value,
+        value = value(),
         onValueChange = onValueChange,
         singleLine = true,
         textStyle = TextStyle(color = Color(0xFF3A4A1A), fontSize = 14.sp),
@@ -2495,12 +2543,12 @@ private fun ChoiceSearchField(
             )
             Spacer(modifier = Modifier.width(6.dp))
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                if (value.isEmpty()) {
+                if (value().isEmpty()) {
                     Text(text = hint, color = Color(0xFF8A8A5A), fontSize = 14.sp)
                 }
                 innerTextField()
             }
-            if (value.isNotEmpty()) {
+            if (value().isNotEmpty()) {
                 IconButton(onClick = { onValueChange("") }, modifier = Modifier.size(20.dp)) {
                     Icon(
                         imageVector = Icons.Default.Close,
