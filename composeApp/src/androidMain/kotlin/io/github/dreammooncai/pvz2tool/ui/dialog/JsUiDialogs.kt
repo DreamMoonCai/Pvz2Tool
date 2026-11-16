@@ -432,7 +432,8 @@ data class JsPopupState(
 
 /** 弹窗帧类型，与 _xxxState 一一对应（MULTISELECT 复用 SELECT） */
 enum class UiFrameKind {
-    CONFIRM, ALERT, PROMPT, SELECT, MULTISELECT, ACTIONSHEET, SLIDER, NUMBER, LOADING, POPUP
+    CONFIRM, ALERT, PROMPT, SELECT, MULTISELECT, ACTIONSHEET, SLIDER, NUMBER, LOADING, POPUP,
+    COMPOSITE_TEXT
 }
 
 /**
@@ -722,6 +723,7 @@ object JsUiManager {
         set(_numberState, JsNumberState(), UiFrameKind.NUMBER)
         set(_loadingState, JsLoadingState(), UiFrameKind.LOADING)
         set(_popupState, JsPopupState(), UiFrameKind.POPUP)
+        set(_compositeTextState, JsCompositeTextState(), UiFrameKind.COMPOSITE_TEXT)
     }
 
     /**
@@ -995,6 +997,60 @@ object JsUiManager {
      */
     suspend fun hidePopup() {
         dismissKind(UiFrameKind.POPUP)
+    }
+
+    // 复合文本工具弹窗状态流（ui.compositeText）
+    private val _compositeTextState = MutableStateFlow(JsCompositeTextState())
+    val compositeTextState: StateFlow<JsCompositeTextState> = _compositeTextState.asStateFlow()
+
+    /**
+     * 显示复合文本工具弹窗（与集成器右上角入口是同一份 UI，见 [CompositeTextToolDialog]）。
+     *
+     * @param params 预填参数（JS 传 `options` 解析而来）
+     * @return `await()` 得到生成的复合文本；取消 / 点外部时返回 null
+     */
+    fun showCompositeText(
+        ownerContext: JsToolContext?,
+        params: CompositeTextParams = CompositeTextParams(),
+        title: String = "复合文本工具",
+        confirmText: String = "复制",
+        cancelText: String = "取消",
+        copyOnConfirm: Boolean = true,
+        dismissible: Boolean = true,
+        onResult: (suspend (JsAny?) -> Unit)? = null,
+        onClose: (suspend (JsAny?) -> Unit)? = null
+    ): CompletableDeferred<String?> {
+        val deferred = CompletableDeferred<String?>()
+        val state = JsCompositeTextState(
+            isVisible = true,
+            title = title,
+            params = params,
+            confirmText = confirmText,
+            cancelText = cancelText,
+            copyOnConfirm = copyOnConfirm,
+            dismissible = dismissible,
+            onResult = onResult,
+            onClose = onClose,
+            deferred = deferred
+        )
+        @Suppress("UNCHECKED_CAST")
+        pushFrame(
+            UiFrame(
+                UiFrameKind.COMPOSITE_TEXT,
+                state,
+                deferred as CompletableDeferred<Any?>,
+                null,
+                onResult = onResult,
+                onClose = onClose,
+                ownerContext = ownerContext
+            )
+        )
+        return deferred
+    }
+
+    /** 隐藏复合文本工具弹窗（级联关闭） */
+    suspend fun hideCompositeText() {
+        dismissKind(UiFrameKind.COMPOSITE_TEXT)
     }
 
     // 解压器实例（由 JS 调用时创建）
@@ -3591,4 +3647,5 @@ fun JsDialogsHost() {
     JsPopupDialog()
     JsVideoDialog()
     JsNumberDialog()
+    JsCompositeTextDialog()
 }

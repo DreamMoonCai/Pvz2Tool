@@ -1,6 +1,7 @@
 var code = this.all.welfare.giftcode_input.value.trim();
 var saves = pvz.saves.load();
-var datas = saves.objects[0].objdata;
+// 一个 pp.dat 可放多个存档（objects 数组）：必须按当前选中槽位取，不能写死 objects[0]
+var datas = saves.objects[pvz.saves.slot()].objdata;
 var welfare_status = this.all.welfare.welfare_status;
 
 var saves_info = this.all.saves_info;

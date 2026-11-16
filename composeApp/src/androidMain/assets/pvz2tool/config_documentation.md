@@ -690,7 +690,7 @@ sections:
 | `deleteGameSaveButton` | String | `删除游玩存档` | 删除当前游玩存档的按钮文字 |
 | `coverPresetButton` | String | - | 使用预设存档覆盖当前游玩存档的按钮文字 |
 | `gameSaveLabel` | String | `游玩存档` | 游玩存档信息区域的标题文字 |
-| `gameSaveInfoTemplate` | String | `存档用户：%s · 最后游玩：%t` | 游玩存档信息展示模板；`%s` 替换为存档内用户名（读取 pp.dat），`%t` 替换为 pp.dat 最后修改时间 |
+| `gameSaveInfoTemplate` | String | `存档用户：%s · 最后游玩：%t` | 游玩存档信息展示模板；`%s` 替换为存档内用户名（读取 pp.dat 的**当前选中存档槽**，一个 pp.dat 可含多个存档），`%t` 替换为 pp.dat 最后修改时间 |
 | `gameSaveUnknownUser` | String | `未知用户` | 无法从 pp.dat 读取用户名时的占位文本 |
 | `gameSaveNotExistTip` | String | `暂无游玩存档` | 游戏存档目录为空或不存在时的提示文字 |
 | `exportOptionTitle` | String | `选择导出方式` | 导出选项弹窗的标题（FileProvider 可用时显示） |

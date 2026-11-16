@@ -48,6 +48,10 @@ import io.github.dreammooncai.pvz2tool.ui.dialog.JsActionItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsChoiceItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsMoreOptions
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
+import io.github.dreammooncai.pvz2tool.ui.dialog.CompositeTextBuilder
+import io.github.dreammooncai.pvz2tool.ui.dialog.CompositeTextColorMode
+import io.github.dreammooncai.pvz2tool.ui.dialog.CompositeTextParams
+import io.github.dreammooncai.pvz2tool.ui.dialog.CompositeTextType
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsPopupItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsPopupPage
 import io.github.dreammooncai.pvz2tool.ui.popup.SubPopup
@@ -157,6 +161,45 @@ object PvzToolGlobals {
         }
     }
 
+    /**
+     * 把 JS options 解析成复合文本工具的参数。
+     *
+     * 🔴 JS 里的值全是 keight 包装对象：字符串必须 `?.orNull?.let { toString(it) }`、
+     * 布尔必须 `?.orNull?.toBoolean()`，**绝不能** `as? String` / `toKotlin() as? Boolean`
+     * （那样恒为 null → 参数被静默忽略，且不报错）。
+     */
+    private suspend fun ScriptRuntime.parseCompositeOptions(options: JsObject?): CompositeTextParams {
+        suspend fun str(vararg keys: String): String? {
+            for (k in keys) {
+                val v = options?.get(k.js, this)?.orNull ?: continue
+                return toString(v)
+            }
+            return null
+        }
+        val type = CompositeTextType.fromKey(str("type", "类型", "kind")) ?: CompositeTextType.PLAIN
+        val rawColor = str("color", "presetColor", "颜色")
+        // 颜色若是十六进制（#开头），自动切到「自定义色」并把值塞进 customHex，省得调用方再写模式
+        val hexLike = rawColor?.trim()?.startsWith("#") == true
+        val colorMode = when {
+            hexLike -> CompositeTextColorMode.CUSTOM
+            else -> CompositeTextColorMode.fromKey(str("colorMode", "模式")) ?: CompositeTextColorMode.PRESET
+        }
+        return CompositeTextParams(
+            type = type,
+            text = str("text", "content", "文字", "内容") ?: "",
+            colorMode = colorMode,
+            presetColor = if (hexLike) CompositeTextParams().presetColor else (rawColor ?: CompositeTextParams().presetColor),
+            customHex = if (hexLike) rawColor!!.trim() else (str("hex", "customHex", "自定义色") ?: "#FF0000"),
+            iconWidth = str("width", "iconWidth", "宽") ?: "",
+            iconHeight = str("height", "iconHeight", "高") ?: "",
+            iconX = str("x", "iconX") ?: "",
+            iconY = str("y", "iconY") ?: "",
+            iconZ = str("z", "iconZ") ?: "",
+            linkUrl = str("url", "link", "linkUrl", "地址") ?: "",
+            linkStyle = str("linkStyle", "style", "样式") ?: ""
+        )
+    }
+
     val ui = Object("ui") { // 提示弹窗（单按钮）：ui.alert(title, message, options?) -> void
         listOf("alert".js, "提示".js).func(
             FunctionParam("title"), FunctionParam("message"), FunctionParam("options")
@@ -220,6 +263,45 @@ object PvzToolGlobals {
             val onResult = bindJsCallback(options, "onResult", runtime)
             JsUiManager.showPrompt(getJsToolContext(),title, message, defaultValue, placeholder, confirmText, cancelText, confirmColor, cancelColor, dismissible, onConfirm, onCancel, onResult).await()?.js
         }
+
+        // 复合文本工具弹窗：ui.compositeText(options?) -> string|null
+        // options: { type?, text?, color?, colorMode?, hex?, width?, height?, x?, y?, z?, url?, linkStyle?,
+        //            title?, confirmText?, cancelText?, copy?, dismissible?, onResult?, onClose? }
+        listOf("compositeText".js, "复合文本".js, "复合文本工具".js).func(
+            FunctionParam("options")
+        ) { args ->
+            val runtime = this
+            val options = args.getOrNull(0).orNull as? JsObject
+            val params = parseCompositeOptions(options)
+            val title = options?.get("title".js, this)?.orNull?.let { toString(it) } ?: "复合文本工具"
+            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "复制"
+            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
+            val copyOnConfirm = options?.get("copy".js, this)?.orNull?.toBoolean() ?: true
+            val dismissible = options?.get("dismissible".js, this)?.orNull?.toBoolean()
+                ?: options?.get("可关闭".js, this)?.orNull?.toBoolean() ?: true
+            val onResult = bindJsCallback(options, "onResult", runtime)
+            val onClose = bindJsCallback(options, "onClose", runtime)
+            JsUiManager.showCompositeText(
+                ownerContext = getJsToolContext(),
+                params = params,
+                title = title,
+                confirmText = confirmText,
+                cancelText = cancelText,
+                copyOnConfirm = copyOnConfirm,
+                dismissible = dismissible,
+                onResult = onResult,
+                onClose = onClose
+            ).await()?.js
+        }
+
+        // 直接拼接复合文本（不弹窗，同步返回）：ui.buildCompositeText(options) -> string
+        listOf("buildCompositeText".js, "拼接复合文本".js, "生成复合文本".js).func(
+            FunctionParam("options")
+        ) { args ->
+            val options = args.getOrNull(0).orNull as? JsObject
+            CompositeTextBuilder.build(parseCompositeOptions(options)).js
+        }
+
 
         // 进度弹窗：ui.progress(title, options?) -> progressController
         // options: { message?, indeterminate?, showCancel?, onCancel? }

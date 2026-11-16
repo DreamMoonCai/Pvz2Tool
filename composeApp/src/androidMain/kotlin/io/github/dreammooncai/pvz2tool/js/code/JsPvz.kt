@@ -12,6 +12,8 @@ import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
+import io.github.dreammooncai.pvz2tool.pop.save.PpDatSaves
+import io.github.dreammooncai.pvz2tool.ui.main.PvzSaveFileManager
 import io.github.dreammooncai.pvz2tool.pop.plugin.crypt.Pvz2NumberCrypt
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -151,11 +153,50 @@ object JsPvz {
             Pvz2NumberCrypt.decrypt(n).js
         }
         listOf("saves".js, "存档".js) eq Object("saves") {
+            // 加载整个存档文件（含 **全部** 存档槽 objects）。多存档请配合 slot() 定位：
+            //   var saves = pvz.saves.load();
+            //   var datas = saves.objects[pvz.saves.slot()].objdata;
             listOf("load".js, "加载".js).func {
                 runCatching {
                     val load = PvzToolJsEngine.getJSEngine().compile("rton.load").invoke() as JSFunction
                     load.invoke(listOf("${JsFileResolver.GAME_SAVES}/pp.dat".js), this)
                 }.getOrElse { error("存档读取失败或存档压根不存在啊？至少拥有存档才能使用此功能...") }
+            }
+
+            // 当前选中存档槽位（0 基，已钳制到有效范围）：
+            // 新版 pp.dat 的 objects 可放 5 个存档，文件里没有「当前是第几个」的标记，
+            // 由工具侧记住用户选的槽位（存档管理栏里的存档槽选择条）。
+            listOf("slot".js, "槽位".js, "当前槽位".js).func {
+                val context = InitializePvz2.context
+                val slots = PpDatSaves.readSlotsOfCurrentSave(context)
+                if (slots.isEmpty()) 0.js else PpDatSaves.selectedPosition(context, slots.size).js
+            }
+
+            // 切换当前选中的存档槽位（0 基，越界自动钳制）：
+            //   pvz.saves.setSlot(2);        // 之后 slot()/金币等脚本都读第 3 个存档
+            // 选择会被记住，并通知界面刷新（存档槽条 / 欢迎语 / 存档信息）。
+            listOf("setSlot".js, "设置槽位".js, "切换槽位".js, "选择存档".js).func("index") { args ->
+                val context = InitializePvz2.context
+                val slots = PpDatSaves.readSlotsOfCurrentSave(context)
+                if (slots.isNotEmpty()) {
+                    val raw = runCatching { toNumber(args[0]).toInt() }.getOrDefault(0)
+                    val clamped = raw.coerceIn(0, slots.size - 1)
+                    PpDatSaves.setSelectedPosition(context, clamped)
+                    PvzSaveFileManager.notifyGameSaveChanged()
+                }
+                null
+            }
+
+            // 存档槽数量（单存档恒为 1）
+            listOf("count".js, "数量".js, "存档数量".js).func {
+                PpDatSaves.readSlotsOfCurrentSave(InitializePvz2.context).size.js
+            }
+
+            // 所有存档槽的用户名（与 objects 数组顺序一致）
+            listOf("names".js, "名称".js, "存档名称".js).func {
+                PpDatSaves.readSlotsOfCurrentSave(InitializePvz2.context)
+                    .map { (it.name ?: "").js }
+                    .js
             }
         }
 

@@ -116,7 +116,11 @@
 |------|----------|------|
 | `pvz.encrypt()` | `pvz.加密()` | 数字加密 |
 | `pvz.decrypt()` | `pvz.解密()` | 数字解密 |
-| `pvz.saves.load()` | `pvz.存档.加载()` | 加载存档 |
+| `pvz.saves.load()` | `pvz.存档.加载()` | 加载存档（整个 pp.dat，含全部存档槽） |
+| `pvz.saves.slot()` | `pvz.存档.槽位()` / `pvz.存档.当前槽位()` | 当前选中的存档槽下标（0 基） |
+| `pvz.saves.setSlot(i)` | `pvz.存档.设置槽位()` / `pvz.存档.切换槽位()` / `pvz.存档.选择存档()` | 切换当前选中的存档槽（0 基，越界钳制） |
+| `pvz.saves.count()` | `pvz.存档.数量()` / `pvz.存档.存档数量()` | 存档槽数量 |
+| `pvz.saves.names()` | `pvz.存档.名称()` / `pvz.存档.存档名称()` | 所有存档槽的用户名数组 |
 | `pvz.plants` | `pvz.植物` / `pvz.植物.全部` | 植物数据 |
 | `pvz.zombies` | `pvz.僵尸` / `pvz.僵尸.全部` | 僵尸数据 |
 | `pvz.gameFeatures` | `pvz.强化道具` / `pvz.强化道具.全部` | 强化道具数据 |
@@ -153,6 +157,8 @@
 | `ui.isCustomGameDisplayEnabled()` | `ui.是否启用自定义画面()` / `ui.画面设置是否可用()` | 「自定义游戏画面」开关是否已开启（可用作 `isShowFromJs` 条件） |
 | `ui.refreshAll()` | `ui.刷新所有()` / `ui.刷新复合文本()` | 主动刷新所有复合文本与动态显隐（见下方详解） |
 | `ui.popup()` | `ui.弹出()` / `ui.对话框()` / `ui.showPopup()` | 通用设置风格弹窗（标题 + 内容项 + 可进入子页面），见下方详解 |
+| `ui.compositeText()` | `ui.复合文本()` / `ui.复合文本工具()` | 弹出**复合文本工具**弹窗（可视化拼 `{{color:}}` / `{{js:}}` / `{{icon:}}` / `{{link:}}`），返回生成结果 |
+| `ui.buildCompositeText()` | `ui.拼接复合文本()` / `ui.生成复合文本()` | 与上面同一套参数，但**不弹窗**、直接同步返回拼接好的字符串 |
 
 #### vpn 对象
 | 英文 | 中文别名 | 说明 |
@@ -978,14 +984,71 @@ console.log("解密结果: " + dec);
 
 #### pvz.saves.load / pvz.存档.加载
 
-加载游戏存档。
+加载游戏存档文件（整个 `pp.dat`，包含**全部**存档槽）。
 
-**返回**：JSObject - 存档对象
+**返回**：JSObject - 存档对象（`objects` 是存档槽数组，槽内 `objdata` 才是数据）
+
+> 🔴 **多存档（重点）**：新版一个 `pp.dat` 可同时放 **5 个存档**，各槽在 `objects` 数组里，
+> 而文件内**没有**「当前玩的是第几个」的标记。所以在多存档环境里
+> **绝不能写死 `objects[0]`**，要用 `pvz.saves.slot()` 取工具侧选中的槽位。
 
 **示例**：
 ```javascript
 var saves = pvz.saves.load();
-console.log(saves.objects[0].objclass);
+// ✅ 正确：跟随「存档管理」栏里选中的存档槽
+var datas = saves.objects[pvz.saves.slot()].objdata;
+console.log(datas.n);          // 用户名
+saves.save();
+```
+
+#### pvz.saves.slot / pvz.存档.槽位
+
+当前选中的存档槽位下标（**0 基**，已钳制到有效范围；单存档恒为 `0`）。
+选择来源 = 工具箱「存档管理」栏里的**存档槽选择条**（切换后会被记住，下次打开仍生效），
+也可由脚本通过 `pvz.saves.setSlot(i)` 切换。
+
+> 🔴 **注意**：`pp.dat` 文件内部**没有**「当前玩的是第几个存档」的标记——游戏自己通过
+> `PlayerProfileIndex` 偏好单独记录（Lua API `getCurrentProfileIndex` / `setCurrentProfileIndex`），
+> 数据不在 pp.dat 里。因此工具侧的「选中槽位」是工具自己记住的，用来决定读/改哪个槽，
+> 它**不会**改变游戏内当前正在玩的存档。
+
+**返回**：number
+
+#### pvz.saves.setSlot / pvz.存档.设置槽位
+
+切换当前选中的存档槽位（**0 基**，越界自动钳制到 `0..count-1`）。切换后 `slot()`、
+金币/钻石等读取脚本、欢迎语、存档槽选择条都会跟着更新，且选择会被记住。
+
+```javascript
+pvz.saves.setSlot(2);              // 选中第 3 个存档
+var datas = pvz.saves.load().objects[pvz.saves.slot()].objdata;
+console.log("当前存档：" + pvz.saves.names()[pvz.saves.slot()]);
+```
+
+**参数**：`index` (number) - 目标槽位下标（0 基）
+**返回**：void
+
+#### pvz.saves.count / pvz.存档.数量
+
+存档槽数量（单存档为 `1`，最多与新版的 5 槽一致）。
+
+**返回**：number
+
+#### pvz.saves.names / pvz.存档.名称
+
+所有存档槽的用户名数组，顺序与 `objects` 一致（某槽没有用户名时为空字符串）。
+
+**返回**：string[]
+
+**多存档综合示例**：
+```javascript
+var saves = pvz.saves.load();
+var idx = pvz.saves.slot();
+console.log("共 " + pvz.saves.count() + " 个存档，当前第 " + (idx + 1) + " 个");
+console.log("全部用户名: " + pvz.saves.names().join(" / "));
+
+var datas = saves.objects[idx].objdata;
+datas.n = "新名字";     // 只改当前槽
 saves.save();
 ```
 
@@ -2420,6 +2483,71 @@ ui.popup("我的设置", [
     }
 });
 ```
+
+#### ui.compositeText / ui.复合文本
+
+**语法**：`ui.compositeText(options?) -> string|null`
+
+弹出**复合文本工具**（就是工具箱集成器右上角那个弹窗的同一份 UI），所有输入、类型选择、实时预览、生成结果都在弹窗里完成，JS 侧只负责拿到最终字符串。
+
+**参数**（`options`，全部可选）：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `type` | string | `"plain"` | 类型：`plain` / `color` / `js` / `icon` / `link`（也接受 `普通文字` / `颜色文本` / `JS表达式` / `图标` / `链接`） |
+| `text` | string | "" | 文字内容（`link` 类型下是**显示文字**；`icon` 类型下是**图标路径**） |
+| `colorMode` | string | `"preset"` | 颜色模式：`preset`（命名色）/ `custom`（十六进制） |
+| `color` | string | `"green"` | 预设色名；**若以 `#` 开头会自动按 `custom` 模式处理** |
+| `hex` | string | `"#FF0000"` | 自定义十六进制色（`#RRGGBB` / `#AARRGGBB`） |
+| `width` / `height` | string | "" | 图标宽 / 高（留空按字号自适应；非 `icon` 类型忽略） |
+| `x` / `y` / `z` | string | "" | 图标偏移与层级（填 `x` 或 `y` 即进入浮层模式，不占位） |
+| `url` | string | "" | `link` 类型的链接地址或 JS 代码 |
+| `linkStyle` | string | "" | `link` 类型样式后缀（`green` / `red` / `gold` …，见复合文本语法） |
+| `title` | string | "复合文本工具" | 弹窗标题 |
+| `confirmText` | string | "复制" | 确认按钮文字 |
+| `cancelText` | string | "取消" | 取消按钮文字 |
+| `copy` | boolean | true | 点确认时是否同时复制到剪贴板 |
+| `dismissible` / `可关闭` | boolean | true | 是否允许点外部关闭（等价于取消） |
+| `onResult` | function | 无 | 确认时触发（收到生成的字符串） |
+| `onClose` | function | 无 | 取消 / 点外部关闭时触发（无参数） |
+
+**返回**：string|null — 确认生成后的复合文本；取消 / 直接关闭返回 `null`。
+
+**示例**：
+```javascript
+// 弹窗里拼一段红色文字
+var t = ui.compositeText({ type: "color", color: "red", text: "限时活动" });
+if (t !== null) {
+    console.log("生成：" + t);   // 例如 {{red:限时活动}}
+    this.value = t;
+}
+
+// 预填一个链接
+var link = ui.compositeText({ type: "link", url: "https://example.com", text: "点我", linkStyle: "gold" });
+
+// 中文别名
+var s = ui.复合文本({ type: "icon", text: "auto_collect.png", width: "24", height: "24" });
+```
+
+#### ui.buildCompositeText / ui.拼接复合文本
+
+**语法**：`ui.buildCompositeText(options?) -> string`
+
+与 `ui.compositeText` **参数完全一致**，但不弹窗、同步返回拼接结果（适合在脚本里批量生成标记，或先算好再塞进 `dream.yml`）。
+
+```javascript
+var t = ui.buildCompositeText({ type: "color", hex: "#FF0000", text: "警告" });
+console.log(t);                       // {{#FF0000:警告}}
+
+var icon = ui.buildCompositeText({ type: "icon", text: "gem.png" });
+console.log(icon);                    // {{icon:gem.png}}
+
+var js = ui.buildCompositeText({ type: "js", text: "vpn.isActive() ? '已断网' : '正常'" });
+console.log(js);                      // {{js:vpn.isActive() ? '已断网' : '正常'}}
+```
+
+> 复合文本的完整语法（颜色 / 图标参数 / 链接 / `-shadow` 变体等）见本文档「复合文本语法」章节。
+> 🔴 `{{...}}` **不支持嵌套**；`{{link|JS代码:显示文字}}` 按**最后一个** `:` 切分，所以 JS 代码里可以有冒号、显示文字里不能有冒号。
 
 ## 8.5. js - JS 执行器
 

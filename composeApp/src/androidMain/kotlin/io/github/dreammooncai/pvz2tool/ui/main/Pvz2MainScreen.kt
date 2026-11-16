@@ -21,6 +21,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
@@ -116,6 +117,7 @@ import io.github.dreammooncai.pvz2tool.js.JsConsole
 import io.github.dreammooncai.pvz2tool.js.JsLogLevel
 import io.github.dreammooncai.pvz2tool.js.JsLogger
 import io.github.dreammooncai.pvz2tool.pop.rton.RTON
+import io.github.dreammooncai.pvz2tool.pop.save.PpDatSaves
 import io.github.dreammooncai.pvz2tool.rememberSoundInteractionSource
 import io.github.dreammooncai.pvz2tool.service.RequestPermissionsVpn
 import io.github.dreammooncai.pvz2tool.controller.FloatingBallController
@@ -677,6 +679,68 @@ private fun PresetSaveSection(
 }
 
 // ========== 游戏存档（游玩存档）信息展示区域 ==========
+/**
+ * 存档槽选择条（仅在一个 pp.dat 内含多个存档时出现）。
+ *
+ * 新版 pp.dat 的 `objects` 数组可同时放 5 个存档，但文件里**没有**「当前玩的是第几个」的标记，
+ * 所以由工具自己记住选中的槽位（[PpDatSaves.setSelectedPosition]）：
+ * 存档信息、欢迎语里的用户名、以及「修改用户名」都会跟着这个选择走。
+ */
+@Composable
+private fun SaveSlotChips(
+    slots: List<PpDatSaves.Slot>,
+    selectedPos: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        slots.forEachIndexed { pos, slot ->
+            val sel = pos == selectedPos
+            // 统一 PVZ 风格：奶黄底 + 橄榄描边 + Hook/HookSelect 图标 + 切换音效，
+            // 与 RadioButtonItem / CheckboxItem 保持一致（不再用突兀的亮绿底白字）。
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (sel) Color(0xFFE8F5D0) else Color(0xFFF3EEB9))
+                    .border(
+                        2.dp,
+                        if (sel) Color(0xFF689F38) else Color(0xFFA1510D),
+                        RoundedCornerShape(10.dp)
+                    )
+                    .clickable(
+                        interactionSource = rememberSoundInteractionSource(
+                            InitializePvz2.config.ui.sounds.switchClickPress,
+                            InitializePvz2.config.ui.sounds.switchClickRelease
+                        )
+                    ) {
+                        SoundController.playSoundFromAssets(InitializePvz2.config.ui.sounds.switchClick)
+                        onSelect(pos)
+                    }
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    imageVector = if (sel) Pvz2Icon.HookSelect else Pvz2Icon.Hook,
+                    contentDescription = if (sel) "当前存档" else "切换到此存档",
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                PvzRichText(
+                    "${pos + 1}. ${slot.displayName()}",
+                    defaultStyle = PvzTextOliveStyle.copy(shadowColor = null),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun GameSaveSection(
     context: Context,
@@ -694,6 +758,10 @@ private fun GameSaveSection(
     var lastModified by remember { mutableStateOf<Long?>(null) }
     var saveExists by remember { mutableStateOf(gameSaveDir.exists() && (gameSaveDir.listFiles()?.isNotEmpty() == true)) }
 
+    // 多存档槽：新版一个 pp.dat 里可放多个存档（objects 数组），这里列出全部槽并高亮当前查看的那个
+    var slots by remember { mutableStateOf<List<PpDatSaves.Slot>>(emptyList()) }
+    var selectedPos by remember { mutableIntStateOf(0) }
+
     // 刷新触发器：当游戏存档发生变化（删除 / 覆盖 / 外部写入等）时重新加载信息
     val refreshTrigger = remember { mutableLongStateOf(0L) }
 
@@ -710,7 +778,10 @@ private fun GameSaveSection(
     // 加载存档信息（从 pp.dat 读取用户名和修改时间）
     // 监听 gameSaveDir 与 refreshTrigger，确保删除 / 覆盖等操作后信息能立即刷新
     LaunchedEffect(gameSaveDir, refreshTrigger.longValue) {
-        userName = loadUserNameFromSave(context)
+        val allSlots = PpDatSaves.readSlotsOfCurrentSave(context)
+        slots = allSlots
+        selectedPos = PpDatSaves.selectedPosition(context, allSlots.size)
+        userName = allSlots.getOrNull(selectedPos)?.name
         val ppDat = File(gameSaveDir, "pp.dat")
         lastModified = if (ppDat.exists() && ppDat.length() > 0) ppDat.lastModified().takeIf { it > 0 } else null
         saveExists = gameSaveDir.exists() && (gameSaveDir.listFiles()?.isNotEmpty() == true)
@@ -843,6 +914,22 @@ private fun GameSaveSection(
         defaultStyle = PvzTextStyle(Color(0xFF423F00)),
         modifier = Modifier.padding(bottom = 12.dp)
     )
+
+    // 多存档槽：一个 pp.dat 放了多个存档时列出全部，点哪个就看/改哪个（选择被记住）
+    if (slots.size > 1) {
+        SaveSlotChips(
+            slots = slots,
+            selectedPos = selectedPos,
+            onSelect = { pos ->
+                PpDatSaves.setSelectedPosition(context, pos)
+                selectedPos = pos
+                userName = slots.getOrNull(pos)?.name
+                // 通知其它位置（欢迎语等）同步刷新
+                PvzSaveFileManager.notifyGameSaveChanged()
+            },
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+    }
 
     // 导出选项弹窗
     PvzStyledDialog(
@@ -1787,6 +1874,8 @@ private fun WelcomeUserSection(
                 scope.launch {
                     val success = saveUserNameToSave(context, newName)
                     if (success) {
+                        // 通知所有存档信息消费者一起刷新（存档管理栏的「存档用户」与存档槽名称都要跟着变）
+                        PvzSaveFileManager.notifyGameSaveChanged()
                         // 刷新显示
                         refreshTrigger.longValue = System.currentTimeMillis()
                     }
@@ -1945,147 +2034,32 @@ private fun EditUserNameDialog(
     }
 }
 
-// ======================== 新增：保存用户名到存档 ========================
+// ======================== 保存 / 读取用户名（多存档槽）========================
 /**
- * 将新用户名保存到 pp.dat
+ * 将新用户名保存到 pp.dat 的**当前选中槽位**。
+ *
+ * 🔴 多存档适配：新版一个 pp.dat 可放 5 个存档（`objects` 数组），
+ * 以前这里写死 `objects[0]`，改名字会串到别的存档上。现在统一走 [PpDatSaves]，
+ * 由它按「工具侧选中槽位」定位，其它槽与其余字段原样保留。
  */
 private suspend fun saveUserNameToSave(context: Context, newUserName: String): Boolean {
     return withContext(Dispatchers.IO) {
-        try {
-            // 1. 获取游戏存档目录
-            val config = InitializePvz2.config
-            val saveSection = config.sections.find { it.id == "saves" } ?: return@withContext false
-            val gameSaveDir = saveSection.resolveTargetDirectory()
-
-            // 2. 检查 pp.dat 是否存在
-            val ppDatFile = File(gameSaveDir, "pp.dat")
-            if (!ppDatFile.exists() || ppDatFile.length() == 0L) {
-                Log.e("EditUser", "pp.dat 不存在或为空")
-                return@withContext false
-            }
-
-            // 3. 创建临时文件
-            val tempJsonFile = File(context.cacheDir, "temp_edit_pp_${System.currentTimeMillis()}.json")
-            val tempRtonFile = File(context.cacheDir, "temp_edit_pp_rton_${System.currentTimeMillis()}.dat")
-
-            try {
-                // 4. 解码 RTON -> JSON
-                RTON.decodeAuto(ppDatFile.absolutePath, tempJsonFile.absolutePath)
-
-                // 5. 解析并修改 JSON
-                val jsonString = tempJsonFile.readText()
-                val json = Json.parseToJsonElement(jsonString).jsonObject
-
-                // 创建可变的 JSON 对象
-                val mutableObjects = json.getValue("objects").jsonArray.toMutableList()
-                val firstObject = mutableObjects[0].jsonObject
-                val objData = firstObject.getValue("objdata").jsonObject
-
-                // 修改用户名字段 "n"
-                val mutableObjData = objData.toMutableMap().apply {
-                    put("n", JsonPrimitive(newUserName))
-                }
-
-                // 重新构建完整的 JSON
-                val modifiedFirstObject = firstObject.toMutableMap().apply {
-                    put("objdata", JsonObject(mutableObjData))
-                }
-                mutableObjects[0] = JsonObject(modifiedFirstObject)
-
-                val finalJson = JsonObject(json.toMutableMap().apply {
-                    put("objects", JsonArray(mutableObjects))
-                })
-
-                // 6. 将修改后的 JSON 写回临时文件
-                tempJsonFile.writeText(finalJson.toString())
-
-                // 7. 编码 JSON -> RTON
-                RTON.encodeAuto(tempJsonFile.absolutePath, tempRtonFile.absolutePath)
-
-                // 8. 验证生成的文件
-                if (!tempRtonFile.exists() || tempRtonFile.length() == 0L) {
-                    Log.e("EditUser", "生成的 RTON 文件无效")
-                    return@withContext false
-                }
-
-                // 9. 备份原文件（可选，安全起见）
-                val backupFile = File(gameSaveDir, "pp.dat.backup_${System.currentTimeMillis()}")
-                if (ppDatFile.exists()) {
-                    ppDatFile.copyTo(backupFile, overwrite = true)
-                }
-
-                // 10. 用新文件覆盖原文件
-                tempRtonFile.copyTo(ppDatFile, overwrite = true)
-
-                // 11. 删除备份（如果成功）
-                if (backupFile.exists()) {
-                    backupFile.delete()
-                }
-
-                Log.d("EditUser", "用户名修改成功: $newUserName")
-                true
-            } catch (e: Exception) {
-                Log.e("EditUser", "修改用户名失败", e)
-                false
-            } finally {
-                // 清理临时文件
-                if (tempJsonFile.exists()) tempJsonFile.delete()
-                if (tempRtonFile.exists()) tempRtonFile.delete()
-            }
-        } catch (e: Exception) {
-            Log.e("EditUser", "修改用户名异常", e)
-            false
-        }
+        runCatching { PpDatSaves.writeSelectedName(context, newUserName) }
+            .onFailure { Log.e("EditUser", "修改用户名失败", it) }
+            .getOrDefault(false)
     }
 }
 
 /**
- * 从当前游戏存档中读取用户名
+ * 从当前游戏存档的**选中槽位**读取用户名。
+ *
+ * 🔴 以前写死 `objects[0]`，多存档时永远显示第一个存档的用户名（即使玩家玩的是第 2~5 个）。
  */
 private suspend fun loadUserNameFromSave(context: Context): String? {
     return withContext(Dispatchers.IO) {
-        try {
-            // 1. 获取游戏存档目录
-            val config = InitializePvz2.config
-            val saveSection = config.sections.find { it.id == "saves" } ?: return@withContext null
-            val gameSaveDir = saveSection.resolveTargetDirectory()
-
-            // 2. 检查 pp.dat 是否存在
-            val ppDatFile = File(gameSaveDir, "pp.dat")
-            if (!ppDatFile.exists() || ppDatFile.length() == 0L) {
-                return@withContext null
-            }
-
-            // 3. 创建临时文件用于存放解码后的 JSON
-            val tempJsonFile = File(context.cacheDir, "temp_pp_${System.currentTimeMillis()}.json")
-
-            try {
-                // 4. 使用 RTON.decodeAuto 解码
-                RTON.decodeAuto(ppDatFile.absolutePath, tempJsonFile.absolutePath)
-
-                val json = Json.parseToJsonElement(tempJsonFile.readText())
-
-                json.jsonObject
-                    .getValue("objects")
-                    .jsonArray[0]
-                    .jsonObject
-                    .getValue("objdata")
-                    .jsonObject
-                    .getValue("n")
-                    .jsonPrimitive.content
-            } catch (e: Exception) {
-                Log.e("WelcomeUser", "读取存档用户名失败", e)
-                null
-            } finally {
-                // 清理临时文件
-                if (tempJsonFile.exists()) {
-                    tempJsonFile.delete()
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("WelcomeUser", "读取存档异常", e)
-            null
-        }
+        runCatching { PpDatSaves.readSelectedName(context) }
+            .onFailure { Log.e("WelcomeUser", "读取存档用户名失败", it) }
+            .getOrNull()
     }
 }
 

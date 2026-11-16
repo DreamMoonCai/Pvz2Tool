@@ -163,6 +163,21 @@ sections:
         icon: "save_icon.png"
         assetPath: "saves/save_2"
 
+      # 多存档示例：一个 pp.dat 内含多个存档（objects 数组），用于验证存档槽选择条
+      - id: "save_multi2"
+        name: "多存档·2槽"
+        desc: "一个 pp.dat 含 2 个存档"
+        type: "RADIO"
+        icon: "save_icon.png"
+        assetPath: "saves/save_multi2"
+
+      - id: "save_multi5"
+        name: "多存档·5槽"
+        desc: "一个 pp.dat 含 5 个存档"
+        type: "RADIO"
+        icon: "save_icon.png"
+        assetPath: "saves/save_multi5"
+
   - id: "saves_info"
     title: "存档信息"
     theme: "RED"
@@ -175,7 +190,7 @@ sections:
         infoValue: "暂无金币信息"
         jsScript: |-
           var saves = pvz.saves.load();
-          var datas = saves.objects[0].objdata
+          var datas = saves.objects[pvz.saves.slot()].objdata
           datas.c.解密
       - id: "DiamondQuantity"
         name: "钻石数量"
@@ -184,7 +199,7 @@ sections:
         infoValue: "暂无钻石信息"
         jsScript: |-
           var saves = pvz.saves.load();
-          var datas = saves.objects[0].objdata
+          var datas = saves.objects[pvz.saves.slot()].objdata
           datas.g.解密
       - id: "PlantQuantity"
         name: "植物数量"
@@ -193,7 +208,7 @@ sections:
         infoValue: "暂无植物信息"
         jsScript: |-
           var saves = pvz.saves.load();
-          var datas = saves.objects[0].objdata
+          var datas = saves.objects[pvz.saves.slot()].objdata
           datas.p.length
 
 
@@ -1534,7 +1549,9 @@ sections:
         type: "BUTTON"
         jsScript: |-
           let saves = pvz.saves.load()
-          console.log(saves.objects[0].objclass);
+          // 一个 pp.dat 可放多个存档：objects[pvz.saves.slot()] 才是「当前选中的那个存档」
+          console.log(saves.objects[pvz.saves.slot()].objclass);
+          console.log("存档数量：" + pvz.saves.count() + "，当前：" + (pvz.saves.slot() + 1));
           saves.save()
           "成功";
 
