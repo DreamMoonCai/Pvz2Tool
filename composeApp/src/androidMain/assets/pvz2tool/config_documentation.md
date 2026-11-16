@@ -367,10 +367,15 @@ items:
 
 **进入游戏时 JS 执行顺序**：
 
-点击"进入游戏"按钮时，按以下顺序依次执行 JS：
+以下两种情况都会走同一套「进入游戏」逻辑，按相同顺序依次执行 JS：
+
+- 点击"进入游戏"按钮
+- 跳过工具箱（`app.skipToolboxNextLaunch(true)`）或重启后自动进游戏（`app.restartGame()`）
 
 1. **版本级 enterGame JS**：执行当前选中版本的 `enterGameScript`；若为空则尝试加载 `enterGamePath`（默认 `version/版本ID/main.js`）
 2. **section 级 JS（无 confirmButtonText 的栏目）**：遍历所有可见栏目，对**未配置 confirmButtonText** 的栏目执行其 `jsScript`；若为空则尝试加载 `jsPath`（默认 `version/版本ID/栏目ID/main.js`）
+
+> 注意：`simplifiedLaunch: true` 精简模式直接启动游戏、不经过主界面，不执行上述进入游戏 JS。
 
 ---
 
@@ -693,6 +698,8 @@ sections:
 | `gameSaveInfoTemplate` | String | `存档用户：%s · 最后游玩：%t` | 游玩存档信息展示模板；`%s` 替换为存档内用户名（读取 pp.dat 的**当前选中存档槽**，一个 pp.dat 可含多个存档），`%t` 替换为 pp.dat 最后修改时间 |
 | `gameSaveUnknownUser` | String | `未知用户` | 无法从 pp.dat 读取用户名时的占位文本 |
 | `gameSaveNotExistTip` | String | `暂无游玩存档` | 游戏存档目录为空或不存在时的提示文字 |
+| `onSaveChangedJs` | String | - | **存档变更事件 JS（内联）**。任何存档变更（覆盖预设 / 切换子存档槽位 / 删除 / 导入 / 备份 / 脚本调 `pvz.saves.setSlot()`）后自动执行一次。脚本内用 `pvz.saves.slot()` 读当前槽位（0 基）。与 `onSaveChangedJsPath` 二选一，本字段优先。典型用途：把工具选中槽位写回游戏当前存档标记（如 sexy 文件的 curuser），路径与读写全由脚本决定 |
+| `onSaveChangedJsPath` | String | - | **存档变更事件 JS 文件路径**。`onSaveChangedJs` 为空时从资源层加载该脚本（支持占位符 / 绝对路径 / 工作目录 / APK assets）；脚本类字段在集成器中会被打包到 `assets/pvz2tool/js/` |
 | `exportOptionTitle` | String | `选择导出方式` | 导出选项弹窗的标题（FileProvider 可用时显示） |
 | `exportToFolderOption` | String | `导出到指定文件夹` | 导出选项弹窗中「导出到文件夹」按钮文字 |
 | `shareAsPackageOption` | String | `分享为存档包` | 导出选项弹窗中「分享为 .pvz2saves 存档包」按钮文字 |

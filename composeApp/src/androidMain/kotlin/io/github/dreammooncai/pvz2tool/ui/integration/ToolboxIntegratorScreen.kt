@@ -549,6 +549,8 @@ fun loadDefaultsFromDreamYml(raw: String): DreamDefaults {
             gameSaveUnknownUser = config?.ui?.save?.gameSaveUnknownUser ?: "",
             gameSaveNotExistTip = config?.ui?.save?.gameSaveNotExistTip ?: "",
             retryButtonText = config?.ui?.save?.retryButtonText ?: "",
+            onSaveChangedJs = config?.ui?.save?.onSaveChangedJs ?: "",
+            onSaveChangedJsPath = config?.ui?.save?.onSaveChangedJsPath ?: "",
             opBackup = config?.ui?.save?.operation?.backup ?: "",
             opExport = config?.ui?.save?.operation?.export ?: "",
             opImport = config?.ui?.save?.operation?.import ?: "",
@@ -712,6 +714,7 @@ data class SaveDraft(
     val shareAsPackageOption: String = "", val gameSaveLabel: String = "",
     val gameSaveInfoTemplate: String = "", val gameSaveUnknownUser: String = "",
     val gameSaveNotExistTip: String = "", val retryButtonText: String = "",
+    val onSaveChangedJs: String = "", val onSaveChangedJsPath: String = "",
     val opBackup: String = "", val opExport: String = "", val opImport: String = "",
     val opDelete: String = "", val opDeleteGameSave: String = "", val opCover: String = "", val opSaveMeta: String = ""
 )
@@ -734,6 +737,7 @@ fun SaveDraft.toConfigSave() = Pvz2ToolConfigUISave(
     exportOptionTitle = exportOptionTitle, exportToFolderOption = exportToFolderOption, shareAsPackageOption = shareAsPackageOption,
     gameSaveLabel = gameSaveLabel, gameSaveInfoTemplate = gameSaveInfoTemplate, gameSaveUnknownUser = gameSaveUnknownUser,
     gameSaveNotExistTip = gameSaveNotExistTip, retryButtonText = retryButtonText,
+    onSaveChangedJs = onSaveChangedJs.ifBlank { null }, onSaveChangedJsPath = packScriptAssetPath(onSaveChangedJsPath),
     operation = Pvz2ToolConfigOperation(backup = opBackup, export = opExport, import = opImport, delete = opDelete, deleteGameSave = opDeleteGameSave, cover = opCover, saveMeta = opSaveMeta)
 )
 
@@ -5827,6 +5831,8 @@ private fun UiAdvancedSettingsContent(
                 UiInputCard("游玩存档未知用户（ui.save.gameSaveUnknownUser）", "") { IntegratorInputField(saveDraft.gameSaveUnknownUser, "游玩存档未知用户") { onSaveDraft(saveDraft.copy(gameSaveUnknownUser = it)) } }
                 UiInputCard("游玩存档不存在提示（ui.save.gameSaveNotExistTip）", "") { IntegratorInputField(saveDraft.gameSaveNotExistTip, "游玩存档不存在提示") { onSaveDraft(saveDraft.copy(gameSaveNotExistTip = it)) } }
                 UiInputCard("重试按钮（ui.save.retryButtonText）", "") { IntegratorInputField(saveDraft.retryButtonText, "重试按钮") { onSaveDraft(saveDraft.copy(retryButtonText = it)) } }
+                UiInputCard("存档变更事件JS·内联（ui.save.onSaveChangedJs）", "") { IntegratorInputField(saveDraft.onSaveChangedJs, "存档变更事件JS·内联", multiline = true, fieldKey = "onSaveChangedJs") { onSaveDraft(saveDraft.copy(onSaveChangedJs = it)) } }
+                UiInputCard("存档变更事件JS·路径（ui.save.onSaveChangedJsPath）", "") { IntegratorInputField(saveDraft.onSaveChangedJsPath, "存档变更事件JS·路径", fieldKey = "onSaveChangedJsPath") { onSaveDraft(saveDraft.copy(onSaveChangedJsPath = it)) } }
                 UiInputCard("操作-备份（ui.save.opBackup）", "") { IntegratorInputField(saveDraft.opBackup, "操作-备份") { onSaveDraft(saveDraft.copy(opBackup = it)) } }
                 UiInputCard("操作-导出（ui.save.opExport）", "") { IntegratorInputField(saveDraft.opExport, "操作-导出") { onSaveDraft(saveDraft.copy(opExport = it)) } }
                 UiInputCard("操作-导入（ui.save.opImport）", "") { IntegratorInputField(saveDraft.opImport, "操作-导入") { onSaveDraft(saveDraft.copy(opImport = it)) } }

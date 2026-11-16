@@ -253,16 +253,18 @@ class Pvz2InitializeActivity : ComponentActivity() {
                             onGoToIntegrator = {
                                 startActivity(Intent(this@Pvz2InitializeActivity, ToolboxIntegratorActivity::class.java))
                             },
+                            // 跳过工具箱 / 重启后自动进游戏：复用「进入游戏」按钮逻辑（含 enterGame 脚本），
+                            // 而不是直接 onGotoGame()，否则 enterGameScript/enterGamePath 不会执行。
+                            autoEnterGame = autoEnterGame || skipToolbox,
                         )
                         // 「跳过工具箱」：主界面照常组合（资源解压、栏目脚本仍会完整执行），
                         // 只是用不透明层盖住，视觉上完全看不到工具箱。
                         if (skipToolbox) SkipToolboxOverlay()
                     }
                 }
-                // 重启后自动进入游戏 / 跳过工具箱：主界面就绪即触发「进入游戏」逻辑
-                if (autoEnterGame || skipToolbox) {
-                    LaunchedEffect(Unit) { onGotoGame() }
-                }
+                // 跳过工具箱 / 重启后自动进游戏：进入脚本已由 Pvz2MainScreen 的 autoEnterGame
+                // 走与「进入游戏」按钮相同的逻辑执行（含 enterGameScript/enterGamePath），
+                // 这里不再直接调用 onGotoGame()，避免绕过脚本或重复进入游戏。
             }
         }
 

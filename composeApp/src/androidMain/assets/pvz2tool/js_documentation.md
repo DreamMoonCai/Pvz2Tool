@@ -1028,6 +1028,44 @@ console.log("当前存档：" + pvz.saves.names()[pvz.saves.slot()]);
 **参数**：`index` (number) - 目标槽位下标（0 基）
 **返回**：void
 
+> ⚠️ **防重入**：`setSlot()` 会触发「存档变更事件」脚本。若事件脚本里又调用 `setSlot()`，
+> 系统会自动跳过本次嵌套触发（不会无限递归）；需要连续切换请用定时/分步执行。
+
+#### 存档变更事件（onSaveChangedJs / onSaveChangedJsPath）
+
+这是一个**配置字段**（不是 JS API），位于 `ui.save`。任何游戏存档发生变更后会自动执行它一次，覆盖：
+
+- 应用/覆盖预设存档
+- 切换子存档槽位（存档管理栏的槽位选择条，或脚本调 `pvz.saves.setSlot()`）
+- 删除、导入、备份游玩存档
+
+脚本内用 `pvz.saves.slot()` 拿当前选中的槽位（0 基），`pvz.saves.names()[pvz.saves.slot()]` 拿其用户名。
+配置方式见 `config_documentation.md` 的 `ui.save.onSaveChangedJs` / `onSaveChangedJsPath`，二者二选一
+（内联优先，路径脚本走资源层加载，支持占位符与绝对路径）。
+
+**典型用途**：把工具选中的槽位同步给游戏自己的「当前存档」标记。例如游戏把当前存档记在 sexy 文件
+的 `curuser` 字段时，可在脚本里读取 `slot()` 后自行写回——工具**不假设**任何游戏文件格式，
+路径与读写完全由脚本决定。完整可运行示例见 `example/saves/on_changed.js`。
+
+示例一，读取外置 files 下 sexy.json 根层级的 `curuser`（示例值 2）：
+```javascript
+var path = "$ANDROID_FILES/sexy.json";       // $ANDROID_FILES = 应用外置 files 目录
+var sexy = JSON.parse(file.readText(path));  // 纯 JSON 用 readText + JSON.parse，不依赖扩展名
+console.log("curuser = " + sexy.curuser);    // 输出：curuser = 2
+```
+
+示例二，切换子存档后把选中槽位写回 `curuser`（配置为 `ui.save.onSaveChangedJs` 自动执行）：
+```javascript
+var slot = pvz.saves.slot();                 // 当前选中槽位（0 基）
+var path = "$ANDROID_FILES/sexy.json";
+var obj = JSON.parse(file.readText(path));
+obj.curuser = slot;
+file.writeText(path, JSON.stringify(obj));   // 顶层两参版本；不要用 file.resolve(path).writeText(obj)
+```
+
+> 若文件名确实以 `.json` 结尾，也可用 `rton.load(path)` → 改字段 → `obj.save()`（load 会注入 save()，
+> 靠扩展名判断是否当 JSON 读）。无扩展名的文件请用上面的 `file.readText` + `JSON.parse`。
+
 #### pvz.saves.count / pvz.存档.数量
 
 存档槽数量（单存档为 `1`，最多与新版的 5 槽一致）。

@@ -7,6 +7,7 @@ import androidx.documentfile.provider.DocumentFile
 import io.github.dreammooncai.pvz2tool.InitializePvz2
 import io.github.dreammooncai.pvz2tool.VersionDef
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
+import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +32,15 @@ object PvzSaveFileManager {
     private val gameSaveChangeListeners = mutableListOf<(Long) -> Unit>()
 
     /**
+     * 存档变更事件脚本是否正在执行中（防重入）。
+     *
+     * 🔴 事件脚本内常会调用 `pvz.saves.setSlot()`（例如把选中的槽位同步回游戏的 sexy/curuser），
+     * 而 setSlot() 内部又会调用 [notifyGameSaveChanged]，若不加锁会无限递归。
+     * 用 AtomicBoolean 而不是布尔：脚本在 uiScope 协程、通知可能来自 IO 协程，存在跨线程。
+     */
+    private val saveChangedScriptRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
      * 注册游戏存档变化监听（游戏目录pp.dat被修改时触发）
      */
     fun addGameSaveChangeListener(listener: (Long) -> Unit) {
@@ -50,6 +60,39 @@ object PvzSaveFileManager {
     fun notifyGameSaveChanged() {
         val time = System.currentTimeMillis()
         gameSaveChangeListeners.forEach { it(time) }
+        fireSaveChangedScript()
+    }
+
+    /**
+     * 触发配置的「存档变更事件」JS（ui.save.onSaveChangedJs / onSaveChangedJsPath）。
+     *
+     * 所有存档变更（覆盖预设、切换子存档槽位、删除、导入、备份、脚本 setSlot 等）都汇入
+     * [notifyGameSaveChanged]，因此本方法覆盖全部场景，脚本内用 `pvz.saves.slot()` 读当前槽位。
+     * 工具不假设任何游戏存档/配置格式，如何同步（例如读写 sexy 的 curuser）完全由脚本决定。
+     */
+    private fun fireSaveChangedScript() {
+        // 防重入：脚本内调用 setSlot() 会再次 notify，跳过本次以免无限递归
+        if (!saveChangedScriptRunning.compareAndSet(false, true)) return
+        // 读取脚本（内联优先，否则从资源层加载）
+        val script = runCatching { InitializePvz2.config.ui.save.readOnSaveChangedJs() }
+            .onFailure { Log.e("SaveChangedJs", "读取存档变更脚本失败", it) }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+        if (script == null) {
+            saveChangedScriptRunning.set(false)
+            return
+        }
+        // 走全局 uiScope，避免 Compose 离场后 ForgottenCoroutineScopeException；key 保证最新胜出
+        JsUiManager.runUserScript(key = "save:onChanged") {
+            try {
+                io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine.executeScript(
+                    script = script,
+                    source = "存档变更事件"
+                )
+            } finally {
+                saveChangedScriptRunning.set(false)
+            }
+        }
     }
 
     /**

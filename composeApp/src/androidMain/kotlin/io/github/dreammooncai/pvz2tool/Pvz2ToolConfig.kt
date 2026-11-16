@@ -631,6 +631,18 @@ data class Pvz2ToolConfigUISave(
     val gameSaveUnknownUser: String = "未知用户",
     /** 游戏存档不存在时的提示文本 */
     val gameSaveNotExistTip: String = "暂无游玩存档",
+    /**
+     * 存档变更事件 JS（内联）。任何游戏存档发生变更（覆盖预设、切换子存档槽位、删除、导入、备份、
+     * 以及脚本调用 pvz.saves.setSlot()）后自动执行一次。
+     *
+     * 用途：把「工具侧选中的槽位」同步给游戏（如写回 sexy 文件的 curuser 字段），或反过来做初始化。
+     * 脚本内用 `pvz.saves.slot()` 读当前槽位。工具不假设任何游戏文件格式，路径由脚本自己写。
+     *
+     * 与 [onSaveChangedJsPath] 二选一：本字段非空优先；都为空则不执行。
+     */
+    val onSaveChangedJs: String? = null,
+    /** 存档变更事件 JS 文件路径（onSaveChangedJs 为空时从资源层加载，支持占位符/绝对路径）。 */
+    val onSaveChangedJsPath: String? = null,
     /** 导出/分享选项弹窗标题 */
     val exportOptionTitle: String = "选择导出方式",
     /** 导出到文件夹选项 */
@@ -640,7 +652,20 @@ data class Pvz2ToolConfigUISave(
     // 新增：重试按钮文字
     val retryButtonText: String,
     val operation: Pvz2ToolConfigOperation, // 新增操作类型
-)
+
+    /**
+     * 读取「存档变更事件」脚本：内联 onSaveChangedJs 优先，否则从 onSaveChangedJsPath 加载。
+     * 路径解析走资源层（占位符 / 绝对路径 / 工作目录 / APK assets），与 SectionItem.readJs 一致。
+     */
+) {
+    fun readOnSaveChangedJs(): String? =
+        onSaveChangedJs?.takeIf { it.isNotBlank() }
+            ?: onSaveChangedJsPath?.let { path ->
+                AssetExtractorHolder.openInputStream(JsFileResolver.resolvePlaceholders(path))?.use { input ->
+                    input.bufferedReader().use { it.readText() }
+                }
+            }
+}
 
 // 2. 新增【操作类型中文描述】配置（结果弹窗标题用）
 @Serializable

@@ -2087,6 +2087,12 @@ fun Pvz2MainScreen(
     /** 预览模式（集成器预览 dream.yml 时）：顶栏左侧显示取消预览按钮 */
     isPreviewMode: Boolean = false,
     onCancelPreview: () -> Unit = {},
+    /**
+     * 启动即自动执行「进入游戏」逻辑（跳过工具箱 / 重启后自动进游戏）。
+     * 走的是与点击「进入游戏」按钮完全相同的回调，确保 enterGameScript/enterGamePath、
+     * section 级脚本、资源解压、全量保存都会执行；仅视觉上不展示工具箱。
+     */
+    autoEnterGame: Boolean = false,
 ) {
     val config = InitializePvz2.config
 
@@ -2207,6 +2213,96 @@ fun Pvz2MainScreen(
         InitializePvz2.updateScreenState { fullState }
         onStateChanged(fullState)
         Log.d("FullSave", "进入游戏：全量保存所有状态")
+    }
+
+    // 「进入游戏」统一入口：按钮点击 与 「跳过工具箱 / 重启后自动进游戏」共用同一段逻辑，
+    // 确保 enterGameScript/enterGamePath、section 级脚本、资源解压、全量保存都会执行。
+    val enterGameAction: () -> Unit = {
+        val resourcesToExtract = mutableListOf<ResourcePair>()
+
+        val version = selectedVersion
+        val targetDir = config.getSmfDirectoryFile()
+
+        // 【修复】这里使用 version.forceOverride
+        if (version.baseAssetPath != null) {
+            resourcesToExtract.add(
+                AssetExtractorHolder.resource(
+                    internalPath = version.baseAssetPath,
+                    targetDir = targetDir,
+                    sectionName = "通用资源"
+                )
+            )
+        }
+        resourcesToExtract.add(
+            AssetExtractorHolder.resource(
+                internalPath = version.resolveAssetPath(),
+                targetDir = targetDir,
+                forceOverride = version.forceOverride,
+                sectionName = "版本特有资源"
+            )
+        )
+        // 注意：功能项解压已移除，仅保留版本级和BASE级解压
+        fun runGotoGame() = JsUiManager.runUserScript(key = "enterGame:${selectedVersion.id}") {
+            // 1. section 级 JS（仅无 confirmButtonText 的栏目）
+            config.sections
+                .filter { isSectionVisible(it) && it.confirmButtonText == null }
+                .forEach { section ->
+                    val sectionJs = section.readJs(version)
+                    if (sectionJs != null) {
+                        try {
+                            PvzToolJsEngine.executeScript(
+                                script = sectionJs,
+                                section = section,
+                                item = null,
+                                version = selectedVersion,
+                                sectionStates = sectionStates,
+                                updateSectionState = ::updateSectionState
+                            )
+                        } catch (e: Exception) {
+                            JsConsole.error("section[${section.id}] JS 执行失败:",e)
+                        }
+                    }
+                }
+            // 2. 版本级 enterGameScript / enterGamePath
+            val versionEnterScript = version.readJs()
+            if (versionEnterScript != null) {
+                try {
+                    PvzToolJsEngine.executeScript(
+                        script = versionEnterScript,
+                        section = null,
+                        item = null,
+                        version = selectedVersion,
+                        sectionStates = sectionStates,
+                        updateSectionState = ::updateSectionState
+                    )
+                } catch (e: Exception) {
+                    JsConsole.error("版本 enterGameScript 执行失败:",e)
+                }
+            }
+            InitializePvz2.mSfmVersion = InitializePvz2.versionName
+            // 关键：进入游戏时全量保存
+            saveFullState()
+            onGotoGameClick()
+        }
+
+        scope.launch {
+            // 统一打包所有 SMF 修改
+            PvzToolJsEngine.flushPendingSmfPacks()
+            if (resourcesToExtract.isNotEmpty()) {
+                extractorHolder.setOnDismissListener {
+                    if (it.isComplete) runGotoGame()
+                }
+                extractorHolder.extract(*resourcesToExtract.toTypedArray())
+            } else {
+                runGotoGame()
+            }
+        }
+    }
+
+    // 跳过工具箱 / 重启后自动进游戏：主界面就绪后自动执行一次「进入游戏」逻辑。
+    // 用 autoEnterGame 作 key，保证只触发一次（配合 Activity 侧移除直接 onGotoGame() 调用）。
+    LaunchedEffect(autoEnterGame) {
+        if (autoEnterGame) enterGameAction()
     }
 
     CompositionLocalProvider(LocalJsExecutionContext provides JsExecutionContext(
@@ -2462,87 +2558,7 @@ fun Pvz2MainScreen(
                                 CoreFunctionSection(
                                     isStandaloneApp = isStandaloneApp,
                                     onGoToIntegrator = onGoToIntegrator,
-                                    onEnterGame = {
-                                        val resourcesToExtract = mutableListOf<ResourcePair>()
-
-                                        val version = selectedVersion
-                                        val targetDir = config.getSmfDirectoryFile()
-
-                                        // 【修复】这里使用 version.forceOverride
-                                        if (version.baseAssetPath != null) {
-                                            resourcesToExtract.add(
-                                                AssetExtractorHolder.resource(
-                                                    internalPath = version.baseAssetPath,
-                                                    targetDir = targetDir,
-                                                    sectionName = "通用资源"
-                                                )
-                                            )
-                                        }
-                                        resourcesToExtract.add(
-                                            AssetExtractorHolder.resource(
-                                                internalPath = version.resolveAssetPath(),
-                                                targetDir = targetDir,
-                                                forceOverride = version.forceOverride,
-                                                sectionName = "版本特有资源"
-                                            )
-                                        )
-                                        // 注意：功能项解压已移除，仅保留版本级和BASE级解压
-                                        fun runGotoGame() = JsUiManager.runUserScript(key = "enterGame:${selectedVersion.id}") {
-                                            // 1. section 级 JS（仅无 confirmButtonText 的栏目）
-                                            config.sections
-                                                .filter { isSectionVisible(it) && it.confirmButtonText == null }
-                                                .forEach { section ->
-                                                    val sectionJs = section.readJs(version)
-                                                    if (sectionJs != null) {
-                                                        try {
-                                                            PvzToolJsEngine.executeScript(
-                                                                script = sectionJs,
-                                                                section = section,
-                                                                item = null,
-                                                                version = selectedVersion,
-                                                                sectionStates = sectionStates,
-                                                                updateSectionState = ::updateSectionState
-                                                            )
-                                                        } catch (e: Exception) {
-                                                            JsConsole.error("section[${section.id}] JS 执行失败:",e)
-                                                        }
-                                                    }
-                                                }
-                                            // 2. 版本级 enterGameScript / enterGamePath
-                                            val versionEnterScript = version.readJs()
-                                            if (versionEnterScript != null) {
-                                                try {
-                                                    PvzToolJsEngine.executeScript(
-                                                        script = versionEnterScript,
-                                                        section = null,
-                                                        item = null,
-                                                        version = selectedVersion,
-                                                        sectionStates = sectionStates,
-                                                        updateSectionState = ::updateSectionState
-                                                    )
-                                                } catch (e: Exception) {
-                                                    JsConsole.error("版本 enterGameScript 执行失败:",e)
-                                                }
-                                            }
-                                            InitializePvz2.mSfmVersion = InitializePvz2.versionName
-                                            // 关键：进入游戏时全量保存
-                                            saveFullState()
-                                            onGotoGameClick()
-                                        }
-
-                                        scope.launch {
-                                            // 统一打包所有 SMF 修改
-                                            PvzToolJsEngine.flushPendingSmfPacks()
-                                            if (resourcesToExtract.isNotEmpty()) {
-                                                extractorHolder.setOnDismissListener {
-                                                    if (it.isComplete) runGotoGame()
-                                                }
-                                                extractorHolder.extract(*resourcesToExtract.toTypedArray())
-                                            } else {
-                                                runGotoGame()
-                                            }
-                                        }
-                                    },
+                                    onEnterGame = enterGameAction,
                                     onTutorial = { showTutorial = true },
                                     onResetData = { onResetDataClick() }
                                 )
