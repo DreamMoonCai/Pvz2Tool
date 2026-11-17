@@ -33,15 +33,28 @@ import kotlinx.coroutines.launch
 
 data class Pvz2ErrorScreenState(
     val message: String,
-    val throwable: Throwable?
+    val throwable: Throwable?,
+    /** 类型名覆盖（崩溃拦截器恢复的堆栈没有 Throwable 实例时用） */
+    val typeName: String? = null,
+    /** 堆栈文本覆盖；非空时优先于 [throwable] 的堆栈显示 */
+    val stackText: String? = null,
+    /** 副标题提示；为空时用默认文案 */
+    val hint: String? = null,
+    /** 是否属于「可恢复」错误（如崩溃已被拦截并重启），为 true 且传了 [Pvz2ErrorScreen.onContinueClick] 时显示「继续使用」 */
+    val recoverable: Boolean = false,
 )
 
 @Composable
 fun Pvz2ErrorScreen(
     state: Pvz2ErrorScreenState,
-    onCloseClick: () -> Unit
+    onCloseClick: () -> Unit,
+    /** 非空时显示「继续使用」按钮（用于崩溃被拦截后，清掉错误状态回到工具箱） */
+    onContinueClick: (() -> Unit)? = null
 ) {
     val throwable = state.throwable
+    val typeName = state.typeName ?: throwable?.javaClass?.simpleName ?: "UnknownError"
+    val stackText = state.stackText ?: throwable?.stackTraceToString() ?: "No stack trace"
+    val hintText = state.hint ?: "应用无法正常启动，请复制错误信息并联系开发者"
     val context = LocalContext.current
     val clipboardManager = LocalClipboard.current
     val scrollState = rememberScrollState()
@@ -66,7 +79,7 @@ fun Pvz2ErrorScreen(
             )
 
             Text(
-                text = "应用无法正常启动，请复制错误信息并联系开发者",
+                text = hintText,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
             )
@@ -93,7 +106,7 @@ fun Pvz2ErrorScreen(
                         color = MaterialTheme.colorScheme.error
                     )
                     Text(
-                        text = throwable?.javaClass?.simpleName ?: "UnknownError",
+                        text = typeName,
                         style = MaterialTheme.typography.bodyMedium,
                         fontFamily = FontFamily.Monospace,
                         modifier = Modifier.padding(bottom = 16.dp)
@@ -105,7 +118,7 @@ fun Pvz2ErrorScreen(
                         color = MaterialTheme.colorScheme.error
                     )
                     Text(
-                        text = throwable?.message ?: "No message",
+                        text = throwable?.message ?: "（无附加信息，详见下方堆栈）",
                         style = MaterialTheme.typography.bodyMedium,
                         fontFamily = FontFamily.Monospace,
                         modifier = Modifier.padding(bottom = 16.dp)
@@ -117,7 +130,7 @@ fun Pvz2ErrorScreen(
                         color = MaterialTheme.colorScheme.error
                     )
                     Text(
-                        text = throwable?.stackTraceToString() ?: "No stack trace",
+                        text = stackText,
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
@@ -135,10 +148,10 @@ fun Pvz2ErrorScreen(
                         scope.launch {
                             val errorLog = buildString {
                                 appendLine("--- PVZ2 Tool ${state.message} Error ---")
-                                appendLine("Type: ${throwable?.javaClass?.name}")
+                                appendLine("Type: $typeName")
                                 appendLine("Message: ${throwable?.message}")
                                 appendLine("Stack Trace:")
-                                appendLine(throwable?.stackTraceToString())
+                                appendLine(stackText)
                             }
                             clipboardManager.setClipEntry(ClipEntry(ClipData.newPlainText("error",errorLog)))
                             Toast.makeText(context, "如果没有请授予复制/剪切板权限-错误日志已复制到剪贴板", Toast.LENGTH_SHORT).show()
@@ -151,6 +164,21 @@ fun Pvz2ErrorScreen(
                     )
                 ) {
                     Text("复制错误信息")
+                }
+
+                // 崩溃被拦截时提供「继续使用」：清掉错误状态即可回到工具箱，
+                // 此时进程是新拉起的，界面状态本身是干净的。
+                onContinueClick?.let { onContinue ->
+                    Button(
+                        onClick = onContinue,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    ) {
+                        Text("继续使用")
+                    }
                 }
 
                 Button(

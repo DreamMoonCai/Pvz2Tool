@@ -25,6 +25,8 @@ class ToolboxIntegratorActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // 全局崩溃拦截（幂等）：集成器也可能被独立拉起，作为入口时要自己装一次
+        io.github.dreammooncai.pvz2tool.diagnostic.CrashGuard.install(this)
         InitializePvz2.init(this)
         InitializePvz2.filePickerManager = filePickerManager
 

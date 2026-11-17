@@ -1,27 +1,18 @@
-【JS API】
-- 新增 ui.number 数量弹窗、NUMBER 栏目条目与 INFO 条目限高，支持跳过工具箱；数量输入组件跟随栏目主题；修复数量条左右无边距。
-- ui.multiSelect 新增全选、搜索、数量输入，改用 PVZ 文字胶囊按钮；网格与列表均支持长按拖动排序；列表新增拖动把手与换位动画、标题自适应居中；修复拖动闪回、飞出、消失，顺序持久化。
-- 新增视频播放与日志（console）JS API；修复视频弹窗未全屏、SMF 压缩后不重解压、options 参数解析失效。
-- 新增 ui.compositeText(options?) 弹出复合文本工具弹窗（await 返回生成字符串）、ui.buildCompositeText(options) 同步构造；集成器复合文本弹窗改为复用公共实现。
-
-【界面 / 交互】
-- 网格「更多」折叠：行内三段式胶囊、每行一个胶囊（limit + visible 分组）、hidden/visible 拆分、内容区宽度按行独立、横滚末尾留边距；演示数据扩到 21 项；撤销折叠版长按拖动。
-- 滑动条支持 ± 长按与 Min/Max 直达边界，按钮与轨道合并为一行。
-- 修复输入框延迟/吞字：探测层改普通测量、打字重组范围收缩、搜索防抖。
-
-【存档变更事件】
-- 新增 ui.save.onSaveChangedJs / onSaveChangedJsPath：覆盖预设、切槽、删除、导入、备份及脚本 setSlot() 等所有存档变更后自动执行用户 JS，脚本内用 pvz.saves.slot() 读当前槽位；配置有二选一、内联优先。
-- 内置防重入，事件脚本内再调 setSlot() 不会无限递归；集成器已补齐两个字段的向导界面。
-- 补充示例：从外置 files 的 sexy.json 读取根层级 curuser、切槽后把选中槽位写回 curuser。
-
-【pp.dat 多存档】
-- 新增 PpDatSaves：按选中槽位读写 pp.dat 的 objects 数组，用户名不再写死第一个存档，其余槽位与字段原样保留。
-- 存档管理栏新增槽位选择条（PVZ 风格：奶黄底 + 橄榄描边 + Hook 勾选图标 + 切换音效）。
-- JS API 新增 pvz.saves.slot() / setSlot(i) / count()。
-- 修正 dream.yml 示例与兑换码脚本中写死的 objects[0]，更新多存档文档说明。
-- 内置 2 存档、5 存档两个示例样本，dream.yml 增加对应入口。
-
-【其他】
-- 集成器补齐新 yml 字段。
-- 修复「跳过工具箱 / 重启自动进游戏」不执行 enterGameScript/enterGamePath 的问题：改为与点击「进入游戏」按钮共用同一套逻辑，版本级与栏目级进入脚本均会执行（精简模式除外）。
-- 文档补齐 ui.choiceActions、more 语义修正。
+更新说明-11.17.0
+1.API 新增视频播放 video（play/pause/resume/stop/seekTo/setVolume 等），Compose 全屏弹窗承载、可跳过；另新增日志 log（get/text/add/clear/count），可读取或追加日志面板内容
+2.API 新增复合文本工具弹窗 ui.compositeText(options?)（await 返回生成的文字）与 ui.buildCompositeText(options) 同步构造，可随时从 JS 弹出并构造复合文本
+3.API 新增 ui.number 数量弹窗与 NUMBER 栏目条目，支持 ± 步进、跟随栏目主题，INFO 条目支持限高，并支持跳过工具箱
+4.API 的 ui.multiSelect 新增全选、搜索、数量输入与长按拖动排序（网格/列表通用、顺序持久化），改用 PVZ 文字胶囊按钮；列表新增拖动把手与换位动画、标题自适应居中；修复拖动闪回、飞出、消失
+5.API 的 ui.slider 新增 ± 长按与 Min/Max 直达边界，按钮与轨道合并为一行
+6.API 新增 pvz.saves.slot() / setSlot(i) / count()，适配新版单个 pp.dat 存放多个存档，按选中槽位读写用户名，不再固定读取第一个存档
+7.新增 ui.save.onSaveChangedJs / onSaveChangedJsPath，任何存档变更后自动执行用户 JS 并内置防重入，可把工具选中的槽位写回游戏当前存档标记（如 sexy 的 curuser 字段）
+8.存档管理栏新增 PVZ 风格槽位选择条（奶黄底 + 橄榄描边 + Hook 勾选图标 + 切换音效），内置 2 槽、5 槽示例样本
+9.集成器补齐新 yml 字段向导界面，复合文本弹窗改为复用公共实现
+10.网格「更多」折叠改造：三段式胶囊、每行一个胶囊、hidden/visible 拆分、内容区宽度按行独立、横滚末尾留边距，演示数据扩到 21 项
+11.修复 JS options 参数解析失效（keight 下 as? Number/String、toKotlin as? Boolean 静默失效），改用 toNumber/toBoolean/toString
+12.修复 SMF 压缩后进入游戏不重新解压、视频弹窗未全屏的问题
+13.修复跳过工具箱 / 重启后自动进游戏不执行 enterGameScript/enterGamePath 的问题，改为与点击「进入游戏」按钮共用同一套逻辑
+14.修复输入框延迟/吞字（探测层改普通测量、打字重组范围收缩、搜索防抖）与数量条左右无边距
+15.修复弹窗（画面设置、存档信息、公告、教程等）一打开就闪退：弹窗自适应布局的探测改为有限高度约束，不再把无限高传给内部滚动容器
+16.新增启动自检：AndroidManifest.xml 里写死的 @0x66 资源引用在资源表中不存在时弹窗提示，逐条给出是哪个 Activity / Provider 的哪个属性、应改成什么（如 @style/Theme.DreamPvzApp、@xml/file_paths），并说明手动替换包的改法与重签步骤
+17.新增全局崩溃拦截：应用内任何未捕获异常不再直接闪退，自动记录完整堆栈并重启到错误页，可查看/复制错误信息、点「继续使用」回到工具箱；短时间内连续崩溃会停止自动重启避免死循环

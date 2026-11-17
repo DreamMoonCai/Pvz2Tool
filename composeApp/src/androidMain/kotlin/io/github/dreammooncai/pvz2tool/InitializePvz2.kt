@@ -21,6 +21,7 @@ import com.russhwolf.settings.SharedPreferencesSettings
 import com.russhwolf.settings.get
 import com.russhwolf.settings.set
 import io.github.dreammooncai.manager.FilePickerManager
+import io.github.dreammooncai.pvz2tool.diagnostic.CrashGuard
 import io.github.dreammooncai.pvz2tool.ui.dialog.AssetExtractorHolder
 import io.github.dreammooncai.pvz2tool.ui.main.Pvz2ScreenState
 import io.github.dreammooncai.util.ContextUtil
@@ -551,6 +552,8 @@ object InitializePvz2 {
      * 若已经由 Activity 初始化过则直接跳过，避免重复解析配置。
      */
     fun ensureInitialized(context: Context) {
+        // 无 Activity 的入口（TimerReceiver / TimerService 被系统直接拉起）也要有全局崩溃拦截
+        CrashGuard.install(context)
         if (this::context.isInitialized) return
         runCatching { init(context.applicationContext) }
             .onFailure { e -> android.util.Log.e("InitializePvz2", "定时器上下文初始化失败", e) }

@@ -82,16 +82,28 @@ fun PerfectAdaptiveLayout(
         //    TextLayoutResult 等测量缓存。而探测层高度**每敲一个字符都会失效**（内容里有输入框时
         //    文本变化 → 子项 dirty → 父级重新 layout），于是「每字符一次全量 intrinsic 测量」，
         //    直接表现为输入框打字卡顿、IME 连打时吞字（单行/多行文本越界时最明显）。
-        //    探测层只需要「自然高度」这一个数：用无限高度约束正常测一次即可得到，
-        //    走的是标准测量路径（含缓存），比 intrinsic 便宜一个量级；
-        //    顺带消除「探测层里出现 Lazy* 会被 intrinsic 测量直接抛异常」的隐患。
+        //    探测层只需要「自然高度」这一个数：用普通约束正常测一次即可得到，
+        //    走的是标准测量路径（含缓存），比 intrinsic 便宜一个量级。
+        //
+        // 🔴🔴 探测测量**必须给有限的最大高度**（这里用 maxContentHeightPx，绝不能是 Constraints.Infinity）：
+        //    Compose 的 `Modifier.verticalScroll` 在 measure 阶段有硬断言
+        //    （CheckScrollableContainerConstraints），一旦拿到无限高约束就抛
+        //    IllegalStateException("Vertically scrollable component was measured with an infinity
+        //    maximum height constraints") → 宿主崩溃。而 PvzPopupContent 的探测层自带
+        //    `.verticalScroll(...)`（显示层要滚动），所以「无限高探测」会让**每一个用
+        //    PvzPopupContent 的弹窗**（画面设置、存档信息、教程、公告、JS 弹窗…）一打开就闪退；
+        //    LazyColumn 同样会因此炸。
+        //    用 maxContentHeightPx 作为上限**与无限高完全等价**：下面的 realContentHeight 本来就会
+        //    被 coerceIn(initialMin, maxContentHeightPx) 钳到该上限，任何超出上限的内容精确值都没有意义
+        //    （显示层固定高度 + 自己的滚动）。于是「自然高度 < 上限」照样取到精确值，
+        //    「≥ 上限」一律取上限，语义不变，且顺带让探测层里的 scroll/Lazy 拿到合法约束。
         val realContentHeight: Int = when {
             forceMaxForm -> maxContentHeightPx
             probeCache.width == maxWidth && probeCache.height >= maxContentHeightPx -> maxContentHeightPx
             else -> probeMeasurable.measure(
                 Constraints(
                     minWidth = 0, maxWidth = maxWidth,
-                    minHeight = 0, maxHeight = Constraints.Infinity
+                    minHeight = 0, maxHeight = maxContentHeightPx.coerceAtLeast(0)
                 )
             ).height.also {
                 probeCache.width = maxWidth

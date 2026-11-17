@@ -56,6 +56,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import io.github.dreammooncai.manager.FilePickerManager
 import io.github.dreammooncai.pvz2tool.controller.GameDisplayFloatingController
+import io.github.dreammooncai.pvz2tool.diagnostic.CrashGuard
+import io.github.dreammooncai.pvz2tool.diagnostic.ManifestRefWarningHost
 import io.github.dreammooncai.pvz2tool.controller.FloatingBallController
 import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
@@ -136,6 +138,10 @@ class Pvz2InitializeActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        // 全局崩溃拦截：尽早安装，之后本进程内任何未捕获异常（含 Compose 组合/测量/布局异常）
+        // 都不会直接闪退，而是落盘堆栈 → 自动重启到错误页（详见 CrashGuard 注释）。
+        CrashGuard.install(this)
+
         // 读取「重启后自动进入游戏」标记
         autoEnterGame = intent?.getBooleanExtra(EXTRA_AUTO_ENTER_GAME, false) ?: false
 
@@ -151,6 +157,11 @@ class Pvz2InitializeActivity : ComponentActivity() {
     private fun proceedWithInitialization() {
         // 初始化配置
         InitializePvz2.init(this)
+        // 上一次运行若发生崩溃，CrashGuard 已把堆栈落盘并自动重启到这里：
+        // 读到就直接渲染错误页（含完整堆栈 + 「继续使用」），而不是让用户面对空白/闪退。
+        if (InitializePvz2.errorScreenState == null) {
+            CrashGuard.consumePendingCrash(this)?.let { InitializePvz2.errorScreenState = it }
+        }
         // 注入文件选择器管理器，供 JS picker API 使用（其 Launcher 已在 Activity 属性初始化阶段注册）
         InitializePvz2.filePickerManager = filePickerManager
 
@@ -171,7 +182,11 @@ class Pvz2InitializeActivity : ComponentActivity() {
                         onCloseClick = {
                             Process.killProcess(Process.myPid())
                             exitProcess(0)
-                        }
+                        },
+                        // 崩溃拦截场景可恢复：清掉错误状态即回到工具箱（当前进程是刚拉起的，界面本身是干净的）
+                        onContinueClick = if (state.recoverable) {
+                            { InitializePvz2.errorScreenState = null }
+                        } else null
                     )
                     return@Pvz2ToolTheme
                 }
@@ -238,6 +253,12 @@ class Pvz2InitializeActivity : ComponentActivity() {
                     operationState = importOperationState,
                     onRetry = null
                 )
+
+                // 启动自检：manifest 里是否有「写了但资源表中不存在」的引用（手动替换集成的包常见）。
+                // 典型症状：android:theme 悬空 → 顶部黑色标题栏；provider 的 FILE_PROVIDER_PATHS 悬空 → 导入存档失败。
+                // 只做提示（讲清改哪个 Activity、改成什么），不改包、不阻断启动。
+                ManifestRefWarningHost()
+
                 key(InitializePvz2.mPvz2MainScreenReloadKey) {
                     val standalone = hasIntegratorActivity()
                     Box(Modifier.fillMaxSize()) {
