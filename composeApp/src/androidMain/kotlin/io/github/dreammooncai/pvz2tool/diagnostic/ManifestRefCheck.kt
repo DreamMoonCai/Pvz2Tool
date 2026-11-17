@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.res.Resources
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,10 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,6 +35,7 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -45,6 +44,12 @@ import com.reandroid.arsc.chunk.xml.AndroidManifestBlock
 import com.reandroid.arsc.chunk.xml.ResXmlAttribute
 import com.reandroid.arsc.chunk.xml.ResXmlElement
 import com.reandroid.arsc.value.ValueType
+import io.github.dreammooncai.pvz2tool.ui.dialog.PvzDialogCard
+import io.github.dreammooncai.pvz2tool.view.PvzGreenButton
+import io.github.dreammooncai.pvz2tool.view.PvzRedButton
+import io.github.dreammooncai.pvz2tool.view.PvzRichText
+import io.github.dreammooncai.pvz2tool.view.PvzTextOliveStyle
+import io.github.dreammooncai.pvz2tool.view.PvzTextStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -312,9 +317,9 @@ fun ManifestRefWarningHost() {
 /**
  * 悬空引用提示弹窗。
  *
- * ⚠️ 刻意不用 `PvzPopupContent` / `PerfectAdaptiveLayout`：这是「包本身就有问题」时的兜底提示，
- * 不该再依赖任何自适应测量逻辑。高度直接给死（[Modifier.fillMaxHeight] 比例），内部用
- * `verticalScroll` 滚动，约束一定是有限的。
+ * 复用项目统一的 [PvzDialogCard]（奶黄底 + 三层绿框 + 绿色标题栏）和 PVZ 红/绿按钮，
+ * 风格与其他弹窗一致。内容区高度由 `fillMaxHeight` 比例 + `weight` 限定为有限值，
+ * 内部用 `verticalScroll` 滚动：屏幕小也能看全，且不会把无限高传给滚动容器。
  */
 @Composable
 fun ManifestRefWarningDialog(
@@ -336,128 +341,118 @@ fun ManifestRefWarningDialog(
             modifier = Modifier.fillMaxSize().padding(20.dp),
             contentAlignment = Alignment.Center
         ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(0.92f).fillMaxHeight(0.8f),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp,
+            PvzDialogCard(
+                title = "资源引用检查",
+                modifier = Modifier.fillMaxWidth(0.92f).fillMaxHeight(0.82f)
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Text(
-                        text = "AndroidManifest.xml 有失效的资源引用",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = "这个包的 AndroidManifest.xml 里写死了 @0x66 资源 id，而这些 id 在当前 resources.arsc " +
-                            "里并不存在（常见于手动替换集成：manifest 片段抄自别的版本，资源表却是新的）。" +
-                            "下面每一条都标了在哪个 Activity / Provider 的哪个属性、应该改成什么。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
-                    )
-                    Spacer(Modifier.height(10.dp))
+                PvzRichText(
+                    text = "AndroidManifest.xml 里写死的 @0x66 资源 id 在当前资源表中不存在" +
+                        "（手动替换集成常见：manifest 片段抄自别的版本，资源表却是新的）。" +
+                        "下面逐条列出位置、后果与改法。",
+                    fontSize = 14.sp,
+                    lineHeight = 19.sp,
+                    defaultStyle = PvzTextOliveStyle.copy(shadowColor = null),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                )
+                Spacer(Modifier.height(6.dp))
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .verticalScroll(scrollState)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(scrollState)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            issues.forEachIndexed { index, issue ->
-                                IssueBlock(index + 1, issue)
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "改法（MT 管理器 / Apktool）：\n" +
-                                    "1. 打开这个 APK → 反编译 AndroidManifest.xml（MT 里长按选「反编译」看明文）\n" +
-                                    "2. 搜索 @0x66 ，按上面每条把数字 id 换成「@style/Theme.DreamPvzApp」这种名字形式，别用数字 id\n" +
-                                    "3. 保存 → 重新签名 → 安装\n" +
-                                    "4. 更省事：直接用工具箱「一键集成」重做，产物不会有这个问题",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                            )
+                        issues.forEachIndexed { index, issue ->
+                            PvzIssueBlock(index + 1, issue)
                         }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    clipboard.setClipEntry(
-                                        ClipEntry(ClipData.newPlainText("manifest_ref_issues", detail))
-                                    )
-                                    Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        ) {
-                            Text("复制详情")
-                        }
-                        Button(
-                            onClick = onDismiss,
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            )
-                        ) {
-                            Text("我知道了")
-                        }
+                        PvzRichText(
+                            text = "改法（MT 管理器 / Apktool）：\n" +
+                                "1. 打开 APK → 反编译 AndroidManifest.xml（MT 里长按选「反编译」看明文）\n" +
+                                "2. 搜索 @0x66，按上面每条把数字 id 换成 @style/Theme.DreamPvzApp 这种名字形式，别用数字 id\n" +
+                                "3. 保存 → 重新签名 → 安装\n" +
+                                "4. 更省事：直接用工具箱「一键集成」重做，产物不会有这个问题",
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            defaultStyle = PvzTextOliveStyle.copy(shadowColor = null),
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
                     }
                 }
+
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    PvzRedButton(
+                        text = "复制详情",
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        onClick = {
+                            scope.launch {
+                                clipboard.setClipEntry(
+                                    ClipEntry(ClipData.newPlainText("manifest_ref_issues", detail))
+                                )
+                                Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+                    PvzGreenButton(
+                        text = "我知道了",
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        onClick = onDismiss
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
             }
         }
     }
 }
 
 @Composable
-private fun IssueBlock(index: Int, issue: ManifestRefCheck.Issue) {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
-        modifier = Modifier.fillMaxWidth()
+private fun PvzIssueBlock(index: Int, issue: ManifestRefCheck.Issue) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFE7DDB0), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFAA9A5F), RoundedCornerShape(8.dp))
+            .padding(10.dp)
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            Text(
+        Column {
+            PvzRichText(
                 text = "$index. ${issue.elementTag}",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.error
+                fontSize = 16.sp,
+                defaultStyle = PvzTextStyle(Color(0xFF9E2A00), Color(0xFFFFE0C0)),
+                modifier = Modifier.padding(bottom = 4.dp)
             )
-            Spacer(Modifier.height(4.dp))
             Text(
                 text = "位置：${issue.elementPath}",
-                style = MaterialTheme.typography.bodySmall,
+                fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurface
+                color = Color(0xFF423F00)
             )
             Text(
                 text = "属性：${issue.attribute} = ${issue.rawValue}  ← 资源不存在",
-                style = MaterialTheme.typography.bodySmall,
+                fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurface
+                color = Color(0xFF9E2A00)
             )
             Text(
                 text = "后果：${issue.impact}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = Color(0xFF5B5410)
             )
             Spacer(Modifier.height(4.dp))
             Text(
                 text = "改为：${issue.hint}",
-                style = MaterialTheme.typography.bodySmall,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
                 fontFamily = FontFamily.Monospace,
-                color = Color(0xFF2E7D32),
-                lineHeight = 15.sp,
+                color = Color(0xFF2E7D32)
             )
         }
     }
