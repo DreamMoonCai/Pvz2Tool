@@ -18,7 +18,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="$ROOT/release/out"
 TEMPLATE_DIR="$ROOT/release/adaptation"
-APK_BUILT="$ROOT/composeApp/build/outputs/apk/release/composeApp-release.apk"
+# 项目未配置签名，assembleRelease 只产出未签名 APK；旧值 composeApp-release.apk 不存在，
+# 会导致 prepare 的「现场编译」分支永远失败、被迫走 --apk 旧产物捷径。
+APK_BUILT="$ROOT/composeApp/build/outputs/apk/release/composeApp-release-unsigned.apk"
 
 REPO="${PVZ2_RELEASE_REPO:-DreamMoonCai/Pvz2Tool}"
 
@@ -123,12 +125,20 @@ cmd_publish() {
 
     local tag="v$version"
     local title="戴夫工具箱 $version"
+    # GitHub 上传端会剥离 asset 文件名中的非 ASCII 字符（中文被吃光）。
+    # 官方方案：底层用 ASCII 文件名，把中文原名放进 label，Release 页面显示 label。
+    local apk_ascii="$OUT_DIR/Pvz2Tool-Installer-${version}.apk"
+    local zip_ascii="$OUT_DIR/Pvz2Tool-AdaptationPack-${version}.zip"
+    cp "$apk_out" "$apk_ascii"
+    cp "$zip_out" "$zip_ascii"
+    local apk_label="$(basename "$apk_out")"
+    local zip_label="$(basename "$zip_out")"
     log "创建 GitHub Release $tag ..."
     gh release create "$tag" \
         --repo "$REPO" \
         --title "$title" \
         --notes "$body" \
-        "$apk_out" "$zip_out"
+        "${apk_ascii}#${apk_label}" "${zip_ascii}#${zip_label}"
     log "发布完成: https://github.com/$REPO/releases/tag/$tag"
 }
 

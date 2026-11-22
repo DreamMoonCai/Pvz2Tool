@@ -78,11 +78,19 @@ jobs:
         run: |
           BODY="戴夫工具箱 $VERSION"
           if [ -n "$NOTES" ]; then BODY="$NOTES"; fi
+          # GitHub 上传端会剥离 asset 文件名中的非 ASCII 字符（中文会被吃光），
+          # 官方方案：底层用 ASCII 文件名，中文放进 label，Release 页面显示 label。
+          ASCII_APK="release/out/Pvz2Tool-Installer-$VERSION.apk"
+          ASCII_ZIP="release/out/Pvz2Tool-AdaptationPack-$VERSION.zip"
+          cp "$APK" "$ASCII_APK"
+          cp "$ZIP" "$ASCII_ZIP"
+          APK_ASSET="$ASCII_APK#$(basename "$APK")"
+          ZIP_ASSET="$ASCII_ZIP#$(basename "$ZIP")"
           gh release create "v$VERSION" \
             --repo "${{ github.repository }}" \
             --title "戴夫工具箱 $VERSION" \
             --notes "$BODY" \
             --draft \
-            "$APK" "$ZIP"
+            "$APK_ASSET" "$ZIP_ASSET"
           echo "草稿已创建：https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
           echo "请人工核验后在该页面点击 Publish release 完成发布。"
