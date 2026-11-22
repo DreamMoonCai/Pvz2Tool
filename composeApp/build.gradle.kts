@@ -60,6 +60,32 @@ private val appVersionRaw = providers.of(AppVersionValueSource::class) {
 val dynamicVersionName: String = appVersionRaw.substringBefore('|')
 val dynamicVersionCode: Int = appVersionRaw.substringAfter('|').toInt()
 
+// ── 发布签名配置（密钥只在本地 local.properties，禁止入库）────────────
+// local.properties 可选字段：release.storeFile / storePassword / keyAlias / keyPassword
+// 未配置时 release 回退到 debug 签名，保证 clone 后仍能安装。
+abstract class ReleaseSigningValueSource : ValueSource<String, ReleaseSigningValueSource.Params> {
+    interface Params : ValueSourceParameters {
+        val propsPath: Property<String>
+    }
+    override fun obtain(): String {
+        val file = File(parameters.propsPath.get())
+        if (!file.exists()) return ""
+        val props = JavaProperties()
+        file.inputStream().use { props.load(it) }
+        val sf = props.getProperty("release.storeFile")?.trim().orEmpty()
+        val sp = props.getProperty("release.storePassword")?.trim().orEmpty()
+        val ka = props.getProperty("release.keyAlias")?.trim().orEmpty()
+        val kp = props.getProperty("release.keyPassword")?.trim().orEmpty()
+        return listOf(sf, sp, ka, kp).joinToString("|")
+    }
+}
+
+private val releaseSigningRaw = providers.of(ReleaseSigningValueSource::class) {
+    parameters.propsPath.set(rootProject.file("local.properties").absolutePath)
+}.get()
+private val hasReleaseSigning = releaseSigningRaw.isNotEmpty() && releaseSigningRaw.substringBefore('|').isNotEmpty()
+private val releaseSigningParts = releaseSigningRaw.split("|")
+
 tasks.register("bumpIteration") {
     group = "versioning"
     description = "同一天再次发包时把迭代数 +1（如 8.6.0 → 8.6.1）"
@@ -198,9 +224,26 @@ android {
             excludes += "/META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(releaseSigningParts[0])
+                storePassword = releaseSigningParts[1]
+                keyAlias = releaseSigningParts[2]
+                keyPassword = releaseSigningParts[3]
+            }
+        }
+    }
     buildTypes {
         all {
             isMinifyEnabled = false
+        }
+        getByName("release") {
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {

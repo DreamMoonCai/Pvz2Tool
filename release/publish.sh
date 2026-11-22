@@ -18,9 +18,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="$ROOT/release/out"
 TEMPLATE_DIR="$ROOT/release/adaptation"
-# 项目未配置签名，assembleRelease 只产出未签名 APK；旧值 composeApp-release.apk 不存在，
-# 会导致 prepare 的「现场编译」分支永远失败、被迫走 --apk 旧产物捷径。
-APK_BUILT="$ROOT/composeApp/build/outputs/apk/release/composeApp-release-unsigned.apk"
+# 产物名随签名配置变化：配置了 signingConfig 时是 composeApp-release.apk，
+# 未配置时是 composeApp-release-unsigned.apk。取实际存在的那个，避免写死其一导致
+# prepare 的「现场编译」分支找不到文件、被迫走 --apk 旧产物捷径。
+APK_DIR="$ROOT/composeApp/build/outputs/apk/release"
+APK_SIGNED="$APK_DIR/composeApp-release.apk"
+APK_UNSIGNED="$APK_DIR/composeApp-release-unsigned.apk"
 
 REPO="${PVZ2_RELEASE_REPO:-DreamMoonCai/Pvz2Tool}"
 
@@ -50,15 +53,22 @@ cmd_prepare() {
 
     mkdir -p "$OUT_DIR"
 
-    local apk="$APK_BUILT"
+    local apk=""
     if [[ -n "$apk_override" ]]; then
         apk="$apk_override"
         log "使用指定 APK: $apk"
     else
         log "编译 Release APK ..."
         (cd "$ROOT" && ./gradlew :composeApp:assembleRelease --console=plain)
+        # 签名包优先；未配置签名时 AGP 产出 -unsigned.apk
+        if [[ -f "$APK_SIGNED" ]]; then
+            apk="$APK_SIGNED"
+        elif [[ -f "$APK_UNSIGNED" ]]; then
+            apk="$APK_UNSIGNED"
+        fi
     fi
-    [[ -f "$apk" ]] || die "Release APK 不存在: $apk"
+    [[ -n "$apk" && -f "$apk" ]] || die "Release APK 不存在（$APK_SIGNED / $APK_UNSIGNED 均无）"
+    log "采用 APK: $apk"
 
     local apk_out="$OUT_DIR/戴夫工具箱集成器_${version}.apk"
     cp "$apk" "$apk_out"
