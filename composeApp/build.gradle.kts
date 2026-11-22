@@ -304,6 +304,22 @@ tasks.named<Test>("jvmTest") {
     maxHeapSize = "4g"
 }
 
+// ── 发布工具 CLI：编译 Release APK 后生成适配包 / arsc.zip ──
+// 用法：./gradlew :composeApp:runReleaseCli --args="adapt <apk> <version> <notesFile|-> <templateDir> <outZip>"
+//       ./gradlew :composeApp:runReleaseCli --args="arsc <apk> <outZip>"
+tasks.register<JavaExec>("runReleaseCli") {
+    group = "release"
+    description = "生成适配包 / arsc.zip（发布流程内部使用）"
+    classpath = files(
+        "build/classes/kotlin/jvm/main",
+        "build/resources/jvm/main"
+    ) + configurations.getByName("jvmRuntimeClasspath")
+    mainClass.set("io.github.dreammooncai.pvz2tool.release.ReleaseCli")
+    // 解码数百 MB 的 APK 需要较大堆
+    jvmArgs("-Xmx4g")
+    dependsOn("compileKotlinJvm", "processJvmMainResources")
+}
+
 dependencies {
     implementation(libs.androidx.appcompat)
     // 注意：刻意不引入 com.google.android.material:material 与 androidx.constraintlayout。

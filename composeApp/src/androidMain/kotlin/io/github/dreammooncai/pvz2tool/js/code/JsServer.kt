@@ -12,6 +12,7 @@ import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.func
 import io.github.dreammooncai.pvz2tool.js.orNull
 import io.github.dreammooncai.pvz2tool.js.toKotlin
+import io.github.dreammooncai.pvz2tool.js.get
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.parseQueryString
@@ -341,7 +342,7 @@ object JsServer {
 
     /** 判断对象是否含有任意一个给定键（中文键与英文键等价） */
     private suspend fun ScriptRuntime.hasAnyKey(obj: JsObject, vararg keys: String): Boolean =
-        keys.any { obj.get(it.js, this).orNull != null }
+        keys.any { obj.get(it.js).orNull != null }
 
     /** 将 handler 的返回值转换为统一响应规格；支持 async handler（返回 Promise） */
     private suspend fun ScriptRuntime.resolveResponse(raw: JsAny?): RespSpec {
@@ -372,14 +373,14 @@ object JsServer {
                 return RespSpec(200, ContentType.Application.Json, emptyMap(), PvzToolJsEngine.stringify(obj))
             }
 
-            val status = (obj.get("status".js, this).orNull ?: obj.get("状态码".js, this).orNull)
+            val status = (obj.get("status".js).orNull ?: obj.get("状态码".js).orNull)
                 ?.let { toNumber(it).toInt() } ?: 200
-            val ctStr = (obj.get("contentType".js, this).orNull ?: obj.get("内容类型".js, this).orNull)
+            val ctStr = (obj.get("contentType".js).orNull ?: obj.get("内容类型".js).orNull)
                 ?.let { toString(it) }
-            val bodyAny = obj.get("body".js, this).orNull ?: obj.get("响应体".js, this).orNull
+            val bodyAny = obj.get("body".js).orNull ?: obj.get("响应体".js).orNull
 
             val userHeaders = mutableMapOf<String, String>()
-            val userHeadersObj = (obj.get("headers".js, this).orNull ?: obj.get("响应头".js, this).orNull) as? JsObject
+            val userHeadersObj = (obj.get("headers".js).orNull ?: obj.get("响应头".js).orNull) as? JsObject
             if (userHeadersObj != null) {
                 // toKotlin 会递归转成 Kotlin 基本类型，此处 v.toString() 拿到的是真正的字符串值
                 val km = userHeadersObj.toKotlin()

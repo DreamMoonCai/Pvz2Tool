@@ -2028,7 +2028,8 @@ ui.extract(
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `columns` | number | 4 | 网格模式每排列数（2~6，仅条目 **≥ 8** 且有图标时生效） |
+| `columns` | number | 4 | 网格模式每排列数（2~6，仅条目 **≥ gridThreshold** 且有图标时生效） |
+| `gridThreshold` | number | 8 | 网格/列表切换阈值：条目数 ≥ 该值且有图标 → 网格，否则列表（别名 `网格阈值`）。想让 4 条也走网格就传 4，想让 20 条仍走列表就传 21 |
 | `cancelable` | boolean | false | 是否允许点击外部取消（关闭时触发 `onCancel`） |
 | `showIndex` | boolean | false | 全局默认是否叠加序号（从 1 开始），仅对有图标的项生效 |
 | `showIndexColor` | string | "black" | 序号颜色，支持命名色或 `#RRGGBB`（见通用说明）；单项可用 `showIndexColor`/`序号颜色` 覆盖 |
@@ -2036,16 +2037,20 @@ ui.extract(
 | `cancelText` | string | "取消" | 「取消」按钮文字（单/多选底部均显示） |
 | `confirmColor` | string | "" | 确定按钮背景色（仅多选） |
 | `cancelColor` | string | "" | 取消按钮背景色 |
+| `reorderable` | boolean | false | 长按拖动排序（列表拖行尾「≡」，网格拖图标），松手换位并回调 `onReorder`；别名 `可排序` / `拖拽排序` |
+| `orderKey` | string | 标题 | 排序持久化键：同一个 key 下次打开沿用上次顺序；传 `""` 表示不持久化（临时排序） |
+| `onReorder` | function | 无 | 拖动结束触发，收到按新顺序排列的 `value` 数组（别名同 multiSelect） |
 | `onSelect` | function | 无 | 选中某项时触发（单选收到 `value`；多选收到 `value` 数组） |
 | `onCancel` | function | 无 | 点击取消 / 点外部时触发（无参数） |
 
-**返回**：string|null - 选中条目的 `value`，取消返回 null
+**返回**：string|null - 选中条目的 `value`，取消返回 null（拖动只改显示顺序，不影响返回值）
 
 **布局规则（参考 SectionType.RADIO 样式）**：
-- 任意条目带图标且总数 **≥ 8** → 网格模式，每排若干，单条目 = 图标(或占位矩形) + 底部文字
-- 任意条目带图标且总数 **< 8** → 列表模式，每条目独占一行，图标(或占位矩形)在文字前
+- 任意条目带图标且总数 **≥ gridThreshold**（默认 8） → 网格模式，每排若干，单条目 = 图标(或占位矩形) + 底部文字
+- 任意条目带图标且总数 **< gridThreshold** → 列表模式，每条目独占一行，图标(或占位矩形)在文字前
 - 所有条目**均无图标** → 纯文字模式，每条目前带单选标记（圆点），独占一行
 - 无图标条目用与图标**同尺寸**的矩形占位，内部居中显示与底部相同的文字，超出自动截断
+- 阈值可用 `gridThreshold`（别名 `网格阈值`）自定义：传更小值让少量条目也走网格，传更大值让较多条目仍走列表
 
 **示例**：
 ```javascript
@@ -2071,6 +2076,39 @@ var pick = ui.select("选择关卡", lv, { showIndex: true, showIndexColor: "gol
 var t = ui.select("难度", ["简单", "普通", "困难"]);
 ```
 
+**拖动排序（`reorderable`）**：单选与多选都支持，网格/列表都生效——
+列表长按行尾「≡」把手拖动，网格长按图标拖动（网格无把手），纯文字列表同列表模式。
+松手换位后：`onReorder` 收到新顺序的 `value` 数组；顺序默认按 `orderKey`（缺省=标题）持久化，
+下次打开沿用；配置增删条目时自动合并。临时排序传 `orderKey: ""`。
+返回值仍是点中那项的 `value`（与顺序无关）；搜索过滤期间自动禁用拖动。
+
+```javascript
+// 单选 + 列表（< 8 条或纯文字）：拖行尾「≡」
+var picked = ui.select("常用功能", ["整理存档", "检查更新", "清理缓存"], {
+    reorderable: true,
+    orderKey: "",   // 临时排序，不持久化
+    onReorder: function (order) { console.log("新顺序：" + order.join(",")) }
+});
+
+// 单选 + 网格（≥ 8 条且有图标）：拖图标
+var lv = [];
+for (var i = 1; i <= 8; i++) lv.push({ name: "关卡" + i, icon: "lv.png", value: String(i) });
+var pick2 = ui.select("关卡顺序", lv, {
+    columns: 4, reorderable: true,
+    orderKey: "关卡顺序",   // 持久化；不传则默认用标题
+    onReorder: function (order) { console.log("新顺序：" + order.join(",")) }
+});
+
+// 自定义网格阈值：4 条也想走网格就传 gridThreshold: 4
+var four = [
+    { name: "阳光", icon: "sun.png", value: "sun" },
+    { name: "水滴", icon: "water.png", value: "water" },
+    { name: "坚果", icon: "nut.png", value: "nut" },
+    { name: "樱桃", icon: "cherry.png", value: "cherry" }
+];
+ui.select("选植物", four, { columns: 2, gridThreshold: 4, reorderable: true });
+```
+
 #### ui.multiSelect / ui.多选
 
 多项选择弹窗：从一批条目中选择任意多个。
@@ -2085,7 +2123,8 @@ var t = ui.select("难度", ["简单", "普通", "困难"]);
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `defaultValues` | Array\<string\> | [] | 默认选中项的 name 或 value 列表 |
-| `columns` | number | 4 | 网格模式每排列数（2~6，仅条目 **≥ 8** 且有图标时生效） |
+| `columns` | number | 4 | 网格模式每排列数（2~6，仅条目 **≥ gridThreshold** 且有图标时生效） |
+| `gridThreshold` | number | 8 | 网格/列表切换阈值：条目数 ≥ 该值且有图标 → 网格，否则列表（别名 `网格阈值`）。如传 4 让 4 条也走网格，传 21 让 20 条仍走列表 |
 | `cancelable` | boolean | false | 是否允许点击外部取消（关闭时触发 `onCancel`） |
 | `showIndex` | boolean | false | 全局默认是否叠加序号（从 1 开始），仅对有图标的项生效 |
 | `showIndexColor` | string | "black" | 序号颜色，支持命名色或 `#RRGGBB`（见通用说明）；单项可用 `showIndexColor`/`序号颜色` 覆盖 |
@@ -2114,6 +2153,43 @@ var t = ui.select("难度", ["简单", "普通", "困难"]);
 > 返回的 `values` 与 `onReorder` 回调都按新顺序给出。
 > 顺序默认按 `orderKey`（缺省=标题）**持久化**，下次打开沿用；配置增删条目时自动合并。
 > 想每次都用配置顺序：`orderKey: ""`。
+
+**拖动排序示例**：
+```javascript
+// 多选 + 列表（< gridThreshold 或纯文字）：长按行尾「≡」拖动
+var picked = ui.multiSelect("常用功能", ["整理存档", "检查更新", "清理缓存"], {
+    reorderable: true,
+    orderKey: "",   // 临时排序，不持久化
+    onReorder: function (order) { console.log("新顺序：" + order.join(",")) }
+});
+console.log("已选：" + picked.join(","));
+
+// 多选 + 网格（≥ gridThreshold 且有图标）：长按图标拖动
+var lv = [];
+for (var i = 1; i <= 9; i++) lv.push({ name: "关卡" + i, icon: "lv.png", value: String(i) });
+var result = ui.multiSelect("选择关卡", lv, {
+    columns: 4,
+    gridThreshold: 8,   // 默认 8；9 条 ≥ 8 → 网格。想让 9 条走列表就传 10
+    defaultValues: ["1", "2"],
+    reorderable: true,
+    orderKey: "关卡顺序",   // 持久化；不传则默认用标题
+    searchable: true,       // 搜索过滤期间自动禁用拖动
+    onReorder: function (order) { console.log("新顺序：" + order.join(",")) }
+});
+console.log("已选：" + result.values.join(","));
+
+// 多选 + 全选 + 拖动：全选只作用于当前过滤结果；返回顺序 = 拖动后的顺序
+var all = ui.multiSelect("管理植物", [
+    { name: "豌豆", icon: "pea.png", value: "pea" },
+    { name: "向日葵", icon: "sunflower.png", value: "sunflower" },
+    { name: "坚果", icon: "nut.png", value: "nut" }
+], {
+    gridThreshold: 3,   // 3 条 ≥ 3 → 网格（默认 8 时这三条会走列表）
+    selectAll: true,
+    reorderable: true,
+    onReorder: function (order) { console.log("拖动后：" + order.join(",")) }
+});
+```
 
 **网格「更多」折叠（`more`）**：条目多时不用纵向铺一屏，一行就能装完。
 
@@ -5170,3 +5246,5 @@ console.log(window.__count);
 *新增：ui.multiSelect/ui.多选 的 options 新增 reorderable（长按拖动排序，网格/列表都生效，搜索过滤期间自动禁用）与 onReorder 回调；返回的 values 与 onSelect/onReorder 均按拖动后的顺序排列*
 *优化：ui.multiSelect 拖动排序体验——列表行右侧的「≡」把手可**按下即拖**（30×36dp 触摸区，不必长按整行；网格仍为长按图标拖动）；换位改用弹簧位移动画（记录上一帧位置 → 以旧位移作起始偏移收敛到 0），不再瞬移生硬*
 *优化：ui.multiSelect 拖动排序改为「长按把手/图标」起拖（行体与空白处不再响应，避免误拖）；新增 orderKey（排序持久化键，默认=标题，传 "" 关闭）——拖动结果写入 SharedPreferences，下次打开按 ItemOrder 合并后还原；修复换位后单元格未 key 导致 dragging 状态错位、格子拖到一半消失的问题*
+*新增：ui.select/ui.选择 的 options 新增 reorderable / orderKey / onReorder（拖动排序，与 ui.multiSelect 同款，网格/列表都生效；单选点选仍返回所选项 value，顺序只影响显示与持久化）；此前拖动仅多选支持*
+*新增：ui.select/ui.multiSelect 的 options 新增 gridThreshold（别名 `网格阈值`，默认 8）——网格/列表切换阈值可自定义，条目数 ≥ 该值且有图标 → 网格，否则列表；原硬编码 8 不再写死*

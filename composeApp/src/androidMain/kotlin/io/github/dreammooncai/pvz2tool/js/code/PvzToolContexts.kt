@@ -21,6 +21,8 @@ import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
 import io.github.dreammooncai.pvz2tool.js.orNull
 import io.github.dreammooncai.pvz2tool.js.toBoolean
+import io.github.dreammooncai.pvz2tool.js.toBooleanOrThrowable
+import io.github.dreammooncai.pvz2tool.js.get
 import io.github.dreammooncai.pvz2tool.pop.core.rsb.Rsb
 import io.github.dreammooncai.pvz2tool.pop.core.rsb.RsbCommonConfig
 import io.github.dreammooncai.pvz2tool.pop.core.rsb.RsbPackConfig
@@ -195,7 +197,7 @@ class PvzToolContexts(
                     // 注入 save()（不可枚举）
                     val saveFunc = Callable { args ->
                         val rtonPath = args.getOrNull(0).orNull?.let { toString(it) } ?: outputPath ?: toString(
-                            jsonObj.get("__rtonPath__".js, this)
+                            jsonObj.get("__rtonPath__".js)
                         )
                         jsonObj.delete("__rtonPath__".js,this)
                         rtonSaveImpl(rtonPath, PvzToolJsEngine.stringify(jsonObj,4))
@@ -286,25 +288,25 @@ class PvzToolContexts(
         listOf("PtxABGR8888Mode".js, "像素ABGR8888模式".js) eq JsPropertyAccessor.BackedField(Callable {
             Ptx.PtxABGR8888Mode.js
         },Callable { args ->
-            Ptx.PtxABGR8888Mode = args[0].toBoolean()
+            Ptx.PtxABGR8888Mode = args[0].toBooleanOrThrowable()
             null
         })
         listOf("PtxARGB8888PaddingMode".js, "像素ARGB8888填充模式".js) eq JsPropertyAccessor.BackedField(Callable {
             Ptx.PtxARGB8888PaddingMode.js
         },Callable { args ->
-            Ptx.PtxARGB8888PaddingMode = args[0].toBoolean()
+            Ptx.PtxARGB8888PaddingMode = args[0].toBooleanOrThrowable()
             null
         })
         listOf("RsbPtxABGR8888Mode".js, "资源像素ABGR8888模式".js) eq JsPropertyAccessor.BackedField(Callable {
             Ptx.RsbPtxABGR8888Mode.js
         },Callable { args ->
-            Ptx.RsbPtxABGR8888Mode = args[0].toBoolean()
+            Ptx.RsbPtxABGR8888Mode = args[0].toBooleanOrThrowable()
             null
         })
         listOf("RsbPtxARGB8888PaddingMode".js, "资源像素ARGB8888填充模式".js) eq JsPropertyAccessor.BackedField(Callable {
             Ptx.RsbPtxARGB8888PaddingMode.js
         },Callable { args ->
-            Ptx.RsbPtxARGB8888PaddingMode = args[0].toBoolean()
+            Ptx.RsbPtxARGB8888PaddingMode = args[0].toBooleanOrThrowable()
             null
         })
 
@@ -376,7 +378,7 @@ class PvzToolContexts(
             val inFilePath  = toString(args[0])
             val outFilePath = toString(args[1])
             val levelName = toString(args[2])
-            val isChineseMode = args[3].toBoolean()
+            val isChineseMode = args[3].toBooleanOrThrowable()
             val ctx = InitializePvz2.context
 
             val outputHandle = access.resolveOutputOrThrow(outFilePath, ctx)

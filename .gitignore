@@ -30,3 +30,5 @@ composeApp/data/
 composeApp/release/
 composeApp/rsb_unpacked_original/
 composeApp/rsb_unpacked_repacked/
+# 发布流程生成的产物（Release APK / 适配包 zip / 元数据）
+release/out/

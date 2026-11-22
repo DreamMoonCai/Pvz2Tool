@@ -65,6 +65,8 @@ import android.app.Activity
 import androidx.core.graphics.drawable.IconCompat
 import io.github.dreammooncai.pvz2tool.controller.GameDisplayFloatingController
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine.getJsToolContext
+import io.github.dreammooncai.pvz2tool.js.toText
+import io.github.dreammooncai.pvz2tool.js.get
 import io.github.dreammooncai.pvz2tool.service.LocalVpnService
 import io.github.dreammooncai.pvz2tool.ui.main.SettingsDialogState
 import kotlinx.coroutines.Dispatchers
@@ -164,14 +166,14 @@ object PvzToolGlobals {
     /**
      * 把 JS options 解析成复合文本工具的参数。
      *
-     * 🔴 JS 里的值全是 keight 包装对象：字符串必须 `?.orNull?.let { toString(it) }`、
-     * 布尔必须 `?.orNull?.toBoolean()`，**绝不能** `as? String` / `toKotlin() as? Boolean`
+     * 🔴 JS 里的值全是 keight 包装对象：字符串必须 `.toText()`、
+     * 布尔必须 `.toBoolean()`，**绝不能** `as? String` / `toKotlin() as? Boolean`
      * （那样恒为 null → 参数被静默忽略，且不报错）。
      */
     private suspend fun ScriptRuntime.parseCompositeOptions(options: JsObject?): CompositeTextParams {
         suspend fun str(vararg keys: String): String? {
             for (k in keys) {
-                val v = options?.get(k.js, this)?.orNull ?: continue
+                val v = options.get(k.js)?.orNull ?: continue
                 return toString(v)
             }
             return null
@@ -208,10 +210,10 @@ object PvzToolGlobals {
             val title = toString(args[0])
             val message = messageToString(args[1], this)
             val options = args[2].orNull as? JsObject
-            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
-            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val dismissible = options?.get("dismissible".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
-                ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val confirmText = options.get("confirmText".js).toText() ?: "确定"
+            val confirmColor = options.get("confirmColor".js).toText() ?: ""
+            val dismissible = options.get("dismissible".js).toBoolean()
+                ?: options.get("可关闭".js).toBoolean() ?: false
             val onConfirm = bindJsCallback(options, "onConfirm", runtime)
             val onResult = bindJsCallback(options, "onResult", runtime)
             JsUiManager.showAlert(getJsToolContext(),title, message, confirmText, confirmColor, dismissible, onConfirm, onResult).await()
@@ -226,12 +228,12 @@ object PvzToolGlobals {
             val title = toString(args[0])
             val message = messageToString(args[1], this)
             val options = args[2].orNull as? JsObject
-            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确认"
-            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
-            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val dismissible = options?.get("dismissible".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
-                ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val confirmText = options.get("confirmText".js).toText() ?: "确认"
+            val cancelText = options.get("cancelText".js).toText() ?: "取消"
+            val confirmColor = options.get("confirmColor".js).toText() ?: ""
+            val cancelColor = options.get("cancelColor".js).toText() ?: ""
+            val dismissible = options.get("dismissible".js).toBoolean()
+                ?: options.get("可关闭".js).toBoolean() ?: false
             val onConfirm = bindJsCallback(options, "onConfirm", runtime)
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onResult = bindJsCallback(options, "onResult", runtime)
@@ -252,12 +254,12 @@ object PvzToolGlobals {
             val defaultValue = args.getOrNull(2).orNull?.let { toString(it) } ?: ""
             val placeholder = args.getOrNull(3).orNull?.let { toString(it) } ?: ""
             val options = args[4].orNull as? JsObject
-            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
-            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
-            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val dismissible = options?.get("dismissible".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
-                ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val confirmText = options.get("confirmText".js).toText() ?: "确定"
+            val cancelText = options.get("cancelText".js).toText() ?: "取消"
+            val confirmColor = options.get("confirmColor".js).toText() ?: ""
+            val cancelColor = options.get("cancelColor".js).toText() ?: ""
+            val dismissible = options.get("dismissible".js)?.orNull?.let { it.toKotlin(this) as? Boolean }
+                ?: options.get("可关闭".js)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val onConfirm = bindJsCallback(options, "onConfirm", runtime)
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onResult = bindJsCallback(options, "onResult", runtime)
@@ -273,12 +275,12 @@ object PvzToolGlobals {
             val runtime = this
             val options = args.getOrNull(0).orNull as? JsObject
             val params = parseCompositeOptions(options)
-            val title = options?.get("title".js, this)?.orNull?.let { toString(it) } ?: "复合文本工具"
-            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "复制"
-            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
-            val copyOnConfirm = options?.get("copy".js, this)?.orNull?.toBoolean() ?: true
-            val dismissible = options?.get("dismissible".js, this)?.orNull?.toBoolean()
-                ?: options?.get("可关闭".js, this)?.orNull?.toBoolean() ?: true
+            val title = options.get("title".js).toText() ?: "复合文本工具"
+            val confirmText = options.get("confirmText".js).toText() ?: "复制"
+            val cancelText = options.get("cancelText".js).toText() ?: "取消"
+            val copyOnConfirm = options.get("copy".js).toBoolean() ?: true
+            val dismissible = options.get("dismissible".js).toBoolean()
+                ?: options.get("可关闭".js).toBoolean() ?: true
             val onResult = bindJsCallback(options, "onResult", runtime)
             val onClose = bindJsCallback(options, "onClose", runtime)
             JsUiManager.showCompositeText(
@@ -313,11 +315,11 @@ object PvzToolGlobals {
             val options = args[1].orNull
 
             // 解析 options 参数
-            val message = options?.get("message".js, this)?.orNull?.let { toString(it) } ?: ""
-            val indeterminate = options?.get("indeterminate".js, this)?.let { it.toKotlin(this) as? Boolean } ?: false
-            val showCancel = options?.get("showCancel".js, this)?.let { it.toKotlin(this) as? Boolean }
+            val message = options.get("message".js).toText() ?: ""
+            val indeterminate = options.get("indeterminate".js)?.let { it.toKotlin(this) as? Boolean } ?: false
+            val showCancel = options.get("showCancel".js)?.let { it.toKotlin(this) as? Boolean }
                 ?: true // 取消回调：用户点击“取消”时触发（供 JS 中断耗时任务）
-            val onCancelJs = options?.get("onCancel".js, this)?.orNull as? JSFunction
+            val onCancelJs = options.get("onCancel".js)?.orNull as? JSFunction
 
             // 先显示进度弹窗
             JsUiManager.showProgress(title, message, indeterminate, showCancel)
@@ -374,8 +376,12 @@ object PvzToolGlobals {
 
         // 单项选择弹窗：ui.select(title, items, options?) -> string|null
         // items: 字符串数组 或 对象数组 [{name, icon?, value?, showIndex?, showIndexColor?}]
-        // options: { columns?, cancelable?, showIndex?, showIndexColor?, confirmText?, cancelText?, confirmColor?, cancelColor?, forceMaxForm?, onCancel?, onSelect? }
+        // options: { columns?, gridThreshold?, cancelable?, showIndex?, showIndexColor?, confirmText?, cancelText?, confirmColor?, cancelColor?, forceMaxForm?,
+        //           reorderable?, orderKey?, onReorder?, onCancel?, onSelect? }
         //   forceMaxForm: true 时以最高形态展示（内容区固定上限高度，跳过探测重测，适合内容很多的场景）
+        //   gridThreshold: 网格/列表切换阈值（默认 8），条目数 >= 该值且有图标 → 网格；中文别名「网格阈值」
+        //   reorderable: true 长按拖动排序（网格/列表都生效），orderKey 持久化键（默认=标题，""=不持久化）
+        //   onReorder: 拖动结束回调（收到按新顺序排列的 value 数组）；返回值仍是选中的那个 value
         listOf("select".js, "选择".js).func(
             FunctionParam("title"), FunctionParam("items"), FunctionParam("options")
         ) { args ->
@@ -384,27 +390,65 @@ object PvzToolGlobals {
             val itemsRaw = args.getOrNull(1).orNull?.toKotlin(this) as? List<*> ?: emptyList<Any>()
             val options = args[2].orNull as? JsObject
             val items = parseChoiceItems(itemsRaw)
-            val columns = (options?.get("columns".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 4).coerceIn(2, 6)
-            val cancelable = options?.get("cancelable".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
-            val showIndex = options?.get("showIndex".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
-            val showIndexColor = toString((options?.get("showIndexColor".js, this).orNull ?: options?.get("序号颜色".js, this).orNull ?: "black".js))
-            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
-            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
-            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val forceMaxForm = options?.get("forceMaxForm".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
-                ?: options?.get("最高形态".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val columns = (options.get("columns".js)?.orNull?.let { toNumber(it).toInt() } ?: 4).coerceIn(2, 6)
+            val gridThreshold = (options.get("gridThreshold".js)?.orNull?.let { toNumber(it).toInt() }
+                ?: options.get("网格阈值".js)?.orNull?.let { toNumber(it).toInt() } ?: 8).coerceAtLeast(1)
+            val cancelable = options.get("cancelable".js)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val showIndex = options.get("showIndex".js)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val showIndexColor = toString((options.get("showIndexColor".js).orNull ?: options.get("序号颜色".js).orNull ?: "black".js))
+            val confirmText = options.get("confirmText".js).toText() ?: "确定"
+            val cancelText = options.get("cancelText".js).toText() ?: "取消"
+            val confirmColor = options.get("confirmColor".js).toText() ?: ""
+            val cancelColor = options.get("cancelColor".js).toText() ?: ""
+            val forceMaxForm = options.get("forceMaxForm".js)?.orNull?.let { it.toKotlin(this) as? Boolean }
+                ?: options.get("最高形态".js)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            // 长按拖动排序（与 ui.multiSelect 同款）：网格/列表都生效。布尔/字符串一律走 orNull + 转换函数
+            val reorderable = options.get("reorderable".js).toBoolean()
+                ?: options.get("可排序".js).toBoolean()
+                ?: options.get("拖拽排序".js).toBoolean() ?: false
+            val orderKey = if (reorderable) {
+                val raw = options.get("orderKey".js)?.orNull
+                    ?: options.get("排序键".js)?.orNull
+                when {
+                    raw == null || raw == Undefined -> title
+                    else -> toString(raw).ifBlank { null }
+                }
+            } else {
+                null
+            }
+            val onReorder = bindJsCallback(options, "onReorder", runtime)
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onSelect = bindJsCallback(options, "onSelect", runtime)
             val onResult = bindJsCallback(options, "onResult", runtime)
-            JsUiManager.showSelect(getJsToolContext(),title, items, columns, cancelable, showIndex, showIndexColor, confirmText, cancelText, confirmColor, cancelColor, forceMaxForm, onCancel, onSelect, onResult).await()?.js
+            JsUiManager.showSelect(
+                ownerContext = getJsToolContext(),
+                title = title,
+                items = items,
+                columns = columns,
+                gridThreshold = gridThreshold,
+                cancelable = cancelable,
+                showIndex = showIndex,
+                showIndexColor = showIndexColor,
+                confirmText = confirmText,
+                cancelText = cancelText,
+                confirmColor = confirmColor,
+                cancelColor = cancelColor,
+                forceMaxForm = forceMaxForm,
+                reorderable = reorderable,
+                onReorder = onReorder,
+                orderKey = orderKey,
+                onCancel = onCancel,
+                onSelect = onSelect,
+                onResult = onResult
+            ).await()?.js
         }
 
         // 多项选择弹窗：ui.multiSelect(title, items, options?) -> string[]
         //   options.selectAll / searchable / quantity 任一开启时，确定返回对象：
         //   { values: string[], count: number }（count 仅在 quantity 开启时有效）
-        // options: { defaultValues?, columns?, cancelable?, showIndex?, showIndexColor?, confirmText?, cancelText?,
+        // options: { defaultValues?, columns?, gridThreshold?, cancelable?, showIndex?, showIndexColor?, confirmText?, cancelText?,
         //           confirmColor?, cancelColor?, forceMaxForm?,
+        //           gridThreshold: 网格/列表切换阈值（默认 8），中文别名「网格阈值」
         //           selectAll?（右上角全选）, searchable?（右上角搜索）,
         //           quantity?（数量输入：true 或 {min,max,step,default,suffix}）,
         //           reorderable?（拖动排序，默认 false）, orderKey?（排序持久化键，默认 = title）,
@@ -418,54 +462,56 @@ object PvzToolGlobals {
             val itemsRaw = args.getOrNull(1).orNull?.toKotlin(this) as? List<*> ?: emptyList<Any>()
             val options = args[2].orNull as? JsObject
             val items = parseChoiceItems(itemsRaw)
-            val defaultValues = options?.get("defaultValues".js, this)?.let { it.toKotlin(this) as? List<*> }
+            val defaultValues = options.get("defaultValues".js)?.let { it.toKotlin(this) as? List<*> }
                 ?.mapNotNull { it?.toString() }
-            val columns = (options?.get("columns".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 4).coerceIn(2, 6)
+            val columns = (options.get("columns".js)?.orNull?.let { toNumber(it).toInt() } ?: 4).coerceIn(2, 6)
+            val gridThreshold = (options.get("gridThreshold".js)?.orNull?.let { toNumber(it).toInt() }
+                ?: options.get("网格阈值".js)?.orNull?.let { toNumber(it).toInt() } ?: 8).coerceAtLeast(1)
             // 🔴 布尔一律走 toBoolean()：`toKotlin() as? Boolean` 在 keight 下取不到值会静默变 false
-            val cancelable = options?.get("cancelable".js, this)?.orNull?.toBoolean() ?: false
-            val showIndex = options?.get("showIndex".js, this)?.orNull?.toBoolean() ?: false
-            val showIndexColor = toString((options?.get("showIndexColor".js, this).orNull ?: options?.get("序号颜色".js, this).orNull ?: "black".js))
-            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
-            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
-            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            var forceMaxForm = options?.get("forceMaxForm".js, this)?.orNull?.toBoolean()
-                ?: options?.get("最高形态".js, this)?.orNull?.toBoolean() ?: false
+            val cancelable = options.get("cancelable".js).toBoolean() ?: false
+            val showIndex = options.get("showIndex".js).toBoolean() ?: false
+            val showIndexColor = toString((options.get("showIndexColor".js).orNull ?: options.get("序号颜色".js).orNull ?: "black".js))
+            val confirmText = options.get("confirmText".js).toText() ?: "确定"
+            val cancelText = options.get("cancelText".js).toText() ?: "取消"
+            val confirmColor = options.get("confirmColor".js).toText() ?: ""
+            val cancelColor = options.get("cancelColor".js).toText() ?: ""
+            var forceMaxForm = options.get("forceMaxForm".js).toBoolean()
+                ?: options.get("最高形态".js).toBoolean() ?: false
 
             // ===== 多选增强：全选 / 搜索 / 数量 =====
-            val selectAllEnabled = options?.get("selectAll".js, this)?.orNull?.toBoolean()
-                ?: options?.get("全选".js, this)?.orNull?.toBoolean() ?: false
-            val searchEnabled = options?.get("searchable".js, this)?.orNull?.toBoolean()
-                ?: options?.get("search".js, this)?.orNull?.toBoolean()
-                ?: options?.get("搜索".js, this)?.orNull?.toBoolean() ?: false
+            val selectAllEnabled = options.get("selectAll".js).toBoolean()
+                ?: options.get("全选".js).toBoolean() ?: false
+            val searchEnabled = options.get("searchable".js).toBoolean()
+                ?: options.get("search".js).toBoolean()
+                ?: options.get("搜索".js).toBoolean() ?: false
             // quantity: false | true | {min,max,step,default,suffix}
-            val quantityRaw = options?.get("quantity".js, this)?.orNull
-                ?: options?.get("数量".js, this)?.orNull
+            val quantityRaw = options.get("quantity".js)?.orNull
+                ?: options.get("数量".js)?.orNull
             val quantityObject = quantityRaw as? JsObject
             val quantityEnabled = when {
                 quantityObject != null -> true
                 else -> quantityRaw?.toBoolean() ?: false
             }
-            val quantityMin = quantityObject?.get("min".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 1
-            val quantityMax = quantityObject?.get("max".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 99
-            val quantityStep = quantityObject?.get("step".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 1
-            val quantityDefault = quantityObject?.get("default".js, this)?.orNull?.let { toNumber(it).toInt() }
-                ?: quantityObject?.get("value".js, this)?.orNull?.let { toNumber(it).toInt() }
+            val quantityMin = quantityObject.get("min".js)?.orNull?.let { toNumber(it).toInt() } ?: 1
+            val quantityMax = quantityObject.get("max".js)?.orNull?.let { toNumber(it).toInt() } ?: 99
+            val quantityStep = quantityObject.get("step".js)?.orNull?.let { toNumber(it).toInt() } ?: 1
+            val quantityDefault = quantityObject.get("default".js)?.orNull?.let { toNumber(it).toInt() }
+                ?: quantityObject.get("value".js)?.orNull?.let { toNumber(it).toInt() }
                 ?: quantityMin
-            val quantitySuffix = quantityObject?.get("suffix".js, this)?.orNull?.let { toString(it) }
-                ?: quantityObject?.get("unit".js, this)?.orNull?.let { toString(it) } ?: ""
+            val quantitySuffix = quantityObject.get("suffix".js).toText()
+                ?: quantityObject.get("unit".js).toText() ?: ""
 
             // 长按拖动排序：网格/列表都生效，返回顺序 = 拖动后的顺序
-            val reorderable = options?.get("reorderable".js, this)?.orNull?.toBoolean()
-                ?: options?.get("可排序".js, this)?.orNull?.toBoolean()
-                ?: options?.get("拖拽排序".js, this)?.orNull?.toBoolean() ?: false
+            val reorderable = options.get("reorderable".js).toBoolean()
+                ?: options.get("可排序".js).toBoolean()
+                ?: options.get("拖拽排序".js).toBoolean() ?: false
             // 排序持久化键：不传默认用 title，这样同一个弹窗下次打开会沿用上次的顺序；
             // 明确想要「临时排序」时传 orderKey:null / ""。
             val orderKey = if (reorderable) {
-                val raw = options?.get("orderKey".js, this)?.orNull
-                    ?: options?.get("排序键".js, this)?.orNull
+                val raw = options.get("orderKey".js)?.orNull
+                    ?: options.get("排序键".js)?.orNull
                 when {
-                    raw == null || raw == io.github.alexzhirkevich.keight.js.Undefined -> title
+                    raw == null || raw == Undefined -> title
                     else -> toString(raw).ifBlank { null }
                 }
             } else {
@@ -475,23 +521,23 @@ object PvzToolGlobals {
             //   limit   = 首屏最多显示几个（默认 5），其余收进三段式横条
             //   visible = 展开后每屏可见几个（默认 = limit），超出横向滚动
             //   text    = 三段式第一段文字（不传则不显示这一段）
-            val moreRaw = options?.get("more".js, this)?.orNull
-                ?: options?.get("更多".js, this)?.orNull
+            val moreRaw = options.get("more".js)?.orNull
+                ?: options.get("更多".js)?.orNull
             val moreObject = moreRaw as? JsObject
             val moreOptions = when {
                 moreObject != null -> {
-                    val limit = moreObject.get("limit".js, this)?.orNull?.let { toNumber(it).toInt() }
-                        ?: moreObject.get("首屏".js, this)?.orNull?.let { toNumber(it).toInt() }
+                    val limit = moreObject.get("limit".js)?.orNull?.let { toNumber(it).toInt() }
+                        ?: moreObject.get("首屏".js)?.orNull?.let { toNumber(it).toInt() }
                         ?: 5
-                    val visible = moreObject.get("visible".js, this)?.orNull?.let { toNumber(it).toInt() }
-                        ?: moreObject.get("可见".js, this)?.orNull?.let { toNumber(it).toInt() }
+                    val visible = moreObject.get("visible".js)?.orNull?.let { toNumber(it).toInt() }
+                        ?: moreObject.get("可见".js)?.orNull?.let { toNumber(it).toInt() }
                         ?: limit
-                    val hidden = moreObject.get("hidden".js, this)?.orNull?.let { toNumber(it).toInt() }
-                        ?: moreObject.get("藏".js, this)?.orNull?.let { toNumber(it).toInt() }
+                    val hidden = moreObject.get("hidden".js)?.orNull?.let { toNumber(it).toInt() }
+                        ?: moreObject.get("藏".js)?.orNull?.let { toNumber(it).toInt() }
                         ?: -1
                     JsMoreOptions(
-                        text = moreObject.get("text".js, this)?.orNull?.let { toString(it) }
-                            ?: moreObject.get("文字".js, this)?.orNull?.let { toString(it) }
+                        text = moreObject.get("text".js).toText()
+                            ?: moreObject.get("文字".js).toText()
                             ?: "",
                         limit = limit.coerceAtLeast(1),
                         visible = visible.coerceAtLeast(1),
@@ -511,6 +557,7 @@ object PvzToolGlobals {
                 items = items,
                 defaultValues = defaultValues,
                 columns = columns,
+                gridThreshold = gridThreshold,
                 cancelable = cancelable,
                 showIndex = showIndex,
                 showIndexColor = showIndexColor,
@@ -558,11 +605,11 @@ object PvzToolGlobals {
             val itemsRaw = args.getOrNull(1).orNull?.toKotlin(this) as? List<*> ?: emptyList<Any>()
             val options = args[2].orNull as? JsObject
             val items = parseActionItems(itemsRaw)
-            val cancelable = options?.get("cancelable".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: true
-            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
-            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val forceMaxForm = options?.get("forceMaxForm".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
-                ?: options?.get("最高形态".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val cancelable = options.get("cancelable".js)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: true
+            val cancelText = options.get("cancelText".js).toText() ?: "取消"
+            val cancelColor = options.get("cancelColor".js).toText() ?: ""
+            val forceMaxForm = options.get("forceMaxForm".js)?.orNull?.let { it.toKotlin(this) as? Boolean }
+                ?: options.get("最高形态".js)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
             val onCancel = bindJsCallback(options, "onCancel", runtime)
             val onSelect = bindJsCallback(options, "onSelect", runtime)
             val onResult = bindJsCallback(options, "onResult", runtime)
@@ -577,24 +624,24 @@ object PvzToolGlobals {
             val runtime = this
             val title = toString(args[0])
             val options = args[1].orNull as? JsObject
-            val min = options?.get("min".js, this)?.orNull?.let { toNumber(it).toDouble() } ?: 0.0
-            val max = options?.get("max".js, this)?.orNull?.let { toNumber(it).toDouble() } ?: 100.0
-            val step = options?.get("step".js, this)?.orNull?.let { toNumber(it).toDouble() } ?: 1.0
-            val default = options?.get("default".js, this)?.orNull?.let { toNumber(it).toDouble() } ?: min
-            val unit = options?.get("unit".js, this)?.orNull?.let { toString(it) } ?: ""
-            val decimals = options?.get("decimals".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 2
-            val showValue = options?.get("showValue".js, this)?.orNull?.toBoolean() ?: true
-            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
-            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
-            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val dismissible = options?.get("dismissible".js, this)?.orNull?.toBoolean()
-                ?: options?.get("可关闭".js, this)?.orNull?.toBoolean() ?: false
+            val min = options.get("min".js)?.orNull?.let { toNumber(it).toDouble() } ?: 0.0
+            val max = options.get("max".js)?.orNull?.let { toNumber(it).toDouble() } ?: 100.0
+            val step = options.get("step".js)?.orNull?.let { toNumber(it).toDouble() } ?: 1.0
+            val default = options.get("default".js)?.orNull?.let { toNumber(it).toDouble() } ?: min
+            val unit = options.get("unit".js).toText() ?: ""
+            val decimals = options.get("decimals".js)?.orNull?.let { toNumber(it).toInt() } ?: 2
+            val showValue = options.get("showValue".js).toBoolean() ?: true
+            val confirmText = options.get("confirmText".js).toText() ?: "确定"
+            val cancelText = options.get("cancelText".js).toText() ?: "取消"
+            val confirmColor = options.get("confirmColor".js).toText() ?: ""
+            val cancelColor = options.get("cancelColor".js).toText() ?: ""
+            val dismissible = options.get("dismissible".js).toBoolean()
+                ?: options.get("可关闭".js).toBoolean() ?: false
             // 数量式步进行：「±」长按连续 + 「« »」直达最小/最大，默认开启
-            val showStepButtons = options?.get("stepButtons".js, this)?.orNull?.toBoolean()
-                ?: options?.get("步进按钮".js, this)?.orNull?.toBoolean() ?: true
-            val showMinMaxButtons = options?.get("minMaxButtons".js, this)?.orNull?.toBoolean()
-                ?: options?.get("最值按钮".js, this)?.orNull?.toBoolean() ?: true
+            val showStepButtons = options.get("stepButtons".js).toBoolean()
+                ?: options.get("步进按钮".js).toBoolean() ?: true
+            val showMinMaxButtons = options.get("minMaxButtons".js).toBoolean()
+                ?: options.get("最值按钮".js).toBoolean() ?: true
             val onChange = bindJsCallback(options, "onChange", runtime)
             val onConfirm = bindJsCallback(options, "onConfirm", runtime)
             val onCancel = bindJsCallback(options, "onCancel", runtime)
@@ -635,21 +682,21 @@ object PvzToolGlobals {
             val runtime = this
             val title = toString(args[0])
             val options = args[1].orNull as? JsObject
-            val min = options?.get("min".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 0
-            val max = options?.get("max".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 100
-            val step = options?.get("step".js, this)?.orNull?.let { toNumber(it).toInt() } ?: 1
-            val default = options?.get("default".js, this)?.orNull?.let { toNumber(it).toInt() } ?: min
-            val suffix = options?.get("suffix".js, this)?.orNull?.let { toString(it) }
-                ?: options?.get("unit".js, this)?.orNull?.let { toString(it) } ?: ""
+            val min = options.get("min".js)?.orNull?.let { toNumber(it).toInt() } ?: 0
+            val max = options.get("max".js)?.orNull?.let { toNumber(it).toInt() } ?: 100
+            val step = options.get("step".js)?.orNull?.let { toNumber(it).toInt() } ?: 1
+            val default = options.get("default".js)?.orNull?.let { toNumber(it).toInt() } ?: min
+            val suffix = options.get("suffix".js).toText()
+                ?: options.get("unit".js).toText() ?: ""
             // 布尔一律走字符串判定（toBoolean 的数值投影在不同场景下不可靠）
-            val showMinMax = options?.get("showMinMaxButtons".js, this)?.orNull
+            val showMinMax = options.get("showMinMaxButtons".js)?.orNull
                 ?.let { toString(it).trim().lowercase() != "false" } ?: true
-            val confirmText = options?.get("confirmText".js, this)?.orNull?.let { toString(it) } ?: "确定"
-            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
-            val confirmColor = options?.get("confirmColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
-            val dismissible = (options?.get("dismissible".js, this)?.orNull
-                ?: options?.get("可关闭".js, this)?.orNull)
+            val confirmText = options.get("confirmText".js).toText() ?: "确定"
+            val cancelText = options.get("cancelText".js).toText() ?: "取消"
+            val confirmColor = options.get("confirmColor".js).toText() ?: ""
+            val cancelColor = options.get("cancelColor".js).toText() ?: ""
+            val dismissible = (options.get("dismissible".js)?.orNull
+                ?: options.get("可关闭".js)?.orNull)
                 ?.let { toString(it).trim().lowercase() == "true" } ?: false
             val onChange = bindJsCallback(options, "onChange", runtime)
             val onConfirm = bindJsCallback(options, "onConfirm", runtime)
@@ -670,11 +717,11 @@ object PvzToolGlobals {
             val runtime = this
             val title = toString(args[0])
             val options = args[1].orNull as? JsObject
-            val message = options?.get("message".js, this)?.orNull?.let { toString(it) } ?: ""
-            val dismissible = options?.get("dismissible".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean }
-                ?: options?.get("可关闭".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
-            val cancelText = options?.get("cancelText".js, this)?.orNull?.let { toString(it) } ?: "取消"
-            val cancelColor = options?.get("cancelColor".js, this)?.orNull?.let { toString(it) } ?: ""
+            val message = options.get("message".js).toText() ?: ""
+            val dismissible = options.get("dismissible".js)?.orNull?.let { it.toKotlin(this) as? Boolean }
+                ?: options.get("可关闭".js)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: false
+            val cancelText = options.get("cancelText".js).toText() ?: "取消"
+            val cancelColor = options.get("cancelColor".js).toText() ?: ""
             val onDismiss = bindJsCallback(options, "onDismiss", runtime)
             val onResult = bindJsCallback(options, "onResult", runtime)
             JsUiManager.showLoading(getJsToolContext(),title, message, dismissible, cancelText, cancelColor, onDismiss, onResult)
@@ -794,10 +841,10 @@ object PvzToolGlobals {
                 JsConsole.warn("未授予通知权限(POST_NOTIFICATIONS)，通知未发送（可在系统设置中开启通知）")
                 return@func null
             }
-            val cid = opts?.get("channelId".js, this)?.orNull?.let { toString(it) } ?: "pvz2tool_default"
-            val cname = opts?.get("channelName".js, this)?.orNull?.let { toString(it) } ?: "工具箱通知"
-            val icon = opts?.get("icon".js, this)?.orNull?.let { toString(it) }
-            val auto = opts?.get("autoCancel".js, this)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: true
+            val cid = opts.get("channelId".js).toText() ?: "pvz2tool_default"
+            val cname = opts.get("channelName".js).toText() ?: "工具箱通知"
+            val icon = opts.get("icon".js).toText()
+            val auto = opts.get("autoCancel".js)?.orNull?.let { it.toKotlin(this) as? Boolean } ?: true
             if (Build.VERSION.SDK_INT >= 26) {
                 val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as AndroidNotificationManager
                 if (nm.getNotificationChannel(cid) == null)
@@ -1023,9 +1070,9 @@ object PvzToolGlobals {
             if (url.isBlank()) return@func Undefined
             val opts = args.getOrNull(1)?.orNull as? JsObject
             // 未指定 volume → null → 控制器按「跟随 setBgmVolume」处理
-            val volume = opts?.get("volume".js, this)?.orNull?.let { toNumber(it).toFloat() }?.coerceIn(0f, 1f)
-            val loop = opts?.get("loop".js, this)?.orNull?.toBoolean() ?: false
-            val fade = opts?.get("fade".js, this)?.orNull?.let { toNumber(it).toLong() }?.coerceAtLeast(0) ?: 1000L
+            val volume = opts.get("volume".js)?.orNull?.let { toNumber(it).toFloat() }?.coerceIn(0f, 1f)
+            val loop = opts.get("loop".js).toBoolean() ?: false
+            val fade = opts.get("fade".js)?.orNull?.let { toNumber(it).toLong() }?.coerceAtLeast(0) ?: 1000L
             val audioUrl = PvzMusicController.resolveAudioUri(url)
             withContext(Dispatchers.Main) {
                 PvzMusicController.playMusic(audioUrl, loop, volume, fade)
@@ -1075,10 +1122,10 @@ object PvzToolGlobals {
             val url = toString(args[0])
             if (url.isBlank()) return@func Undefined
             val opts = args.getOrNull(1)?.orNull as? JsObject
-            val loop = opts?.get("loop".js, this)?.orNull?.toBoolean() ?: false
-            val volume = opts?.get("volume".js, this)?.orNull?.let { toNumber(it).toFloat() }?.coerceIn(0f, 1f) ?: 1f
-            val poster = opts?.get("poster".js, this)?.orNull?.let { toString(it) }?.takeIf { it.isNotBlank() }
-            val start = opts?.get("start".js, this)?.orNull?.let { toNumber(it).toLong() } ?: 0L
+            val loop = opts.get("loop".js).toBoolean() ?: false
+            val volume = opts.get("volume".js)?.orNull?.let { toNumber(it).toFloat() }?.coerceIn(0f, 1f) ?: 1f
+            val poster = opts.get("poster".js).toText()?.takeIf { it.isNotBlank() }
+            val start = opts.get("start".js)?.orNull?.let { toNumber(it).toLong() } ?: 0L
             val videoPath = JsVideoManager.resolveVideoPath(url)
             withContext(Dispatchers.Main) {
                 JsVideoManager.play(videoPath, loop, volume, poster, start)
@@ -1146,8 +1193,8 @@ object PvzToolGlobals {
             val opts = args.getOrNull(0)?.orNull as? JsObject
             // 🔴 options 里的数字/布尔必须走 toNumber/toBoolean（context receiver），
             // 直接 `as? Number` / `as? Boolean` 拿到的是 keight 包装对象，参数会被静默忽略。
-            val limit = opts?.get("limit".js, this)?.orNull?.let { toNumber(it).toInt() } ?: -1
-            val level = opts?.get("level".js, this)?.orNull?.let { toString(it).trim().lowercase() }
+            val limit = opts.get("limit".js)?.orNull?.let { toNumber(it).toInt() } ?: -1
+            val level = opts.get("level".js)?.orNull?.let { toString(it).trim().lowercase() }
                 ?.takeIf { it.isNotEmpty() }
             var entries = JsLogger.logs.value
             if (!level.isNullOrEmpty()) {
@@ -1166,7 +1213,7 @@ object PvzToolGlobals {
         // 获取日志纯文本（每行一条，便于写文件）：log.text(options?) -> string
         listOf("text".js, "文本".js).func(FunctionParam("options")) { args ->
             val opts = args.getOrNull(0)?.orNull as? JsObject
-            val limit = opts?.get("limit".js, this)?.orNull?.let { toNumber(it).toInt() } ?: -1
+            val limit = opts.get("limit".js)?.orNull?.let { toNumber(it).toInt() } ?: -1
             var entries = JsLogger.logs.value
             if (limit > 0) entries = entries.takeLast(limit)
             entries.joinToString("\n") { "[${it.timestamp}] ${it.level.name} ${it.message}" }.js
@@ -1364,13 +1411,13 @@ private suspend fun ScriptRuntime.parseChoiceItems(raw: List<*>): List<JsChoiceI
             is String -> JsChoiceItem(el, "", el)
             is Number -> JsChoiceItem(el.toString(), "", el.toString())
             is JsObject -> {
-                val name = toString((el.get("name".js,this).orNull ?: el.get("名称".js,this).orNull ?: "".js))
+                val name = toString((el.get("name".js).orNull ?: el.get("名称".js).orNull ?: "".js))
                 if (name.isBlank()) return@mapNotNull null
-                val icon = toString((el.get("icon".js,this).orNull ?: el.get("图标".js,this).orNull ?: "".js))
-                val value = toString((el.get("value".js,this).orNull ?: el.get("值".js,this).orNull ?: "".js))
-                val itemShowIndex = (el.get("showIndex".js, this).orNull ?: el.get("显示序号".js, this).orNull)
+                val icon = toString((el.get("icon".js).orNull ?: el.get("图标".js).orNull ?: "".js))
+                val value = toString((el.get("value".js).orNull ?: el.get("值".js).orNull ?: "".js))
+                val itemShowIndex = (el.get("showIndex".js).orNull ?: el.get("显示序号".js).orNull)
                     ?.let { it.toKotlin(this) as? Boolean }
-                val itemShowIndexColor = (el.get("showIndexColor".js, this).orNull ?: el.get("序号颜色".js, this).orNull)
+                val itemShowIndexColor = (el.get("showIndexColor".js).orNull ?: el.get("序号颜色".js).orNull)
                     ?.let { toString(it) }
                 JsChoiceItem(name, icon, value.ifEmpty { name }, itemShowIndex, itemShowIndexColor)
             }
@@ -1392,10 +1439,10 @@ private suspend fun ScriptRuntime.parseActionItems(raw: List<*>): List<JsActionI
             is String -> JsActionItem(el, el, false)
             is Number -> JsActionItem(el.toString(), el.toString(), false)
             is JsObject -> {
-                val name = toString((el.get("name".js, this).orNull ?: el.get("名称".js, this).orNull ?: "".js))
+                val name = toString((el.get("name".js).orNull ?: el.get("名称".js).orNull ?: "".js))
                 if (name.isBlank()) return@mapNotNull null
-                val value = toString((el.get("value".js, this).orNull ?: el.get("值".js, this).orNull ?: "".js))
-                val danger = (el.get("danger".js, this).orNull ?: el.get("危险".js, this).orNull)
+                val value = toString((el.get("value".js).orNull ?: el.get("值".js).orNull ?: "".js))
+                val danger = (el.get("danger".js).orNull ?: el.get("危险".js).orNull)
                     ?.let { it.toKotlin(this) as? Boolean } ?: false
                 JsActionItem(name, value.ifEmpty { name }, danger)
             }

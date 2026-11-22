@@ -1,0 +1,132 @@
+1.更新sdk
+以下操作一般勾选前两个dex，不要勾选戴夫工具箱的dex
+2.搜索invoke-static \{\}, Landroid/os/Environment;->getExternalStorageDirectory\(\)Ljava/io/File;勾选正则表达式，并替换为invoke-static {}, LDreamRootPath;->getRootFile()Ljava/io/File;
+搜索(?s)invoke-virtual \{([vp])(\d+)\}, Landroid/telephony/TelephonyManager;->(getDeviceId|getDeviceIdBySlot|getNetworkCountryIso|getSubscriberId|getSimSerialNumber|getSimState|getLine1Number|getVoiceMailNumber|isNetworkRoaming|getMeid|getNetworkType|getSimOperator|getSimOperatorName|getVoiceMailAlphaTag|getPhoneType|getSimCountryIso|getCellLocation|getNetworkOperator|getNetworkOperatorName)\(\)(.*?;)替换invoke-static {$1$2}, LDreamRootPath;->$3(Landroid/telephony/TelephonyManager;)$4
+搜索invoke-direct \{([^}]*)\}, Lcom/popcap/SexyAppFramework/AndroidGameApp;->getIMSIBySlot\(Landroid/content/Context;I\)Ljava/lang/String;替换invoke-static {$1}, LDreamRootPath;->getIMSIBySlot(Ljava/lang/Object;Landroid/content/Context;I)Ljava/lang/String;
+3.为自定义布局做更深度更改(不是必要的，可以不加)
+搜索(?s)invoke-interface \{([vp])(\d+)\}, Landroid/view/WindowManager;->getDefaultDisplay\(\)(.*?;)替换invoke-static {$1$2}, LDreamRootPath;->getDefaultDisplay(Landroid/view/WindowManager;)$3
+
+以上方案支持到sdk27
+
+升级sdk28需要在AndroidManifest.xml的<application>标签内增加
+<uses-library
+    android:name="org.apache.http.legacy"
+    android:required="false" />
+    
+在 <application 此处> 标签中设置 android:usesCleartextTraffic="true"
+    
+使用此方案后sdk可以提升至30
+
+
+从sdk24(安卓7)开始需要给游戏activity增加android:resizeableActivity="false"，否则可能会拉伸，但是如果使用戴夫工具箱最新版则不需要，甚至可以需要为sdk24以下增加android:resizeableActivity="true"，因为自定义比例功能需要在xml不做任何比例限制，以及如果有android.max_aspect统一使用
+<meta-data
+   android:name="android.max_aspect"
+   android:value="4.0" />
+
+为保证分屏或大小变化情况下不会重启重建游戏需要将android:configChanges修改为android:configChanges="density|keyboardHidden|layoutDirection|navigation|orientation|screenLayout|screenSize|smallestScreenSize"
+为避免以分屏模式(宽度小于高度)下打开时画面变形需要修改Lcom/popcap/SexyAppFramework/AndroidGameApp;其中Device_GetCurrentUIOrientation替换为以下内容
+.method private Device_GetCurrentUIOrientation()I
+    .registers 11
+
+    const/4 v8, 0x0
+
+    const/4 v6, 0x2
+
+    const/4 v7, 0x1
+
+    const/4 v0, 0x0
+
+    :try_start_0
+    iget-object v9, p0, Lcom/popcap/SexyAppFramework/AndroidGameApp;->mActivity:Lcom/popcap/SexyAppFramework/SexyAppFrameworkActivity;
+
+    invoke-virtual {v9}, Lcom/popcap/SexyAppFramework/SexyAppFrameworkActivity;->getWindowManager()Landroid/view/WindowManager;
+
+    move-result-object v9
+
+    invoke-interface {v9}, Landroid/view/WindowManager;->getDefaultDisplay()Landroid/view/Display;
+    :try_end_0
+    .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_0} :catch_0
+
+    move-result-object v0
+
+    invoke-virtual {v0}, Landroid/view/Display;->getWidth()I
+
+    move-result v5
+
+    invoke-virtual {v0}, Landroid/view/Display;->getHeight()I
+
+    move-result v3
+
+    invoke-virtual {v0}, Landroid/view/Display;->getRotation()I
+
+    move-result v4
+
+    const/4 v2, 0x0
+
+    if-lez v5, :cond_0
+
+    if-lez v3, :cond_0
+
+    if-lt v5, v3, :cond_3
+
+    move v2, v6
+
+    :cond_0
+    :goto_0
+    move v2, v6
+
+    if-ne v2, v6, :cond_5
+
+    if-eqz v4, :cond_1
+
+    if-ne v4, v7, :cond_4
+
+    :cond_1
+    const/4 v6, 0x4
+
+    :cond_2
+    :goto_1
+    return v6
+
+    :catch_0
+    move-exception v1
+
+    const-string v6, "Exception"
+
+    invoke-virtual {v1}, Ljava/lang/Exception;->toString()Ljava/lang/String;
+
+    move-result-object v7
+
+    invoke-static {v6, v7}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I
+
+    move v6, v8
+
+    goto :goto_1
+
+    :cond_3
+    move v2, v7
+
+    goto :goto_0
+
+    :cond_4
+    const/4 v6, 0x3
+
+    goto :goto_1
+
+    :cond_5
+    if-ne v2, v7, :cond_7
+
+    if-eqz v4, :cond_6
+
+    if-ne v4, v7, :cond_2
+
+    :cond_6
+    move v6, v7
+
+    goto :goto_1
+
+    :cond_7
+    move v6, v8
+
+    goto :goto_1
+.end method

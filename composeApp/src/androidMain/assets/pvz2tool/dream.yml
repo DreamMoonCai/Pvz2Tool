@@ -1507,6 +1507,168 @@ sections:
           });
           "已弹出通用设置弹窗"
 
+      # ===== 拖动排序（reorderable）全场景示例 =====
+      # 布局三态（由条目数据自动决定，无需配置）：
+      #   · 任意条目带 icon 且总数 >= gridThreshold（默认 8）→ 网格模式，长按「图标」拖动换位（无把手）
+      #   · 带 icon 但总数 < gridThreshold        → 列表模式，长按行尾「≡」把手拖动
+      #   · 所有条目均无 icon                     → 纯文字列表，同样长按行尾「≡」拖动
+      # gridThreshold（别名「网格阈值」）：切换网格/列表的条目数阈值，默认 8，可自定义。
+      #   传更小值让少量条目也走网格（如 4 条传 4），传更大值让较多条目仍走列表（如 20 条传 21）。
+      # 排序只改变显示顺序：单选返回值仍是点中那项的 value；多选返回值按拖动后的顺序给出。
+      # orderKey：不传 = 用弹窗标题当 key 持久化；传字符串 = 独立 key；传 "" = 临时排序不持久化。
+      # onReorder：拖动结束回调，收到按新顺序排列的 value 数组。
+      # 注意：搜索过滤期间自动禁用拖动；开启「更多」折叠(more)时 reorderable 被忽略。
+
+      - id: "test_ui_17"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "拖动·单选(列表<8·有图标)"
+        buttonColor: "orange"
+        jsScript: |-
+          // 单选 + 有图标但只有 4 条(<8) → 列表模式，长按行尾「≡」拖动
+          var items = [
+            { name: "第一关", value: "1", icon: "save_icon.png" },
+            { name: "第二关", value: "2", icon: "save_icon.png" },
+            { name: "第三关", value: "3", icon: "save_icon.png" },
+            { name: "第四关", value: "4", icon: "save_icon.png" }
+          ];
+          // orderKey 不传 → 用标题作 key：下次打开沿用这次拖好的顺序
+          var picked = ui.select("关卡顺序(单选列表)", items, {
+            reorderable: true,
+            onReorder: function (order) { console.log("单选新顺序：" + order.join(",")) }
+          });
+          "选中关卡：" + picked
+
+      - id: "test_ui_18"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "拖动·单选(网格>=8)"
+        buttonColor: "green"
+        jsScript: |-
+          // 单选 + 有图标且 8 条(>=8) → 网格模式，长按「图标」拖动（网格没有把手）
+          var items = [];
+          for (var i = 1; i <= 8; i++) {
+            items.push({ name: "关卡" + i, value: String(i), icon: "save_icon.png",
+              showIndex: true, showIndexColor: "white" });
+          }
+          var picked = ui.select("关卡顺序(单选网格)", items, {
+            columns: 4,
+            reorderable: true,
+            orderKey: "demo_single_grid",   // 自定义持久化 key（与其他弹窗隔离）
+            onReorder: function (order) { console.log("单选网格新顺序：" + order.join(",")) }
+          });
+          "选中关卡：" + picked
+
+      - id: "test_ui_19"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "拖动·单选(纯文字列表)"
+        buttonColor: "blue"
+        jsScript: |-
+          // 全无图标 → 纯文字列表，长按行尾「≡」拖动；orderKey:"" = 临时排序不持久化
+          var picked = ui.select("常用功能(单选纯文字)",
+            ["整理存档", "检查更新", "清理缓存", "导入存档", "导出存档"], {
+            reorderable: true,
+            orderKey: "",
+            onReorder: function (order) { console.log("纯文字新顺序：" + order.join(",")) }
+          });
+          "选中：" + picked
+
+      - id: "test_ui_20"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "拖动·多选(列表<8·有图标)"
+        buttonColor: "orange"
+        jsScript: |-
+          // 多选 + 有图标 <8 → 列表模式，行尾「≡」按住即可拖；返回值按拖动后顺序
+          var items = [
+            { name: "植物", value: "plants", icon: "save_icon.png" },
+            { name: "僵尸", value: "zombies", icon: "save_icon.png" },
+            { name: "道具", value: "items", icon: "save_icon.png" },
+            { name: "装扮", value: "costumes", icon: "save_icon.png" }
+          ];
+          var arr = ui.multiSelect("选择分类(多选列表)", items, {
+            defaultValues: ["plants"],
+            reorderable: true,
+            onReorder: function (order) { console.log("多选新顺序：" + order.join(",")) }
+          });
+          "已选：" + arr.join(",")
+
+      - id: "test_ui_21"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "拖动·多选(网格>=8)"
+        buttonColor: "green"
+        jsScript: |-
+          // 多选 + 有图标 >=8 → 网格模式，长按图标拖动；可叠加全选/搜索（搜索时暂停拖动）
+          var items = [];
+          for (var i = 1; i <= 12; i++) {
+            items.push({ name: "功能" + i, value: "f" + i, icon: "save_icon.png",
+              showIndex: true, showIndexColor: "black" });
+          }
+          var arr = ui.multiSelect("功能顺序(多选网格)", items, {
+            columns: 4,
+            selectAll: true, searchable: true,
+            reorderable: true,
+            orderKey: "demo_multi_grid",
+            onReorder: function (order) { console.log("多选网格新顺序：" + order.join(",")) }
+          });
+          "已选：" + arr.join(",")
+
+      - id: "test_ui_22"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "拖动·多选(纯文字列表)"
+        buttonColor: "blue"
+        jsScript: |-
+          // 多选 + 全无图标 → 纯文字列表拖动；临时排序(orderKey:"")
+          var arr = ui.multiSelect("常驻功能(多选纯文字)",
+            ["自动收集", "跳过动画", "高帧率", "省电模式", "后台静音"], {
+            reorderable: true,
+            orderKey: "",
+            onReorder: function (order) { console.log("多选纯文字新顺序：" + order.join(",")) }
+          });
+          "已选：" + arr.join(",")
+
+      - id: "test_ui_23"
+        name: ""
+        desc: ""
+        type: "BUTTON"
+        buttonText: "拖动·自定义网格阈值(gridThreshold)"
+        buttonColor: "purple"
+        jsScript: |-
+          // gridThreshold 自定义网格/列表切换阈值（默认 8）：
+          // 场景A：只有 4 条，但传 gridThreshold:4 → 4>=4 走网格（默认 8 时这 4 条会走列表）
+          var few = [
+            { name: "豌豆", value: "pea", icon: "save_icon.png" },
+            { name: "向日葵", value: "sun", icon: "save_icon.png" },
+            { name: "坚果", value: "nut", icon: "save_icon.png" },
+            { name: "樱桃", value: "cherry", icon: "save_icon.png" }
+          ];
+          ui.select("4条也走网格", few, {
+            columns: 2, gridThreshold: 4,   // 别名「网格阈值」也可
+            reorderable: true,
+            orderKey: ""
+          });
+
+          // 场景B：10 条，传 gridThreshold:11 → 10<11 仍走列表（默认 8 时这 10 条会走网格）
+          var many = [];
+          for (var i = 1; i <= 10; i++) {
+            many.push({ name: "条目" + i, value: String(i), icon: "save_icon.png" });
+          }
+          ui.multiSelect("10条仍走列表", many, {
+            gridThreshold: 11,
+            reorderable: true,
+            orderKey: ""
+          });
+          "已演示：4 条走网格 / 10 条走列表"
+
       # ---------- 测试：使用 version/new/smf/dynamic.rsb.smf ----------
       - id: "test_dynamic_手动解包"
         name: "测试 SMF 手动解包"

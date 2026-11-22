@@ -1,0 +1,41 @@
+首先需要有原版apk，记下原版有几个dex，比如原版只有两个
+那么选中戴夫工具箱的所有dex，长按，重命名，输入classes{3}{S}，预览并重命名
+如果原版有三个，那就输入classes{4}{S}，右上角的时钟图标可以快速选择之前输入过的重命名名字
+然后打开戴夫工具箱版本的植2apk，把刚刚重命名好的直接复制进去即可
+接下来打开戴夫工具箱版本的植2apk中resources.arsc文件，点击右上角批量导入，选择更新包的arsc.zip保存退出即可
+assets目录可以看到新版本新增的属性，有一些新属性会在自带的配置文件增加，可以对比更新配置
+
+以下都在AndroidManifest.xml的<application ...>..此处..</application>进行操作
+找到
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+    </intent-filter>
+进行删除
+然后打开新增内容，搜索替换包名，并把所有内容增加到application块里面即可完成适配
+
+注意检查AndroidManifest.xml的targetSdkVersion至少在21或以上，如果不是21或以上请手动改成21即可
+
+对于高版本的植2，以上dex的步骤是反过来的
+修改植2apk，选中所有dex，重命名为戴夫工具箱版本最后一个dex的数字加1，然后把戴夫工具箱版本的dex替换到植2apk(也就是旧版本是追加到植2apk最后，新版本是插入到植2apk最前)
+针对高版本的植2，登录界面抽风挤压，删除工具箱dex的androidx目录下的constraintlayout目录即可
+
+如果需要进入游戏时显示启动图请找到你游戏activity把android:theme改为android:theme="@app66:style/Theme.DreamPvzApp"否则可能会显示外框背景图
+
+补充说明:lib目录armeabi和armeabi-v7a是一样的，二选一合并保留，不能同时存在否则部分设备闪退
+新的META-INF目录也需要复制并替换否则gif动图不生效
+
+如果更新了resources.arsc内容，请务必同时更新
+保证androidx.core.content.FileProvider的android:resource="值不是0x66xxxx"必须是"@app66:xml/file_paths"
+<provider
+    android:name="androidx.core.content.FileProvider"
+    android:exported="false"
+    android:authorities="com.popcap.pvz2mgtz.fileprovider"
+    android:grantUriPermissions="true">
+    <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@app66:xml/file_paths" />，此处保证内容一致，否则可能导致分享功能失效
+</provider>
+保证AndroidManifest.xml的
+全文没有android:theme="@66xxxx"
+如果有改成android:theme="@app66:style/Theme.DreamPvzApp"

@@ -8,6 +8,7 @@ import com.reandroid.arsc.chunk.TableBlock
 import com.reandroid.arsc.chunk.xml.AndroidManifestBlock
 import com.reandroid.arsc.chunk.xml.ResXmlAttribute
 import com.reandroid.arsc.chunk.xml.ResXmlElement
+import com.reandroid.arsc.item.ResXmlString
 import com.reandroid.arsc.value.ValueType
 import com.reandroid.xml.kxml2.KXmlParser
 import java.io.File
@@ -283,9 +284,67 @@ object ToolboxApkMerger {
         }
         target.use {
             outApk.parentFile?.mkdirs()
+            // 🔴 写盘前清理 manifest 字符串池里 id=0 的伪 ResXmlID 链接（ARSCLib 1.4.0 缺陷兜底）。
+            //    必须紧邻 writeApk、且在所有 manifest 修改（removeGameLauncher / appendLauncherBlock /
+            //    主题）之后。
+            //    根因：writeApk → ResXmlStringPool.onPreRefresh → sort → ResXmlIDList.sort →
+            //    linkResXmlIDMapInternal 按「新索引」把每个 ResXmlString 重新 link 到 ResXmlIDMap[i]；
+            //    若 sort 前某 ResXmlString.mResXmlID 还指向别的 id，linkResourceIdInternal 检测
+            //    「已 link 到不同 id」直接抛 IllegalStateException("Resource id string item is already linked")，
+            //    打包失败。部分游戏包（如 PVZ2 高清版）的 manifest 经其它工具处理后，idMap 覆盖整个
+            //    字符串池并塞入大量 id=0 的伪项（meta-data value、进程名等），增删 manifest 元素触发
+            //    重排后必定踩中。
+            //    解法：只解绑这些 id=0 伪项的链接（unLinkResourceIdInternal 同时清 ResXmlID 侧反向
+            //    引用），让 ARSCLib 在 refresh 里干净重建；正常属性 id（name/theme/targetSdkVersion）
+            //    的链接必须保留——实测把它们一起解绑会导致这些属性写盘后退化成 0 引用。
+            sanitizeManifestResXmlIds(target)
             target.writeApk(outApk)
         }
         return MergeResult(outApk, report)
+    }
+
+    /**
+     * 仅当 manifest 的 ResXmlIDMap「畸形」时，解绑字符串池里 id=0 的伪 [ResXmlString] 链接。
+     *
+     * 正常 manifest：idMap 只覆盖字符串池前若干个「属性名」项，且每项都有真实的 framework 属性 id
+     *   （如 android:name=0x01010003）。ARSCLib 自身能正确维护这类映射，整段跳过、切勿干预。
+     * 畸形 manifest（部分游戏包经其它工具改过，如 PVZ2 高清版）：idMap 覆盖整个字符串池，
+     *   并把大量「非属性名」字符串（meta-data 的 value、进程名等）也塞进来，其 id 值为 0。
+     *   这类包经我们增删 manifest 元素后，writeApk 的 refresh→sort 无法正确重建索引，抛
+     *   "Resource id string item is already linked"。
+     *
+     * 判据：idMap 覆盖范围内存在 getResourceId()==0 的伪项；命中才处理，且**只**解绑这类伪项。
+     * 只清 link 关联、不动 idMap 里的 id 值，也不碰正常属性 id 的链接，故属性名→资源 id 语义不变。
+     * 异常兜底：任何失败都不阻断打包（干净包 ARSCLib 自行处理）。
+     */
+    private fun sanitizeManifestResXmlIds(target: ApkModule) {
+        runCatching {
+            val tm = target.androidManifest
+            val pool = tm.getStringPool()
+            val idMapSize = tm.getResXmlIDMap()?.size() ?: 0
+            val n = minOf(idMapSize, pool.size())
+
+            // 检测畸形：idMap 范围内是否存在 id=0 的伪项。正常包一律跳过，避免破坏其映射。
+            var malformed = false
+            for (i in 0 until n) {
+                val item = pool.get(i)
+                if (item is ResXmlString && item.hasResourceId().not()) {
+                    malformed = true
+                    break
+                }
+            }
+            if (!malformed) return
+
+            // 只解绑 id=0 的伪项（畸形源）。正常属性 id（如 name/theme/targetSdkVersion）的
+            // 链接必须保留，否则写盘后这些属性会退化成 0 引用（实测 targetSdkVersion 丢失）。
+            val it = pool.iterator()
+            while (it.hasNext()) {
+                val item = it.next()
+                if (item is ResXmlString && item.getResXmlID() != null && item.hasResourceId().not()) {
+                    item.unLinkResourceIdInternal()
+                }
+            }
+        }
     }
 
     // ---- 报告（只读，不写回） ----

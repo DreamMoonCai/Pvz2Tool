@@ -1,0 +1,88 @@
+name: 发布戴夫工具箱
+
+# 仅手动触发：这本身就是「批准发布」的动作。
+# 运行时会编译 Release、生成两个产物，并创建【草稿 Release】（draft=true），
+# 需维护者在 GitHub 网页确认内容后手动点 Publish 才真正对外发布。
+on:
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: '本版本更新说明（每行一条，留空则沿用模板）'
+        required: false
+        type: string
+      version_override:
+        description: '版本号覆盖（留空则用构建时动态版本 月.日.迭代）'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make scripts executable
+        run: chmod +x ./gradlew ./release/publish.sh
+
+      - name: 写入版本说明
+        if: ${{ inputs.notes != '' }}
+        run: |
+          mkdir -p release/out
+          printf '%s\n' '${{ inputs.notes }}' > release/out/notes.txt
+        working-directory: ${{ github.workspace }}
+
+      - name: 编译 Release 并生成两个产物
+        run: |
+          NOTES_ARG=""
+          if [ -f release/out/notes.txt ]; then NOTES_ARG="--notes release/out/notes.txt"; fi
+          ./release/publish.sh prepare $NOTES_ARG
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+
+      - name: 读取版本号与产物路径
+        id: meta
+        run: |
+          source release/out/release_meta.env
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "apk=$APK_OUT" >> "$GITHUB_OUTPUT"
+          echo "zip=$ZIP_OUT" >> "$GITHUB_OUTPUT"
+
+      - name: 上传产物为 Actions artifact（便于人工核验）
+        uses: actions/upload-artifact@v4
+        with:
+          name: pvz2tool-${{ steps.meta.outputs.version }}
+          path: |
+            ${{ steps.meta.outputs.apk }}
+            ${{ steps.meta.outputs.zip }}
+          if-no-files-found: error
+
+      - name: 创建草稿 Release（不会立即发布）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          APK: ${{ steps.meta.outputs.apk }}
+          ZIP: ${{ steps.meta.outputs.zip }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          BODY="戴夫工具箱 $VERSION"
+          if [ -n "$NOTES" ]; then BODY="$NOTES"; fi
+          gh release create "v$VERSION" \
+            --repo "${{ github.repository }}" \
+            --title "戴夫工具箱 $VERSION" \
+            --notes "$BODY" \
+            --draft \
+            "$APK" "$ZIP"
+          echo "草稿已创建：https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
+          echo "请人工核验后在该页面点击 Publish release 完成发布。"

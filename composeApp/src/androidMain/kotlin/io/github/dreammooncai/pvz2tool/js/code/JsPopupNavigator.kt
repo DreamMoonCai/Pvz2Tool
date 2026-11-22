@@ -9,6 +9,7 @@ import io.github.alexzhirkevich.keight.js.Object
 import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.js.func
 import io.github.dreammooncai.pvz2tool.js.orNull
+import io.github.dreammooncai.pvz2tool.js.get
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsPopupItem
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsPopupPage
 import io.github.dreammooncai.pvz2tool.ui.dialog.JsUiManager
@@ -39,11 +40,11 @@ class JsPopupNavigator(
 
     companion object {
         private suspend fun ScriptRuntime.parsePopupPage(raw: JsObject): JsPopupPage {
-            val title = toString((raw.get("title".js, this).orNull ?: raw.get("标题".js, this).orNull ?: "".js))
-            val itemsRaw = raw.get("items".js, this).orNull?.toKotlin(this) as? List<*> ?: emptyList<Any>()
+            val title = toString((raw.get("title".js).orNull ?: raw.get("标题".js).orNull ?: "".js))
+            val itemsRaw = raw.get("items".js).orNull?.toKotlin(this) as? List<*> ?: emptyList<Any>()
             val items = parsePopupItems(itemsRaw)
-            val bottomText = raw.get("bottomText".js, this).orNull?.let { toString(it) }
-                ?: raw.get("底部文本".js, this).orNull?.let { toString(it) }
+            val bottomText = raw.get("bottomText".js).orNull?.let { toString(it) }
+                ?: raw.get("底部文本".js).orNull?.let { toString(it) }
             return JsPopupPage(title = title, items = items, bottomText = bottomText)
         }
 
@@ -53,13 +54,13 @@ class JsPopupNavigator(
                 raw.mapNotNull { el ->
                     when (el) {
                         is JsObject -> {
-                            val type = toString((el.get("type".js, this).orNull ?: el.get("类型".js, this).orNull ?: "".js))
-                            val title = toString((el.get("title".js, this).orNull ?: el.get("标题".js, this).orNull ?: "".js))
-                            val value = (el.get("value".js, this).orNull ?: el.get("值".js, this).orNull)
+                            val type = toString((el.get("type".js).orNull ?: el.get("类型".js).orNull ?: "".js))
+                            val title = toString((el.get("title".js).orNull ?: el.get("标题".js).orNull ?: "".js))
+                            val value = (el.get("value".js).orNull ?: el.get("值".js).orNull)
                                 ?.let { it.toKotlin(this) as? Boolean } ?: false
-                            val text = toString((el.get("text".js, this).orNull ?: el.get("文本".js, this).orNull ?: "".js))
-                            val onChangeJs = el.get("onChange".js, this).orNull as? JSFunction
-                            val onClickJs = el.get("onClick".js, this).orNull as? JSFunction
+                            val text = toString((el.get("text".js).orNull ?: el.get("文本".js).orNull ?: "".js))
+                            val onChangeJs = el.get("onChange".js).orNull as? JSFunction
+                            val onClickJs = el.get("onClick".js).orNull as? JSFunction
                             val onChange: (suspend (JsAny?) -> Unit)? =
                                 onChangeJs?.let { fn -> { v -> runCatching { fn.invoke(listOf(v), this) } } }
                             val onClick: (suspend (JsAny?) -> Unit)? =

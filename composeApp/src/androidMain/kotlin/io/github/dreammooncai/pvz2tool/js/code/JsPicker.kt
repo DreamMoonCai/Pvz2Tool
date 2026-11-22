@@ -18,6 +18,7 @@ import io.github.dreammooncai.pvz2tool.js.JsFileResolver
 import io.github.dreammooncai.pvz2tool.js.eq
 import io.github.dreammooncai.pvz2tool.js.func
 import io.github.dreammooncai.pvz2tool.js.orNull
+import io.github.dreammooncai.pvz2tool.js.get
 import kotlin.text.Charsets
 
 /**
@@ -101,7 +102,7 @@ object JsPicker {
      */
     private suspend fun ScriptRuntime.parseMimeType(options: JsAny?): String {
         val obj = options?.orNull ?: return "*/*"
-        return obj.get("mimeType".js, this)?.orNull
+        return obj.get("mimeType".js)?.orNull
             ?.let { toString(it) }
             ?.takeIf { it.isNotBlank() } ?: "*/*"
     }

@@ -270,6 +270,8 @@ data class JsSelectState(
     val items: List<JsChoiceItem> = emptyList(),
     val mode: String = "single", // "single" | "multi"
     val columns: Int = 4,
+    /** 网格/列表切换阈值：任意条目带图标且条目数 >= 该值 → 网格，否则列表（默认 8） */
+    val gridThreshold: Int = 8,
     val cancelable: Boolean = false,
     val confirmText: String = "确定",
     val cancelText: String = "取消",
@@ -1151,13 +1153,15 @@ object JsUiManager {
      * 显示单项选择弹窗，返回 CompletableDeferred<String?>（选中项 value，取消返回 null）
      * @param items 待选项
      * @param defaultValue 默认选中项的 name 或 value
-     * @param columns 网格模式每排列数（仅条目 >= 8 且有图标时生效）
+     * @param columns 网格模式每排列数（仅条目 >= gridThreshold 且有图标时生效）
+     * @param gridThreshold 网格/列表切换阈值（默认 8）：条目数 >= 该值且有图标 → 网格，否则列表
      */
     fun showSelect(
         ownerContext: JsToolContext?,
         title: String,
         items: List<JsChoiceItem>,
         columns: Int = 4,
+        gridThreshold: Int = 8,
         cancelable: Boolean = false,
         showIndex: Boolean = false,
         showIndexColor: String = "black",
@@ -1166,6 +1170,11 @@ object JsUiManager {
         confirmColor: String = "",
         cancelColor: String = "",
         forceMaxForm: Boolean = false,
+        /** 允许长按拖动调整条目顺序（网格/列表都生效，单选点选仍返回所选项的 value） */
+        reorderable: Boolean = false,
+        onReorder: (suspend (JsAny?) -> Unit)? = null,
+        /** 排序持久化 key（null = 不持久化） */
+        orderKey: String? = null,
         onCancel: (suspend (JsAny?) -> Unit)? = null,
         onSelect: (suspend (JsAny?) -> Unit)? = null,
         onResult: (suspend (JsAny?) -> Unit)? = null
@@ -1177,6 +1186,7 @@ object JsUiManager {
             items = items,
             mode = "single",
             columns = columns,
+            gridThreshold = gridThreshold.coerceAtLeast(1),
             cancelable = cancelable,
             showIndex = showIndex,
             showIndexColor = showIndexColor,
@@ -1185,6 +1195,9 @@ object JsUiManager {
             confirmColor = confirmColor,
             cancelColor = cancelColor,
             forceMaxForm = forceMaxForm,
+            reorderable = reorderable,
+            onReorder = onReorder,
+            orderKey = orderKey,
             onCancel = onCancel,
             onSelect = onSelect,
             deferredSingle = deferred
@@ -1215,6 +1228,7 @@ object JsUiManager {
         items: List<JsChoiceItem>,
         defaultValues: List<String>? = null,
         columns: Int = 4,
+        gridThreshold: Int = 8,
         cancelable: Boolean = false,
         showIndex: Boolean = false,
         showIndexColor: String = "black",
@@ -1253,6 +1267,7 @@ object JsUiManager {
             items = items,
             mode = "multi",
             columns = columns,
+            gridThreshold = gridThreshold.coerceAtLeast(1),
             cancelable = cancelable,
             defaultIndices = defaultIndices,
             showIndex = showIndex,
@@ -2090,8 +2105,8 @@ private fun PromptTextInput(
  * JS 单项 / 多项选择弹窗
  *
  * 布局规则（参考 SectionType.RADIO 样式）：
- * - 任意条目带图标且总数 >= 8 → 网格模式，每排若干，单条目 = 图标(或占位矩形) + 底部文字
- * - 任意条目带图标且总数 < 8 → 列表模式，每条目独占一行，图标(或占位矩形)在文字前
+ * - 任意条目带图标且总数 >= [gridThreshold]（默认 8） → 网格模式，每排若干，单条目 = 图标(或占位矩形) + 底部文字
+ * - 任意条目带图标且总数 < [gridThreshold] → 列表模式，每条目独占一行，图标(或占位矩形)在文字前
  * - 所有条目均无图标 → 纯文字模式，每条目前带选择标记(单选=圆点/多选=勾)，独占一行
  *
  * 无图标条目：用与图标同尺寸的矩形，内部居中显示与底部相同的文字，超出截断以保持观感。
@@ -2105,7 +2120,7 @@ fun JsItemChoiceDialog() {
     val state by JsUiManager.selectState.collectAsState()
 
     val hasAnyIcon = state.items.any { it.icon.isNotBlank() }
-    val isGrid = hasAnyIcon && state.items.size >= 8
+    val isGrid = hasAnyIcon && state.items.size >= state.gridThreshold
 
     // 同类型嵌套时 deferred 变化 → 重置为默认值；跨类型嵌套后重新可见（deferred 不变）→ 从草稿恢复。
     val choiceKey: Any? = state.deferredSingle ?: state.deferredMulti
@@ -2341,9 +2356,9 @@ fun JsItemChoiceDialog() {
                     )
                 }
 
-                // 多选 + reorderable：网格/列表都用可拖动容器（长按格子拖动换位）
+                // 单选/多选 + reorderable：网格/列表都用可拖动容器（长按格子拖动换位）
                 // 例外：开了「更多」折叠时交给 FoldedChoicesRow（它自己支持跨区拖动）
-                if (isMulti && state.reorderable && !foldEnabled) {
+                if (state.reorderable && !foldEnabled) {
                     ReorderableItemGrid(
                         ids = headChoices.map { it.first.toString() },
                         columns = if (isGrid) state.columns.coerceIn(2, 6) else 1,
@@ -2375,8 +2390,8 @@ fun JsItemChoiceDialog() {
                                 modifier = Modifier.fillMaxWidth(),
                                 item = choice,
                                 index = index,
-                                selected = index in selectedIndices,
-                                isMulti = true,
+                                selected = if (state.mode == "multi") index in selectedIndices else selectedIndex == index,
+                                isMulti = isMulti,
                                 showIndex = state.showIndex,
                                 showIndexColor = state.showIndexColor,
                                 onSelect = onSelect,
@@ -2387,8 +2402,8 @@ fun JsItemChoiceDialog() {
                                 item = choice,
                                 index = index,
                                 hasAnyIcon = hasAnyIcon,
-                                selected = index in selectedIndices,
-                                isMulti = true,
+                                selected = if (state.mode == "multi") index in selectedIndices else selectedIndex == index,
+                                isMulti = isMulti,
                                 showIndex = state.showIndex,
                                 showIndexColor = state.showIndexColor,
                                 onSelect = onSelect,

@@ -9,6 +9,8 @@ import io.github.alexzhirkevich.keight.js.js
 import io.github.dreammooncai.pvz2tool.js.PvzToolJsEngine
 import io.github.dreammooncai.pvz2tool.js.func
 import io.github.dreammooncai.pvz2tool.js.orNull
+import io.github.dreammooncai.pvz2tool.js.toText
+import io.github.dreammooncai.pvz2tool.js.get
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
 import io.ktor.client.plugins.HttpTimeout
@@ -92,7 +94,7 @@ object JsHttp {
             FunctionParam("options")
         ) { args ->
             val url = toString(args[0])
-            val body = args.getOrNull(1)?.orNull?.let { toString(it) } ?: ""
+            val body = args.getOrNull(1).toText() ?: ""
             val options = args.getOrNull(2)?.orNull
             val (headers, ct, timeout) = parseOptions(options)
 
@@ -119,7 +121,7 @@ object JsHttp {
             FunctionParam("options")
         ) { args ->
             val url = toString(args[0])
-            val body = args.getOrNull(1)?.orNull?.let { toString(it) } ?: ""
+            val body = args.getOrNull(1).toText() ?: ""
             val options = args.getOrNull(2)?.orNull
             val (headers, ct, timeout) = parseOptions(options)
 
@@ -169,7 +171,7 @@ object JsHttp {
             FunctionParam("options")
         ) { args ->
             val url = toString(args[0])
-            val body = args.getOrNull(1)?.orNull?.let { toString(it) } ?: ""
+            val body = args.getOrNull(1).toText() ?: ""
             val options = args.getOrNull(2)?.orNull
             val (headers, ct, timeout) = parseOptions(options)
 
@@ -221,18 +223,18 @@ object JsHttp {
             val options = optionsAny as? JsObject
                 ?: return@func null
 
-            val url = options.get("url".js, this)?.orNull?.let { toString(it) }
-                ?: options.get("地址".js, this)?.orNull?.let { toString(it) }
+            val url = options.get("url".js).toText()
+                ?: options.get("地址".js).toText()
                 ?: return@func null
 
-            val method = (options.get("method".js, this)?.orNull?.let { toString(it) }
-                ?: options.get("方法".js, this)?.orNull?.let { toString(it) }
+            val method = (options.get("method".js).toText()
+                ?: options.get("方法".js).toText()
                 ?: "GET").uppercase()
 
             val (hdrs, ct, timeout) = parseOptions(options)
 
-            val body = options.get("body".js, this)?.orNull?.let { toString(it) }
-                ?: options.get("数据".js, this)?.orNull?.let { toString(it) }
+            val body = options.get("body".js).toText()
+                ?: options.get("数据".js).toText()
                 ?: ""
 
             try {
@@ -295,8 +297,8 @@ private suspend fun ScriptRuntime.parseOptions(
     )
 
     // 解析 headers
-    val headersObj = (options.get("headers".js, this)
-        ?: options.get("请求头".js, this))?.orNull
+    val headersObj = (options.get("headers".js)
+        ?: options.get("请求头".js))?.orNull
     val headers = mutableMapOf<String, String>()
     if (headersObj is JsObject) {
         val kotlinMap = headersObj.toKotlin(this)
@@ -310,13 +312,13 @@ private suspend fun ScriptRuntime.parseOptions(
     }
 
     // 解析 contentType
-    val ct = (options.get("contentType".js, this)
-        ?: options.get("内容类型".js, this))?.orNull?.let { toString(it) }
+    val ct = (options.get("contentType".js)
+        ?: options.get("内容类型".js)).toText()
         ?: "application/json"
 
     // 解析 timeout（毫秒）
-    val timeout = (options.get("timeout".js, this)
-        ?: options.get("超时".js, this))?.orNull?.let { toNumber(it).toLong() }
+    val timeout = (options.get("timeout".js)
+        ?: options.get("超时".js))?.orNull?.let { toNumber(it).toLong() }
         ?: 30_000L
 
     return Triple(headers, ct, timeout)
